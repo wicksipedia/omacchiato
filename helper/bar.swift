@@ -1699,7 +1699,7 @@ final class PopupView: NSView {
                 let track = NSRect(x: x, y: rect.midY - 3, width: trackW, height: 6)
                 palette.rowBG.setFill()
                 NSBezierPath(roundedRect: track, xRadius: 3, yRadius: 3).fill()
-                palette.accent.setFill()
+                (row.tint ?? palette.accent).setFill()
                 NSBezierPath(roundedRect: NSRect(x: track.minX, y: track.minY,
                                                  width: track.width * CGFloat(value), height: track.height),
                              xRadius: 3, yRadius: 3).fill()

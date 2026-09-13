@@ -201,6 +201,17 @@ def health_icon(status):
 
 
 # --- rendering -------------------------------------------------------------
+def pace_colour(pct, elapsed):
+    """Green at or near an even pace, yellow ahead of it, red well ahead of
+    it or close to the limit. Without a clock, the usage alone decides."""
+    if elapsed is None:
+        return colour_for(pct)
+    ahead = pct - elapsed * 100
+    if pct >= 90 or ahead > 20:
+        return "red"
+    return "yellow" if ahead > 5 else "green"
+
+
 FIVE_HOURS = 5 * 3600
 WEEK = 7 * 24 * 3600
 
@@ -211,8 +222,10 @@ def window_rows(rows, title, pct, resets, span):
     slider = {"text": "", "slider": max(0.0, min(1.0, pct / 100.0))}
     # the tick marks how far through the window the clock is, so the fill
     # reads as ahead of or behind an even pace
-    if left is not None and 0 < left <= span:
-        slider["marker"] = 1 - left / span
+    elapsed = 1 - left / span if left is not None and 0 < left <= span else None
+    if elapsed is not None:
+        slider["marker"] = elapsed
+    slider["color"] = pace_colour(pct, elapsed)
     rows.append(slider)
     if left is not None and left > 0:
         rows.append({"text": "Resets in " + countdown(left), "dim": True})

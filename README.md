@@ -294,7 +294,8 @@ colour emoji draws its own colours and ignores the icon tint, which is why
 the label carries it too. `icon` overrides the config. A `slider` between 0
 and 1 draws a progress track, and on a slider row `text` is a short
 right-aligned readout rather than a label, so put the label on the row
-above. A `marker` between 0 and 1 draws a tick across the track. The
+above. On a slider row, `color` sets the fill. A `marker` between 0 and 1
+draws a tick across the track. The
 Claude pill uses it to show how far through each usage window you are. Give a pill rows and clicking it opens the popup instead of
 re-running the command.
 
