@@ -280,7 +280,7 @@ pill's colour and give it a popup:
     {"text": "Claude usage", "hero": true},
     {"separator": true},
     {"text": "Session", "detail": "10%"},
-    {"text": "5-hour window", "slider": 0.1},
+    {"text": "5-hour window", "slider": 0.1, "marker": 0.58},
     {"text": "Resets in 2h 6m", "dim": true}
   ]
 }
@@ -294,7 +294,8 @@ colour emoji draws its own colours and ignores the icon tint, which is why
 the label carries it too. `icon` overrides the config. A `slider` between 0
 and 1 draws a progress track, and on a slider row `text` is a short
 right-aligned readout rather than a label, so put the label on the row
-above. Give a pill rows and clicking it opens the popup instead of
+above. A `marker` between 0 and 1 draws a tick across the track. The
+Claude pill uses it to show how far through each usage window you are. Give a pill rows and clicking it opens the popup instead of
 re-running the command.
 
 A pill draws nothing while its label and its icon are both empty, which is

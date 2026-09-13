@@ -810,6 +810,7 @@ func pluginPopupRows(_ raw: [[String: Any]]) -> [PopupRow] {
                         hero: spec["hero"] as? Bool ?? false,
                         dim: spec["dim"] as? Bool ?? false,
                         slider: spec["slider"] as? Double,
+                        marker: spec["marker"] as? Double,
                         action: action,
                         tint: pluginColor(spec["color"] as? String))
     }
@@ -1573,6 +1574,7 @@ struct PopupRow {
     var dim = false // the quiet action footer
     var highlight = false // today's week, the active device
     var slider: Double? // 0...1 draws a track instead of text
+    var marker: Double? // 0...1 draws a tick across the slider track
     var onSlide: ((Double) -> Void)?
     var action: (() -> Void)?
     // fixed-width cells, calendar only — the font isn't monospaced, so
@@ -1701,6 +1703,12 @@ final class PopupView: NSView {
                 NSBezierPath(roundedRect: NSRect(x: track.minX, y: track.minY,
                                                  width: track.width * CGFloat(value), height: track.height),
                              xRadius: 3, yRadius: 3).fill()
+                if let marker = row.marker {
+                    let tickX = track.minX + track.width * CGFloat(max(0, min(1, marker)))
+                    palette.label.setFill()
+                    NSBezierPath(roundedRect: NSRect(x: tickX - 1, y: track.midY - 6, width: 2, height: 12),
+                                 xRadius: 1, yRadius: 1).fill()
+                }
                 drawText(row.text, font(row), color(row),
                          leftAt: rect.maxX - advance(row.text, font(row)) - 4, midY: rect.midY)
             } else {

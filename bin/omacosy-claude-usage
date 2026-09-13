@@ -201,10 +201,19 @@ def health_icon(status):
 
 
 # --- rendering -------------------------------------------------------------
-def window_rows(rows, title, pct, resets):
+FIVE_HOURS = 5 * 3600
+WEEK = 7 * 24 * 3600
+
+
+def window_rows(rows, title, pct, resets, span):
     left = seconds_until(resets) if resets is not None else None
     rows.append({"text": title, "detail": "%d%%" % round(pct)})
-    rows.append({"text": "", "slider": max(0.0, min(1.0, pct / 100.0))})
+    slider = {"text": "", "slider": max(0.0, min(1.0, pct / 100.0))}
+    # the tick marks how far through the window the clock is, so the fill
+    # reads as ahead of or behind an even pace
+    if left is not None and 0 < left <= span:
+        slider["marker"] = 1 - left / span
+    rows.append(slider)
     if left is not None and left > 0:
         rows.append({"text": "Resets in " + countdown(left), "dim": True})
 
@@ -216,12 +225,12 @@ def render_api(body):
         return None
     left = seconds_until(five.get("resets_at"))
     rows = [{"text": "Claude usage", "hero": True}, {"separator": True}]
-    window_rows(rows, "Session, 5-hour", pct, five.get("resets_at"))
+    window_rows(rows, "Session, 5-hour", pct, five.get("resets_at"), FIVE_HOURS)
 
     week = body.get("seven_day") or {}
     if week.get("utilization") is not None:
         rows.append({"separator": True})
-        window_rows(rows, "All models, weekly", week["utilization"], week.get("resets_at"))
+        window_rows(rows, "All models, weekly", week["utilization"], week.get("resets_at"), WEEK)
 
     # per-model weekly windows: the server names them, so a model added later
     # appears without a change here
@@ -231,7 +240,7 @@ def render_api(body):
         if limit.get("kind") != "weekly_scoped" or not name:
             continue
         rows.append({"separator": True})
-        window_rows(rows, "%s, weekly" % name, limit.get("percent") or 0, limit.get("resets_at"))
+        window_rows(rows, "%s, weekly" % name, limit.get("percent") or 0, limit.get("resets_at"), WEEK)
 
     spend = body.get("spend") or {}
     used, cap = spend.get("used") or {}, spend.get("limit") or {}
@@ -283,7 +292,7 @@ def render_capture(limits):
 
     rows = [{"text": "Claude usage", "hero": True}, {"separator": True}]
     if five_pct is not None:
-        window_rows(rows, "Session, 5-hour", five_pct, five_reset)
+        window_rows(rows, "Session, 5-hour", five_pct, five_reset, FIVE_HOURS)
         label, colour = "%d%% · %s" % (five_pct, countdown(seconds_until(five_reset))), colour_for(five_pct)
     else:
         label, colour = "--", "muted"
@@ -291,7 +300,7 @@ def render_capture(limits):
                  {"text": "Window ended since the last session", "dim": True}]
     if week_pct is not None:
         rows.append({"separator": True})
-        window_rows(rows, "All models, weekly", week_pct, week_reset)
+        window_rows(rows, "All models, weekly", week_pct, week_reset, WEEK)
     return {"label": label, "color": colour, "rows": rows}
 
 
