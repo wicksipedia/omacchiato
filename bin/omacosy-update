@@ -41,9 +41,12 @@ if [ -n "$(git -C "$REPO" status --porcelain)" ]; then
 fi
 
 say "checking for updates"
-git -C "$REPO" fetch --quiet origin "$BRANCH" || die "could not reach the remote"
+# the branch's own upstream, so a clone of a fork pulls from the fork
+UPSTREAM="$(git -C "$REPO" rev-parse --abbrev-ref '@{upstream}' 2>/dev/null)" ||
+  die "$BRANCH tracks no remote branch; set one with: git branch -u <remote>/<branch>"
+git -C "$REPO" fetch --quiet "${UPSTREAM%%/*}" "${UPSTREAM#*/}" || die "could not reach the remote"
 LOCAL="$(git -C "$REPO" rev-parse HEAD)"
-REMOTE="$(git -C "$REPO" rev-parse "origin/$BRANCH")"
+REMOTE="$(git -C "$REPO" rev-parse "$UPSTREAM")"
 
 if [ "$LOCAL" = "$REMOTE" ]; then
   say "already up to date ($(git -C "$REPO" log -1 --format='%h %s'))"
@@ -56,11 +59,11 @@ fi
 # clone ends up in a state nobody can reason about.
 if git -C "$REPO" merge-base --is-ancestor "$REMOTE" "$LOCAL"; then
   AHEAD="$(git -C "$REPO" rev-list --count "$REMOTE..$LOCAL")"
-  say "nothing to pull — you are $AHEAD commit(s) ahead of origin/$BRANCH"
+  say "nothing to pull — you are $AHEAD commit(s) ahead of $UPSTREAM"
   exit 0
 fi
 if ! git -C "$REPO" merge-base --is-ancestor "$LOCAL" "$REMOTE"; then
-  die "your branch and origin/$BRANCH have both moved — resolve by hand"
+  die "your branch and $UPSTREAM have both moved — resolve by hand"
 fi
 
 COUNT="$(git -C "$REPO" rev-list --count "$LOCAL..$REMOTE")"
@@ -74,7 +77,7 @@ if [ "${1:-}" = "--check" ]; then
 fi
 
 say "pulling"
-git -C "$REPO" merge --ff-only "origin/$BRANCH" --quiet ||
+git -C "$REPO" merge --ff-only "$UPSTREAM" --quiet ||
   die "fast-forward failed; resolve by hand"
 
 # install.sh rebuilds only what changed and restarts the agents it

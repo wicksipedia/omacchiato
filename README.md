@@ -57,7 +57,9 @@ omacosy-update --check  # just say whether there is anything new
 `install.sh` rebuilds only the binaries whose sources changed and
 restarts their agents, so an update is a pull plus a re-run, and this
 command wraps both. It refuses a clone with local edits, and refuses
-one whose branch has diverged, rather than deciding either for you.
+one whose branch has diverged, rather than deciding either for you. It
+pulls the remote branch that your branch tracks, so a clone of a fork
+updates from the fork.
 
 There is no background update check. The bar makes exactly one network
 call (the weather), and a daemon polling GitHub on a timer would
