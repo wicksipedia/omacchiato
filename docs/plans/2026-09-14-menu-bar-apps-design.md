@@ -66,3 +66,20 @@ back. OmniWM's `HiddenBarClickForwarder` forwards clicks the same way.
 Test by hand on this Mac: open the popup, check the rows, open each app's
 menu, and take screenshots. Check the empty list and the missing permission.
 Update the README and the list of pill names in `bar-pills.conf`.
+
+## Outcome
+
+The test changed one decision. `AXPress` opens most menus, but a press on an
+icon that the notch hides left the native menu bar stuck on screen until that
+app quit. So the pill does not press icons:
+
+- A row for a visible icon posts a real click. The pointer moves to the top
+  edge so the menu bar slides in, the bar clicks the icon once the menu bar
+  is in place (about 0.25 s, set by macOS's animation), and the pointer moves
+  back.
+- A row for an icon behind the notch says `opens app` and opens the app.
+- `Show menu bar ⌃F8` posts Ctrl+F8 with the Fn flag, as a real function key
+  carries it.
+
+macOS has no setting for the menu bar's slide-in, so 0.25 s is the floor for a
+real click. Details are in `tasks/plan.md`.
