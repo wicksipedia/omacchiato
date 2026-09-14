@@ -17,5 +17,6 @@ brew "lazygit"
 brew "btop"
 brew "starship"
 brew "jq"
+brew "gh"                  # the GitHub pull requests pill
 
 cask "font-jetbrains-mono-nerd-font"
