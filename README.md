@@ -739,16 +739,19 @@ hovering a Touch ID prompt leaves focus exactly where it is instead of
 falling through to the window beneath. Per-app opt-out lives in
 `config/ffm-ignore` (omarchy's JetBrains-style exception).
 
-4-finger swipes left/right switch workspaces on the display under the
+Under AeroSpace, 4-finger swipes left/right switch workspaces on the display under the
 cursor (native-Spaces semantics), with wrap-around, on any trackpad.
 The system's own 4-finger gestures are disabled by `macos-defaults.sh`
 so Mission Control never fights the daemon; `uninstall.sh` restores
 them.
 
-Under OmniWM, OmniWM's own 3-finger swipe switches workspaces, and the
-daemon keeps only the 4-finger swipe up for the overview.
-`macos-defaults.sh` turns off the system's 3-finger swipe between
-full-screen apps so the two do not fight.
+Under OmniWM, OmniWM's own swipes do the horizontal work. A 4-finger
+swipe left or right switches workspaces. In a Niri workspace, a 3-finger
+swipe left or right scrolls the columns and focuses the column it stops
+on, and a fast flick can pass more than one column. The daemon keeps
+only the 4-finger swipe up for the overview. `macos-defaults.sh` turns
+off the system's 3-finger swipe between full-screen apps so the two do
+not fight.
 
 ## Workspace overview
 

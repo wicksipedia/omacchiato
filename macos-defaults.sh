@@ -44,8 +44,8 @@ killall SystemUIServer 2>/dev/null || true
 
 echo "macos-defaults: menu bar set to auto-hide (log out/in if it doesn't apply immediately)"
 
-# The 4-finger swipes belong to omacosy-gesture (workspaces + the
-# omacosy overview). Left enabled, the SYSTEM also fires Mission
+# The 4-finger swipes belong to omacosy (workspace swipes and the
+# overview). Left enabled, the SYSTEM also fires Mission
 # Control / Spaces on the same gesture — MC opens on top of the
 # overview and eats every click and keystroke (and SCK captures catch
 # windows mid-MC-zoom). Trackpad -> More Gestures equivalents: off.
@@ -54,8 +54,8 @@ defaults write com.apple.AppleMultitouchTrackpad TrackpadFourFingerHorizSwipeGes
 defaults write com.apple.driver.AppleBluetoothMultitouch.trackpad TrackpadFourFingerVertSwipeGesture -int 0 2>/dev/null || true
 defaults write com.apple.driver.AppleBluetoothMultitouch.trackpad TrackpadFourFingerHorizSwipeGesture -int 0 2>/dev/null || true
 defaults write com.apple.dock showMissionControlGestureEnabled -bool false
-# OmniWM's workspace swipe uses three fingers (workspaceSwipeFingerCount
-# in settings.toml), so the system's 3-finger swipe between full-screen
+# OmniWM's column scroll uses three fingers (fingerCount in
+# settings.toml), so the system's 3-finger swipe between full-screen
 # apps is off too.
 defaults write com.apple.AppleMultitouchTrackpad TrackpadThreeFingerHorizSwipeGesture -int 0
 defaults write com.apple.driver.AppleBluetoothMultitouch.trackpad TrackpadThreeFingerHorizSwipeGesture -int 0 2>/dev/null || true
