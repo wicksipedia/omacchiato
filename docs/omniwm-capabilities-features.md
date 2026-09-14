@@ -485,8 +485,8 @@ manifest-driven (`IPCAutomationManifest.swift` generates usage + shell completio
    event tap and surface it. Not in README.
 7. **Sleep prevention.** `Core/Sleep/SleepPreventionManager.swift` takes IOPM assertions (with
    user-session tracking). Not in README.
-8. **WM conflict detection.** `App/LaunchConflictChecker.swift` detects concurrent AeroSpace,
-   Amethyst, bobrwm, glide, komorebi, Nehir, another OmniWM, etc. at launch. Not in README.
+8. **WM conflict detection.** `App/LaunchConflictChecker.swift` detects another window manager at
+   launch (Amethyst, bobrwm, glide, komorebi, Nehir, another OmniWM and more). Not in README.
 9. **Mission Control gesture probe.** `UI/MissionControlGestureProbe.swift` reads `com.apple.dock` /
    trackpad defaults to detect whether macOS will steal 3/4-finger vertical swipes and deep-links to
    Trackpad settings (README only mentions the manual instruction).

@@ -433,31 +433,28 @@ the other direction (docs promising aliases that don't exist).
 - No "switch with animation direction hint" or continuous-swipe progress API —
   discrete commands only.
 
-### (d) Scripting parity with `aerospace` CLI
+### (d) Scripting surface
 
-Rough mapping of the aerospace surface:
+What a script can and cannot do over IPC:
 
-- **Have equivalents**: `list-windows`/`list-workspaces`/`list-monitors`/
-  `list-apps` (queries, with selectors + `--fields` + json/tsv like aerospace's
-  `--format`), `focus`, `move`, `move-node-to-workspace` (focused-only),
-  `workspace <n>`, `workspace-back-and-forth`, `move-workspace-to-monitor`,
-  `fullscreen`, `layout` (floating/tiling toggle + niri/dwindle selection),
-  `resize`, `balance-sizes`, `focus-monitor`, `swap` (via move-column/swap-split),
-  `--help`-style discoverability (better: runtime `query capabilities`),
-  event loop (`watch` ≈ aerospace's `exec-on-workspace-change`, but richer:
-  7 channels + JSON payloads).
-- **Missing vs aerospace**: `exec-and-forget`-style exec (deliberately absent),
-  `reload-config`, `enable`/`disable` toggle (IPC only reports
-  `ignored_disabled`, can't flip it), `close`/`close-all-windows-but-current`,
-  `move-node-to-workspace` for a *non-focused* window, `macos-native-minimize`
-  handling, `mode` (binding modes don't exist), `trigger-binding`,
-  `debug-windows` dumps, and config get (`aerospace config --get`). Rule
-  add/apply partially substitutes for aerospace's on-window-detected config but
-  is persistent, not per-invocation.
-- **Better than aerospace**: authenticated socket, typed JSON envelopes with
-  stable error codes, full runtime introspection (`capabilities`), snapshot
-  subscriptions with initial state, per-monitor bar projection, window rules
-  CRUD over IPC.
+- **Available**: queries for windows, workspaces, displays and apps (with
+  selectors, `--fields`, and json or tsv output), focus, move, move to a
+  workspace (focused window only), switch to workspace `<n>`, workspace
+  back-and-forth, move a workspace to a monitor, fullscreen, layout
+  (floating/tiling toggle and niri/dwindle selection), resize, balance sizes,
+  focus-monitor, swap (via move-column/swap-split), runtime discovery through
+  `query capabilities`, and an event loop (`watch`, with 7 channels and JSON
+  payloads).
+- **Missing**: an exec command (deliberately absent), reload-config, an
+  enable/disable toggle (IPC only reports `ignored_disabled` and cannot flip
+  it), close and close-all-but-current, moving a *non-focused* window to a
+  workspace, native-minimize handling, binding modes, trigger-binding, debug
+  dumps of the window tree, and reading the config. Rule add/apply is
+  persistent, not per invocation.
+- **Strengths**: an authenticated socket, typed JSON envelopes with stable
+  error codes, full runtime introspection (`capabilities`), snapshot
+  subscriptions with initial state, a per-monitor bar projection, and window
+  rules CRUD over IPC.
 
 **Net for omacosy**: bar and gesture integrations can build on this today; an
 external overview needs its own capture pipeline plus a focus-then-move dance;

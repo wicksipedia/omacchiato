@@ -1,10 +1,9 @@
 # omacosy: notes for Claude
 
 omacosy is an omarchy-style tiling desktop for macOS 26: a status bar,
-gesture and focus daemons, themes and install scripts around a tiling
-window manager. OmniWM is the default window manager, and AeroSpace is
-the alternative. README.md describes the features and CONTRIBUTING.md
-holds the design rules. This file holds what the code does not show.
+a gesture daemon, a workspace overview, themes and install scripts
+around the OmniWM window manager. README.md describes the features and
+CONTRIBUTING.md holds the design rules. This file holds what the code does not show.
 Notes about one Mac go in CLAUDE.local.md, which git ignores.
 
 ## Repository
@@ -52,8 +51,8 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   ```
 
 - TCC keys a grant on the code signature. Sign with the same Apple
-  Development identity and identifier every time, and the bar, ffm,
-  borders, overview and helper keep their grants across rebuilds.
+  Development identity and identifier every time, and the bar, overview
+  and helper keep their grants across rebuilds.
 - `omacosy-gesture` is the exception. TCC pins its grant to the exact
   build, so every rebuild needs a new Accessibility grant. `install.sh`
   rebuilds it only when a file in `helper/gesture/` changed.
@@ -63,12 +62,9 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   `screencapture -x -R0,0,3000,40 bar.png`.
 - Logs: `/tmp/omacosy-bar.log` (timings and `tlog` lines),
   `/tmp/omacosy-bar.err`, `/tmp/omacosy-gesture.log`,
-  `/tmp/omacosy-overview.log`, `/tmp/omacosy-borders.log`,
-  `/tmp/omacosy-ffm.err`, `/tmp/omacosy-ws.log`.
-- Launch agents: `com.omacosy.bar`, `com.omacosy.borders`,
-  `com.omacosy.gesture`, and `com.omacosy.ffm` (loaded only under
-  AeroSpace). Restart one with
-  `launchctl kickstart -k "gui/$(id -u)/<label>"`.
+  `/tmp/omacosy-overview.log`, `/tmp/omacosy-ws.log`.
+- Launch agents: `com.omacosy.bar` and `com.omacosy.gesture`. Restart
+  one with `launchctl kickstart -k "gui/$(id -u)/<label>"`.
 
 ## Tests on the user's screen
 
@@ -108,9 +104,13 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   pair and `OMACOSY_APPEARANCE`.
 - The native menu bar auto-hides (`_HIHideMenuBar`,
   `AutoHideMenuBarOption`), and the bar sits in its place.
-- With no window manager, the bar still draws on every screen with no
-  workspace chips, and looks for a manager again every 5 s. If the bar
-  is missing, read `/tmp/omacosy-bar.err` and
+- `Super+K` opens a cheatsheet built from the `[[hotkeys]]` in
+  `~/.config/omniwm/settings.toml` and the Karabiner rules whose
+  descriptions start with `omacosy-omniwm:`.
+- If OmniWM does not answer, the bar counts that as no window manager.
+  It still draws on every screen with no workspace chips, and looks for
+  OmniWM again every 5 s. If the bar is missing, read
+  `/tmp/omacosy-bar.err` and
   `launchctl print "gui/$(id -u)/com.omacosy.bar"` (runs, last exit code).
 
 ## Menu bar apps pill
@@ -154,6 +154,12 @@ The design and the test results are in
   reloads its `settings.toml`. So theme-set writes the Ghostty palette
   before it edits OmniWM's settings.
 - Under a pair, OmniWM's `[appearance] mode` is `automatic`.
+- OmniWM draws the focus border (`[borders]` in settings.toml).
+  theme-set writes the theme's `ACTIVE_COLOR` from
+  `themes/<name>/borders.sh` into `[borders.color]`, and the overview
+  reads its accent from the same file.
+- `theme-next` (`Super+Shift+T`) calls theme-set with one name, so it
+  ends a light/dark pair.
 
 ## OmniWM
 
@@ -194,19 +200,22 @@ The design and the test results are in
   lint and build) and
   `LIBRARY_PATH="$(./Scripts/ghostty-preflight.sh print-library-dir)" swift test`.
 
-## install.sh and the window managers
+## install.sh
 
-- `WM=aerospace` if an AeroSpace process runs when `install.sh` starts,
-  otherwise `WM=omniwm`. Quitting a running window manager strands the
-  windows it parked off screen, so the install never replaces a running
-  AeroSpace.
-- Under OmniWM, the install leaves `com.omacosy.ffm` unloaded and copies
-  `config/gesture/config.omniwm.json` to `~/.config/omacosy/gesture.json`.
-- `omacosy-wm-switch` does the guarded handover. It records a snapshot,
-  starts the new manager, waits for the grants, and then gives a
-  90-second "yes" gate that reverts on anything else. It writes the apps
-  it installs to the manifest (`~/.local/state/omacosy/manifest`), and
-  `uninstall.sh` removes only what the manifest lists.
+- It copies `config/gesture/config.json` to
+  `~/.config/omacosy/gesture.json` on every run. The gesture daemon
+  keeps only the vertical swipes, because OmniWM owns the horizontal
+  ones.
+- It retires what older installs left behind: the `com.omacosy.dwindle`,
+  `com.omacosy.borders` and `com.omacosy.ffm` agents and binaries, and
+  links in `~/.local/bin` to scripts that no longer exist. The
+  retirement blocks sit after the bar build.
+- While the previous window manager still runs, it warns and does not
+  start OmniWM. Quitting a window manager strands the windows it parked
+  off screen, so the user quits it.
+- `uninstall.sh` removes only what the manifest
+  (`~/.local/state/omacosy/manifest`) lists. It also removes the retired
+  agents, for an install that never ran a newer `install.sh`.
 
 ## Pill scripts in `bin/`
 

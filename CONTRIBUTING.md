@@ -18,7 +18,7 @@ Small repo, strong opinions. PRs are welcome when they keep these.
   `helper/bar.swift`, drawing from a model it holds in memory and feeds
   from publishers (SkyLight, CoreAudio, IOPS, DisplayServices,
   SCDynamicStore, IOBluetooth). Nothing on a render path may fork: the
-  slow half — asking aerospace what exists — runs off the main queue on
+  slow half — asking OmniWM what exists — runs off the main queue on
   window create/destroy only. A workspace switch touches no subprocess.
 - **Ask for a font family and VERIFY you got it.** Requesting a family
   that is not installed does not fail, it silently substitutes; that is

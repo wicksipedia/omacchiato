@@ -1,54 +1,17 @@
-# OmniWM port — task list (branch: omniwm)
+# OmniWM notes
 
-The rule of the branch: `main` stays the AeroSpace world; nothing here
-switches the live WM except `omacosy-wm-switch omniwm`, which is
-grant-first, snapshot-backed and auto-reverting.
-
-## Done
-
-- [x] Brewfile + tap trust, settings.toml skeleton, config symlink
-- [x] `omacosy-wm-switch` — snapshot, grant-first handover, 90s
-      dead-man revert (install.sh never switches on its own)
-- [x] Core hotkeys: workspaces 1-9, move+follow, back-and-forth,
-      focus arrows (binding format verified against OmniWM's parser)
-
-## Done (agents, 2026-08-25)
-
-- [x] Full keybinding parity — 35 bindings, every id verified against
-      ActionCatalog.swift; gaps documented in settings.toml comments
-      (OmniWM has NO close-window command; no "other monitor" throw,
-      only directional). [[workspaces]] block added: 1-9 main, 14-17
-      secondary (their built-in default is only 7 workspaces!), plus
-      appRules pinning Signal/WhatsApp/Discord/Spotify to 14-17.
-- [x] Bar workspace feed — WM detected per use; omniwmctl query
-      workspaces/windows/displays + a persistent `watch
-      active-workspace --exec /bin/cat` stream for instant focus;
-      click-to-jump via `workspace focus-name`. Aerospace path
-      untouched.
-- [x] Cheatsheet — parses [[hotkeys]] from settings.toml under OmniWM,
-      comment blocks become group headings, Control+Option+Command
-      renders as Super.
-- [x] WM-aware plumbing — omacosy-ws routes through omniwmctl
-      (per-monitor natively, no twin math); collapse/cycle/float/
-      focus-guard/spawn stand down cleanly; toggle records and
-      restarts the right WM; uninstall tears OmniWM down.
-
-## To verify on the next guarded switch
-
-1. **Settings load.** OmniWM's TOML decoder is strict and silently
-   replaces an unparseable file with defaults — the likeliest cause of
-   trial #1's stranding. Watch whether the hotkeys survive first load.
-2. **IPC socket** must be enabled once from OmniWM's status-bar menu
-   before omniwmctl works (socket:
-   ~/Library/Caches/com.barut.OmniWM/ipc.sock).
-3. Bar under OmniWM (payload shapes taken from source, never probed
-   live), borders, spawn behaviour, monitor routing vs 11-19.
+Findings from running omacosy on OmniWM: trial notes, the capability
+audit, upgrade notes and a ledger of upstream quirks. Read the ledger
+before you assume that a strange layout is omacosy's fault.
 
 ## Trial findings (2026-08-26, first live day)
 
-- **Switch flow works** after two script fixes: gates read /dev/tty,
-  and OmniWM is re-poked after AeroSpace dies (it refuses to start
-  alongside another WM and its conflict dialog never re-checks).
+- **OmniWM refuses to start alongside another window manager**, and
+  its conflict dialog never checks again: launch it again after the
+  other manager quits.
+- **IPC socket** had to be enabled once from OmniWM's status-bar menu
+  before omniwmctl worked (socket:
+  ~/Library/Caches/com.barut.OmniWM/ipc.sock).
 - **Dwindle ignores outer gaps** — DwindleSettings carries only
   innerGap; [gaps.outer] is Niri-only. Verified empirically (top=42
   and bottom=60 both no-ops after forced relayout; innerGap
@@ -60,17 +23,13 @@ grant-first, snapshot-backed and auto-reverting.
   needs an OmniWM restart to take. Cost us an hour of GUI archaeology;
   the settings file had been right all along.
 - **Swipe feel**: one-switch-per-swipe by design, less smooth than
-  aerospace-swipe's feel. Trial con.
-- **Vertical swipes RESTORED (2026-08-26)**: aerospace-swipe runs
-  demoted to vertical-only (direction-overrides patch, swipe_left/right
-  "none"), swipe-up fires `omniwmctl command toggle-overview`,
-  swipe-down closes via `omacosy-helper omniwm-overview-close` —
-  activation-based, since OmniWM blackholes IPC while its overview is
-  open and ignored synthetic Escape. Both live-verified.
-  PENDING: the granted swipe binary predates the direction-overrides
-  patch (their makefile skips recompiles without `make clean`), so
-  horizontal swipes are harmlessly double-handled until the
-  post-certificate rebuild.
+  omacosy-gesture's swipes. Trial con.
+- **Vertical swipes RESTORED (2026-08-26)**: the gesture daemon runs
+  with its horizontal swipes off, swipe-up fires `omniwmctl command
+  toggle-overview`, and swipe-down closes via `omacosy-helper
+  omniwm-overview-close` — activation-based, since OmniWM blackholes
+  IPC while its overview is open and ignored synthetic Escape. Both
+  live-verified. Swipe-up has since moved to omacosy-overview.
 - **Phantom-bar workaround FAILED** — their workspace bar's
   reserveLayoutSpace does reserve under dwindle (measured, windows
   y=32->78), but the bar cannot be made invisible (app icons and
@@ -282,16 +241,15 @@ per-line parser silently rejects; and — the last one standing —
 **OmniWM's active-workspace event channel skips empty-workspace
 switches during bursts** (measured: focus-name 8/9 returned
 `executed`, no event arrived, the pill froze while the screen showed
-the empty workspace). The bar cannot trust the stream alone; every
-omacosy-ws switch now feeds the bar's fast-path file directly, the way
-aerospace's exec-on-workspace-change hook always did. UPSTREAM ISSUE
-CANDIDATE (#6).
+the empty workspace). The bar cannot trust that stream alone, so it
+follows the workspace-bar channel, which fires on every switch. Ledger
+#5 tracks the upstream issue.
 
 ## Stability watch (2026-08-26, late)
 
 OmniWM relaunched itself at 03:34 with no crash report and no known
-trigger — during its downtime swipes fell back to the aerospace path
-(dead socket warnings, self-healed on return). Watch for recurrence;
+trigger — during its downtime swipes failed with dead-socket warnings
+and recovered on their own when it returned. Watch for recurrence;
 if it repeats, `log show --predicate 'process == \"OmniWM\"'` around
 the restart is the first stop. Degraded behavior during a WM restart
 is acceptable-by-design; silent WM restarts are not.
@@ -301,16 +259,14 @@ is acceptable-by-design; silent WM restarts are not.
 1. **Apple Development certificate** (Xcode -> Settings -> Accounts ->
    Manage Certificates -> +). Tonight cost five re-grants; this ends
    the class.
-2. `make clean && make` in aerospace-swipe + stable re-sign — one
-   final grant, activates the direction-overrides patch.
-3. Mirror the LIVE ~/.config/omniwm/settings.toml (full canonical,
+2. Mirror the LIVE ~/.config/omniwm/settings.toml (full canonical,
    0.6.3-proof) into config/omniwm/settings.toml — the repo still
    carries the sparse file that 0.6.3 rejects. Then make install.sh
    provision it with a key-patch step rather than a plain copy.
-4. Upstream issues: dwindle outer-gaps resolved-but-not-applied
+3. Upstream issues: dwindle outer-gaps resolved-but-not-applied
    (payload says 42, layout applies 0 — full evidence in this doc),
    and the unimplemented alias section in docs/IPC-CLI.md.
-5. theme-set writes overview backdrop/border colors (option 1 of the
+4. theme-set writes overview backdrop/border colors (option 1 of the
    overview plan).
 
 ## Remaining
@@ -321,26 +277,10 @@ is acceptable-by-design; silent WM restarts are not.
    hotkey id list from `Sources/OmniWM/Core/Input/DefaultHotkeyBindings.swift`.
    Also `[[appRules]]` seeding: messengers/media to the secondary-set
    workspaces so the "apps per screen" survive restarts.
-2. **Bar workspace feed.** `helper/bar.swift` shells `aerospace` for
-   workspaces and focus. Add an OmniWM source (omniwmctl query or its
-   IPC subscriptions) selected by which WM is running; pills and
-   click-to-jump must work in both worlds.
-3. **Cheatsheet.** `Super+K` renders bindings parsed from
-   aerospace.toml; teach it to read `[[hotkeys]]` from settings.toml
-   when OmniWM is active.
-4. **WM-aware plumbing.** `omacosy-toggle`, `uninstall.sh`, the
-   focus-guard, `omacosy-ws`/`-collapse`/`-cycle`/`-float`/`-spawn`:
-   each either gains an OmniWM path, stands down under OmniWM, or is
-   retired by a native OmniWM feature (ffm, swipes are native; the
-   overview may be next).
-5. **Verification pass.** Borders under OmniWM (SkyLight events should
-   flow regardless), spawn-flicker behaviour vs our serialized spawn,
-   multi-monitor workspace model mapping (11-19 convention vs OmniWM's
-   monitor routing), Ghostty titlebar interplay.
+2. **Verification pass.** Spawn-flicker behaviour vs our serialized
+   spawn, Ghostty titlebar interplay.
 
 ## Open questions
 
-- OmniWM's workspace model vs our per-display 1-9/11-19 convention:
-  adopt theirs or emulate ours via named workspaces?
 - Retire omacosy-overview for OmniWM's, or keep ours for the themed
   look? (Theirs has search and drag; ours matches the wallpaper zoom.)

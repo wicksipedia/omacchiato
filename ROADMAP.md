@@ -8,27 +8,12 @@ Direction, not promises. Ordered roughly by pull.
   the built-in panel via DisplayServices; external monitors need a
   DDC/I²C stack (what MonitorControl does). Deliberately out of
   scope so far.
-- **Re-dwindle for moved windows.** The split hint decides where the
-  NEXT window opens, so windows *moved* into a workspace (throws, the
-  undock collapse) still land as flat siblings. Hyprland re-tiles them
-  binarily; we don't yet.
 - **Super + mouse-drag resize (and move).** Hyprland binds Super +
   right-drag to resize the window toward the grabbed corner, and Super +
-  left-drag to move it; omarchy users expect both. The pieces exist:
-  mouse events carry modifier flags (so no keyboard tap is needed),
-  `aerospace resize` takes `--window-id`, and `omacosy-ffm` already
-  holds Accessibility and knows the window under the cursor. Needs an
-  active CGEvent tap on right-mouse events (a step up from ffm's
-  listen-only monitor, worth a Permissions note), and a decision
-  between `aerospace resize` per drag tick (~25ms per call, so ~30Hz,
-  visibly stepped) and direct AX `setSize` (smooth, but needs a
-  measurement that AeroSpace re-normalizes a fast resize stream the
-  way it does a native edge drag).
-- **Focus guard vs. typing.** An app that yanks focus while you are
-  actively typing (input < 2s old) is indistinguishable from a
-  user-driven switch and slips through. A denylist for known
-  offenders (messengers on non-visible workspaces) is the likely
-  escalation.
+  left-drag to move it; omarchy users expect both. OmniWM moves and
+  resizes windows with a modifier and a drag, and settings.toml sets
+  Option for both (`mouseMoveModifierKey`, `mouseResizeModifierKey`).
+  Whether Super works there is untested.
 - **macOS support matrix.** Built and tested on macOS 26 (Tahoe),
   Apple Silicon, one external display. Sequoia and Intel are
   unknown territory — reports welcome.
@@ -62,7 +47,7 @@ same event, from signal received to pixels drawn:
 | native, model held in memory | 2.50 ms | 3.65 ms |
 
 The difference is not language. It is that `spaces.sh` spawns five
-`aerospace` CLI calls (~23 ms each) to ask what just happened, while the
+window-manager CLI calls (~23 ms each) to ask what just happened, while the
 native process already holds the window model — fed by the same SkyLight
 notifications three daemons are separately subscribed to today. The slow
 path (which windows exist, where) costs ~65 ms and runs off the main
@@ -92,13 +77,13 @@ Findings worth keeping even if this goes no further:
   7.6 s under contention. The architecture only pays if subprocess work
   never sits on the path a frame travels — the same discipline, applied
   one level in.
-- **AeroSpace monitor ids are not stable across a hotplug.** Undock and
-  the built-in stops being monitor 2 and becomes monitor 1; a cached id
-  then answers `Invalid monitor ID`, the snapshot returns empty, and the
-  bar keeps rendering the last set it knew — stale, with no error. Found
-  within an hour of first running it, by unplugging. The id is now
-  re-resolved by display NAME on every screen-parameters change, which is
-  the same trap `borders.swift` hit with a stale CG-to-Cocoa flip.
+- **Monitor ids were not stable across a hotplug** under the window
+  manager the bar was first built for. Undock and the built-in stopped
+  being monitor 2 and became monitor 1; a cached id then answered
+  `Invalid monitor ID`, the snapshot returned empty, and the bar kept
+  rendering the last set it knew — stale, with no error. Found within an
+  hour of first running it, by unplugging. The id is now re-resolved by
+  display NAME on every screen-parameters change.
 
 - **Bluetooth privacy is judged by the RESPONSIBLE process, not the
   binary.** IOBluetooth does not fail when ungranted, it aborts the whole
@@ -156,10 +141,8 @@ them. This bar draws above windows and has to decide for itself, and
 geometry alone is not enough — measured, on a notched display the notch
 inset (32 px) and the gap a tiled window leaves for the bar (33 px) are
 the same edge, so an ordinary tiled window reads as fullscreen by height.
-WIDTH separates them: `--no-outer-gaps` means the window takes the 8 px
-side gaps too, and a tiled one never does. Note that
-`%{window-is-fullscreen}` reported `false` on a window that measured
-1512x950 — aerospace's own flag could not be used for this.
+WIDTH separates them: a fullscreen window takes the 8 px side gaps too,
+and a tiled one never does.
 
 The apple menu is the last of the parity list: About This Mac, System
 Settings, Lock Screen, Sleep, Restart, Shut Down, Next Theme. Its popup
@@ -179,48 +162,28 @@ existing (~20MB) and every plugin's fork storm no longer happening. Call
 memory a wash; the win was always latency, and it should be described
 that way.
 
-Still separate processes: borders, the overview and ffm. An
-earlier draft of this file called folding them in "the obvious next
-step", which the measurements do not support as stated.
+Still a separate process: the overview. An earlier draft of this file
+called folding it in "the obvious next step", which the measurements do
+not support as stated.
 
 A minimal AppKit daemon with one empty window is 32.5MB resident before
-it does anything. borders is 30MB RSS / 11MB footprint — essentially all
-runtime tax for one CAShapeLayer ring — and overview is 37MB either way,
-being the one that actually holds capture buffers. Folding both into the
-bar reclaims two AppKit runtimes, about 55-65MB, and deletes real
-duplication: bar and borders each hold their own WindowServer connection
-draining overlapping create/destroy/move/resize events, three kqueue
-watches sit on the same theme directory, and both handle display hotplug
-separately, which is why each hit its own version of that bug.
-
-Against it: blast radius (a borders crash currently leaves the bar up)
-and the permission surface. TCC grants are tied to the signature, so one
-binary holding Screen Recording, Bluetooth and Accessibility loses all
-three whenever a rebuild invalidates it, where today they fail
-independently.
-
-So: borders is the clear candidate — nearly pure runtime tax, the same
-event stream, the same hotplug logic, no extra grant. Overview is
-marginal, needing Screen Recording and holding capture buffers either
-way. ffm stays out precisely to keep its Accessibility grant isolated,
-and the dwindle daemon is gone entirely — a focus hook runs
-`omacosy-helper` for a few milliseconds instead of a resident process.
-Borders stays out because at 9.2MB with no AppKit it is already the
-cheapest thing here.
+it does anything, and the overview is 37MB either way, being the one
+that holds capture buffers. Folding it into the bar would reclaim one
+AppKit runtime. Against it: blast radius (an overview crash leaves the
+bar up) and the permission surface. TCC grants are tied to the
+signature, so one binary holding Screen Recording, Bluetooth and
+Accessibility loses all three whenever a rebuild invalidates it, where
+today they fail independently.
 
 Never a lock screen (`loginwindow` is protected) or a Notification
 Center replacement.
 
 ## Wants
 
-- **omarchy's scrolling layout** (`Super+L`, per-workspace) — the
-  second layout omarchy ships; AeroSpace has no native equivalent,
-  so this would be another daemon-grafted behavior.
 - **More themes.** `themes/<name>/` is copy-a-directory; omarchy's
   MIT-licensed palettes drop in. The easiest PR in the repo.
-- **Upstreaming.** The aerospace-swipe macOS 26 fixes are offered
-  upstream (acsandmann/aerospace-swipe #29/#30) — the engine now lives
-  in-tree as `omacosy-gesture`, so a merge is a courtesy, not a
-  dependency; an AeroSpace
-  window-created hook would delete our SkyLight dependency for the
-  bar's window events.
+- **Upstreaming.** The gesture engine's macOS 26 fixes are offered
+  upstream (pull requests #29 and #30, linked in the README). The
+  engine lives in-tree as `omacosy-gesture`, so a merge is a courtesy,
+  not a dependency. A window-created event in OmniWM's IPC would
+  delete the bar's SkyLight dependency for window events.
