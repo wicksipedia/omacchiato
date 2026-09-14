@@ -125,9 +125,17 @@ def write_cache(entry):
         pass
 
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args):
+        return None
+
+
 def get_json(url, headers=None):
     req = urllib.request.Request(url, headers=headers or {})
-    with urllib.request.urlopen(req, timeout=TIMEOUT_S) as r:
+    # urllib sends every header again to the redirect target, the token too,
+    # so a request with headers follows no redirect
+    open_url = urllib.request.build_opener(NoRedirect).open if headers else urllib.request.urlopen
+    with open_url(req, timeout=TIMEOUT_S) as r:
         return json.load(r)
 
 
