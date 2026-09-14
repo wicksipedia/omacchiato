@@ -3,8 +3,8 @@
 # theme in one move.
 # Swaps ~/.config/omarchy/current/theme (the omarchy convention), then
 # nudges every consumer: Korren live-reloads on its own (it watches the
-# omarchy dir), the bar and borders both watch the theme and restyle
-# in place — nothing here has to tell them.
+# omarchy dir), and the bar watches the theme and restyles in place —
+# nothing here has to tell them.
 
 set -euo pipefail
 # resolve through the ~/.local/bin symlink to the real repo
@@ -80,9 +80,9 @@ APPLESCRIPT
 fi
 
 
-# omacosy-bar and omacosy-borders both re-read the theme on their own
-# (kqueue on ~/.config/omarchy/current), so the symlink swap above IS
-# the notification
+# omacosy-bar re-reads the theme on its own (kqueue on
+# ~/.config/omarchy/current), so the symlink swap above IS the
+# notification
 
 # Before the OmniWM edits below: OmniWM rebuilds its quake terminal from
 # the Ghostty config files when settings.toml changes, so the new palette
@@ -119,10 +119,9 @@ PY
   "$HOME/.local/bin/omacosy-helper" ghostty-reload >/dev/null || true
 fi
 
-# OmniWM draws the focus border while it is the window manager (our
-# ring clips at screen edges there — no outer gaps). Its color lives in
-# settings.toml as 0-1 floats; write the theme's ACTIVE_COLOR
-# (0xAARRGGBB) into it — OmniWM live-reloads, so this recolors at once.
+# OmniWM draws the focus border. Its color lives in settings.toml as 0-1
+# floats; write the theme's ACTIVE_COLOR (0xAARRGGBB) into it. OmniWM
+# live-reloads, so this recolors at once.
 OMNIWM_SETTINGS="$HOME/.config/omniwm/settings.toml"
 if [ -f "$OMNIWM_SETTINGS" ] && [ -f "$THEMES_DIR/$NAME/borders.sh" ]; then
   ACTIVE="$(grep -o 'ACTIVE_COLOR=0x[0-9a-fA-F]*' "$THEMES_DIR/$NAME/borders.sh" | head -1 | cut -d= -f2)"

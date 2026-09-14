@@ -241,6 +241,14 @@ launchctl bootout "gui/$(id -u)/com.omacosy.dwindle" 2>/dev/null || true
 launchctl unload "$HOME/Library/LaunchAgents/com.omacosy.dwindle.plist" 2>/dev/null || true
 rm -f "$HOME/Library/LaunchAgents/com.omacosy.dwindle.plist" "$HOME/.local/bin/omacosy-dwindle"
 
+# omacosy-borders is gone: OmniWM draws the focus border, and theme-set
+# colours it. An older install still runs the daemon, which would draw a
+# second ring.
+launchctl bootout "gui/$(id -u)/com.omacosy.borders" 2>/dev/null || true
+launchctl unload "$HOME/Library/LaunchAgents/com.omacosy.borders.plist" 2>/dev/null || true
+rm -f "$HOME/Library/LaunchAgents/com.omacosy.borders.plist" "$HOME/.local/bin/omacosy-borders" \
+  "$HOME/.config/omacosy/borders.conf"
+
 # focus-follows-mouse daemon (own binary so helper rebuilds never
 # invalidate its Accessibility grant); runs as a launchd agent
 if [ ! -x "$HOME/.local/bin/omacosy-ffm" ] || [ "$REPO_DIR/helper/ffm.swift" -nt "$HOME/.local/bin/omacosy-ffm" ]; then
@@ -248,18 +256,11 @@ if [ ! -x "$HOME/.local/bin/omacosy-ffm" ] || [ "$REPO_DIR/helper/ffm.swift" -nt
   swiftc -O -F /System/Library/PrivateFrameworks -framework SkyLight -o "$HOME/.local/bin/omacosy-ffm" "$REPO_DIR/helper/ffm.swift"
 fi
 
-# focused-window border ring (replaces JankyBorders; no permissions;
-# SkyLight for the window-server event notifications)
-if [ ! -x "$HOME/.local/bin/omacosy-borders" ] || [ "$REPO_DIR/helper/borders.swift" -nt "$HOME/.local/bin/omacosy-borders" ]; then
-  log "Building omacosy-borders"
-  swiftc -O -F /System/Library/PrivateFrameworks -framework SkyLight -o "$HOME/.local/bin/omacosy-borders" "$REPO_DIR/helper/borders.swift"
-fi
 # stable code identity so TCC grants survive rebuilds (skipped when no
 # signing identity is present — then re-grant after each rebuild)
 if security find-identity -p codesigning -v 2>/dev/null | grep -q "Apple Development"; then
   codesign -f -s "Apple Development" --identifier com.omacosy.helper "$HOME/.local/bin/omacosy-helper" 2>/dev/null || true
   codesign -f -s "Apple Development" --identifier com.omacosy.ffm "$HOME/.local/bin/omacosy-ffm" 2>/dev/null || true
-  codesign -f -s "Apple Development" --identifier com.omacosy.borders "$HOME/.local/bin/omacosy-borders" 2>/dev/null || true
   # the BUNDLE is signed now; the identifier is what grants key on
   codesign -f -s "Apple Development" --identifier com.omacosy.bar "$BAR_APP" 2>/dev/null || true
   codesign -f -s "Apple Development" --identifier com.omacosy.overview "$HOME/.local/bin/omacosy-overview" 2>/dev/null || true
@@ -279,7 +280,6 @@ fi
 # hover-ignore list (launchd agents can't read ~/Documents — copied)
 mkdir -p "$HOME/.config/omacosy"
 cp "$REPO_DIR/config/ffm-ignore" "$HOME/.config/omacosy/ffm-ignore"
-cp "$REPO_DIR/config/borders.conf" "$HOME/.config/omacosy/borders.conf"
 # app choices, RESOLVED (apps.local.conf already applied), for the same
 # reason: the bar's activity pill launches $TERMINAL and cannot read the
 # repo from a launchd agent when the clone is TCC-protected
@@ -291,21 +291,6 @@ if [ "$WM" = omniwm ]; then
   "$REPO_DIR/bin/omacosy-karabiner-omniwm" install \
     || log "WARNING: the OmniWM Karabiner rules did not install. Re-run install.sh."
 fi
-
-cat > "$HOME/Library/LaunchAgents/com.omacosy.borders.plist" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key><string>com.omacosy.borders</string>
-  <key>ProgramArguments</key><array><string>$HOME/.local/bin/omacosy-borders</string></array>
-  <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><true/>
-</dict>
-</plist>
-PLIST
-launchctl unload "$HOME/Library/LaunchAgents/com.omacosy.borders.plist" 2>/dev/null || true
-launchctl load "$HOME/Library/LaunchAgents/com.omacosy.borders.plist"
 
 cat > "$HOME/Library/LaunchAgents/com.omacosy.ffm.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
