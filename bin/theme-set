@@ -29,7 +29,8 @@ if [[ "$SPEC" == *:* ]]; then
   case "$MODE" in [Dd]ark) MODE=dark ;; *) MODE=light ;; esac
   NAME="$(tr ',' '\n' <<<"$SPEC" | sed -n "s/^ *$MODE: *//p" | head -1)"
 fi
-if [ -z "$NAME" ] || [ ! -d "$THEMES_DIR/$NAME" ]; then
+# a theme is a directory in themes/, so a name that is a path is refused
+if [ -z "$NAME" ] || [[ "$NAME" == */* || "$NAME" == *..* ]] || [ ! -d "$THEMES_DIR/$NAME" ]; then
   echo "theme-set: unknown theme '$NAME'. Available:" >&2
   for t in "$THEMES_DIR"/*/; do basename "$t"; done >&2
   exit 1
