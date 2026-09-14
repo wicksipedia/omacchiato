@@ -108,6 +108,10 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   pair and `OMACOSY_APPEARANCE`.
 - The native menu bar auto-hides (`_HIHideMenuBar`,
   `AutoHideMenuBarOption`), and the bar sits in its place.
+- With no window manager, the bar still draws on every screen with no
+  workspace chips, and looks for a manager again every 5 s. If the bar
+  is missing, read `/tmp/omacosy-bar.err` and
+  `launchctl print "gui/$(id -u)/com.omacosy.bar"` (runs, last exit code).
 
 ## Menu bar apps pill
 
@@ -180,6 +184,10 @@ The design and the test results are in
 - A local OmniWM build shares the bundle ID `com.barut.OmniWM` with the
   Homebrew build. A grant can move between the two, and "Quit & Reopen"
   launches `/Applications/OmniWM.app`. Start a local build by its path.
+- OmniWM's `make dev-install` puts `OmniWM Dev.app` in `~/Applications`,
+  with the bundle ID `com.barut.OmniWM.dev` and the same IPC socket.
+  Match OmniWM by bundle-ID prefix. An exact match once made the bar
+  treat the dev build as no window manager.
 - Screen Recording is optional for OmniWM.
 - To work on upstream OmniWM (BarutSRB/OmniWM), run
   `./Scripts/dev-tools.sh setup` once. CI runs `make verify` (format,
