@@ -26,6 +26,7 @@ TIMEOUT_S = 30
 # ponytail: one page of each search. Paginate if 100 open PRs is ever too few.
 QUERY = """
 query($open: String!, $closed: String!) {
+  viewer { login }
   open: search(query: $open, type: ISSUE, first: 100) { nodes { ...pr } }
   closed: search(query: $closed, type: ISSUE, first: 50) { nodes { ...pr } }
 }
@@ -35,13 +36,14 @@ fragment pr on PullRequest {
   reviews { totalCount }
   latestOpinionatedReviews(first: 20) { nodes { state } }
   commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
+  reviewThreads(first: 30) { nodes { isResolved comments(first: 1) { nodes { author { login } } } } }
 }
 """
 # the url is null when the repository is gone, and split on null ends the page
 UNREAD_PRS = ('.[] | select(.subject.type == "PullRequest" and .subject.url != null)'
               ' | "\\(.repository.full_name)#\\(.subject.url | split("/") | last)"')
-CI_ICON = {"SUCCESS": "✅", "PENDING": "⏳", "EXPECTED": "⏳", "FAILURE": "❌", "ERROR": "❌"}
 FAILED = ("FAILURE", "ERROR")
+RUNNING = ("PENDING", "EXPECTED")
 
 
 def out(payload):
@@ -59,15 +61,42 @@ def ci_state(pr):
     return (rollup or {}).get("state")
 
 
-def icon(pr):
+def decision(pr):
+    # reviewDecision is null in a repository with no required reviews
+    states = {r["state"] for r in pr["latestOpinionatedReviews"]["nodes"]}
+    return pr["reviewDecision"] or next(
+        (s for s in ("CHANGES_REQUESTED", "APPROVED") if s in states), None)
+
+
+def open_threads(pr, me):
+    """Unresolved review threads that someone other than you started."""
+    count = 0
+    for thread in (pr.get("reviewThreads") or {}).get("nodes") or []:
+        first = ((thread.get("comments") or {}).get("nodes") or [{}])[0]
+        if not thread.get("isResolved") and (first.get("author") or {}).get("login") != me:
+            count += 1
+    return count
+
+
+def icon(pr, me):
+    """One mark per PR, for what it needs next."""
     if pr["state"] == "MERGED":
         return "🟣"
     if pr["state"] == "CLOSED":
         return "⚫"
-    return CI_ICON.get(ci_state(pr), "⚪")
+    if pr["isDraft"]:
+        return "📝"
+    ci = ci_state(pr)
+    if ci in FAILED or pr["mergeable"] == "CONFLICTING":
+        return "💥"
+    if decision(pr) == "CHANGES_REQUESTED" or open_threads(pr, me):
+        return "💬"
+    if decision(pr) == "APPROVED":
+        return "⏳" if ci in RUNNING else "✅"
+    return "🙋"
 
 
-def status(pr):
+def status(pr, me):
     if pr["state"] == "MERGED":
         return "Merged."
     if pr["state"] == "CLOSED":
@@ -80,15 +109,14 @@ def status(pr):
     ci = ci_state(pr)
     if ci in FAILED:
         parts.append("CI failed.")
-    elif ci in ("PENDING", "EXPECTED"):
+    elif ci in RUNNING:
         parts.append("CI is running.")
-    # reviewDecision is null in a repository with no required reviews
-    states = {r["state"] for r in pr["latestOpinionatedReviews"]["nodes"]}
-    decision = pr["reviewDecision"] or next(
-        (s for s in ("CHANGES_REQUESTED", "APPROVED") if s in states), None)
-    if decision == "APPROVED":
-        parts.append("Approved.")
-    elif decision == "CHANGES_REQUESTED":
+    threads = open_threads(pr, me)
+    if threads:
+        parts.append("%d review thread%s to resolve." % (threads, "" if threads == 1 else "s"))
+    if decision(pr) == "APPROVED":
+        parts.append("Approved." if parts else "Ready to merge.")
+    elif decision(pr) == "CHANGES_REQUESTED":
         parts.append("Changes requested.")
     elif not pr["isDraft"]:
         parts.append("Waiting for a first review." if pr["reviews"]["totalCount"] == 0
@@ -96,7 +124,7 @@ def status(pr):
     return " ".join(parts)
 
 
-def render(open_prs, closed_prs, unread):
+def render(open_prs, closed_prs, unread, me=""):
     open_prs = [pr for pr in open_prs if pr.get("viewerSubscription") not in ("UNSUBSCRIBED", "IGNORED")]
     shown = open_prs + [pr for pr in closed_prs if key(pr) in unread]
     groups = {}
@@ -111,11 +139,11 @@ def render(open_prs, closed_prs, unread):
             title = pr["title"]
             if len(title) > TITLE_MAX:
                 title = title[:TITLE_MAX - 1].rstrip() + "…"
-            row = {"text": "%s #%d %s" % (icon(pr), pr["number"], title), "url": pr["url"]}
+            row = {"text": "%s #%d %s" % (icon(pr, me), pr["number"], title), "url": pr["url"]}
             if key(pr) in unread:
                 row.update(detail="new", color="accent")
             rows.append(row)
-            rows.append({"text": "    " + status(pr), "dim": True, "url": pr["url"]})
+            rows.append({"text": "    " + status(pr, me), "dim": True, "url": pr["url"]})
     if not rows:
         rows.append({"text": "No open pull requests", "dim": True})
     rows += [{"separator": True},
@@ -162,7 +190,7 @@ def fetch(extra):
                 proc.kill()
                 proc.wait()
     return ([n for n in data["open"]["nodes"] if n],
-            [n for n in data["closed"]["nodes"] if n], unread)
+            [n for n in data["closed"]["nodes"] if n], unread, data["viewer"]["login"])
 
 
 def fallback(reason):
@@ -182,25 +210,35 @@ def fallback(reason):
 
 
 def self_test():
-    def pr(n, ci="SUCCESS", state="OPEN", reviews=0, decision=None):
+    def pr(n, ci="SUCCESS", state="OPEN", reviews=0, decision=None, threads=()):
         return {"number": n, "title": "t" * 80, "url": "https://github.com/a/b/pull/%d" % n,
                 "state": state, "isDraft": False, "mergeable": "MERGEABLE",
                 "reviewDecision": decision, "repository": {"nameWithOwner": "a/b"},
                 "reviews": {"totalCount": reviews}, "latestOpinionatedReviews": {"nodes": []},
-                "commits": {"nodes": [{"commit": {"statusCheckRollup": {"state": ci}}}]}}
+                "commits": {"nodes": [{"commit": {"statusCheckRollup": {"state": ci}}}]},
+                "reviewThreads": {"nodes": [
+                    {"isResolved": False, "comments": {"nodes": [{"author": {"login": who}}]}}
+                    for who in threads]}}
     p = render([pr(1), pr(2, ci="FAILURE", reviews=1, decision="APPROVED")],
-               [pr(3, state="MERGED"), pr(4, state="CLOSED")], {"a/b#2", "a/b#3"})
+               [pr(3, state="MERGED"), pr(4, state="CLOSED")], {"a/b#2", "a/b#3"}, "me")
     assert p["label"] == "2 !" and p["color"] == "red", p
     texts = [r.get("text", "") for r in p["rows"]]
     assert texts[0] == "a/b" and p["rows"][0]["detail"] == "3", texts
     assert not any("#4 " in t for t in texts), "a read closed PR is hidden"
     assert texts[1].startswith("🟣 #3 ") and texts[2].strip() == "Merged.", texts
-    assert texts[3].startswith("❌ #2 ") and len(texts[3]) == len("❌ #2 ") + TITLE_MAX, texts
+    assert texts[3].startswith("💥 #2 ") and len(texts[3]) == len("💥 #2 ") + TITLE_MAX, texts
     assert texts[4].strip() == "CI failed. Approved.", texts
-    assert texts[6].strip() == "Waiting for a first review.", texts
+    assert texts[5].startswith("🙋 #1 ") and texts[6].strip() == "Waiting for a first review.", texts
     assert render([pr(1)], [], set())["label"] == "1"
     muted = dict(pr(5), viewerSubscription="UNSUBSCRIBED")
     assert render([pr(1), muted], [], {"a/b#5"})["label"] == "1", "an unsubscribed PR is hidden"
+    assert icon(pr(6, reviews=1, decision="APPROVED"), "me") == "✅"
+    assert status(pr(6, reviews=1, decision="APPROVED"), "me") == "Ready to merge."
+    assert icon(pr(7, ci="PENDING", reviews=1, decision="APPROVED"), "me") == "⏳"
+    assert icon(pr(8, reviews=1, threads=("them",)), "me") == "💬"
+    assert status(pr(8, reviews=1, threads=("them", "them")), "me") == "2 review threads to resolve. Waiting for review."
+    assert icon(pr(9, threads=("me",)), "me") == "🙋", "your own thread is not feedback"
+    assert icon(dict(pr(10), mergeable="CONFLICTING"), "me") == "💥"
     print("ok")
 
 

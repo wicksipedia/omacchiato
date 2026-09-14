@@ -330,8 +330,8 @@ percentage for a window that no longer exists.
 `omacosy-github-prs` lists the open pull requests you authored. It needs
 the GitHub CLI, signed in with `gh auth login`. The pill shows how many
 PRs are open and adds `!` when one of them has an update. The popup groups
-the PRs by repository. Each PR row starts with its CI state, and the line
-under it says what the PR waits for. Clicking either line opens the PR. To
+the PRs by repository. Each PR row starts with a mark for its state, and
+the line under it says what the PR waits for. Clicking either line opens the PR. To
 drop a PR from the list, unsubscribe from its notifications on GitHub.
 
 ```
@@ -344,8 +344,17 @@ Arguments are extra GitHub search qualifiers. `-repo:owner/name` leaves
 out a repository of automated PRs, and `org:name` keeps one organisation.
 For the icon, the Nerd Font pull request glyph is U+F407.
 
-The CI marks are ✅ passed, ⏳ running, ❌ failed and ⚪ no checks. The
-pill turns red while CI fails on any open PR.
+Each PR gets one mark, for what it needs next:
+
+- ✅ ready to merge: approved, with passing checks and no conflicts
+- 💬 feedback to resolve: changes requested, or a review thread from
+  someone else that nobody has resolved
+- 💥 CI failed, or the branch has merge conflicts
+- 🙋 waiting for a review
+- ⏳ approved, with CI still running
+- 📝 a draft
+
+The pill turns red while CI fails on any open PR.
 
 An update is an unread GitHub notification on the PR. GitHub marks the
 notification read when you open the PR, so the `!` goes at the next run
