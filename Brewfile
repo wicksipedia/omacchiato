@@ -4,7 +4,7 @@
 cask "omniwm"
 cask "karabiner-elements"  # Caps Lock -> Super
 cask "ghostty"             # default terminal + floating TUI host (btop)
-cask "raycast"             # launcher (Super+Space opens OmniWM's palette instead)
+cask "raycast"             # launcher on Cmd+Space, set in Raycast
 
 # CLI stack
 brew "fzf"

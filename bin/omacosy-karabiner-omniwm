@@ -72,8 +72,8 @@ rules = slot_rules + [
     # bursts — a bare `open -na` gives OmniWM's above-not-below spiral
     rule("terminal", "return_or_enter", SUPER, cmd=f"{home}/.local/bin/omacosy-spawn '{apps['TERMINAL']}'"),
     rule("browser", "return_or_enter", SHIFT, cmd=f"open -a '{apps['BROWSER']}'"),
-    # trial: OmniWM's command palette on the launcher chord (Raycast
-    # parked — swap the two lines to go back)
+    # OmniWM's command palette on the launcher chord; Raycast keeps its
+    # own Cmd+Space hotkey
     rule("launcher", "spacebar", SUPER, cmd="/opt/homebrew/bin/omniwmctl command open-command-palette >/dev/null 2>&1"),
     rule("overview", "o", SUPER, cmd=f"{home}/.local/bin/omacosy-overview"),
     # throws go to the OTHER display, not a direction — resolved

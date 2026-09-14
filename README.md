@@ -543,6 +543,7 @@ typing or app shortcuts. Caps Lock tapped alone is Escape.
 | **Apps and system** | |
 | `Super+enter` / `Super+shift+enter` | terminal / browser |
 | `Super+space` | OmniWM's command palette |
+| `Cmd+space` | Raycast (give it this hotkey in Raycast's settings) |
 | `Super+shift+f` / `+m` / `+g` | files / music / messenger (set in `apps.conf`) |
 | `Super+shift+e` / `+c` / `+y` | Outlook / Teams / a YouTube web app |
 | `Super+shift+t` | next theme (one theme, so a light/dark pair stops) |
