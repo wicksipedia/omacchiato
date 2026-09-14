@@ -258,7 +258,12 @@ done
 if [ -L "$HOME/.config/aerospace" ] && [ "$(readlink "$HOME/.config/aerospace")" = "$REPO_DIR/config/aerospace" ]; then
   rm "$HOME/.config/aerospace"
 fi
-if have "copied-config $HOME/.config/aerospace"; then rm -rf "$HOME/.config/aerospace"; fi
+if have "copied-config $HOME/.config/aerospace"; then
+  rm -rf "$HOME/.config/aerospace"
+  # without this line, every later run would delete a config written there
+  { grep -vxF "copied-config $HOME/.config/aerospace" "$MANIFEST" || true; } > "$MANIFEST.tmp"
+  mv "$MANIFEST.tmp" "$MANIFEST"
+fi
 rm -f "$REPO_DIR/config/aerospace/aerospace.toml"
 rmdir "$REPO_DIR/config/aerospace" 2>/dev/null || true
 

@@ -19,6 +19,9 @@ have() { [ -f "$MANIFEST" ] && grep -qxF "$1" "$MANIFEST"; }
 log "Stopping OmniWM and the bar"
 osascript -e 'quit app "OmniWM"' 2>/dev/null || true
 pkill -f OmniWM.app 2>/dev/null || true
+# an older install can still run AeroSpace; quitting it first puts back
+# the windows it parked off screen before its cask goes
+osascript -e 'quit app "AeroSpace"' 2>/dev/null || true
 osascript -e 'quit app "Karabiner-Elements"' 2>/dev/null || true
 # borders, ffm and dwindle are retired, but an install that never ran a
 # newer install.sh can still have them

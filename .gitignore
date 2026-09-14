@@ -4,4 +4,7 @@
 /omacosy-gesture.app/
 config/apps.local.conf
 __pycache__/
+# an older install generated this; install.sh deletes it
+config/aerospace/aerospace.toml
+.claude/worktrees/
 CLAUDE.local.md
