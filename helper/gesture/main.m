@@ -3,16 +3,13 @@
 // Absorbed from acsandmann/aerospace-swipe (MIT, notice kept in
 // LICENSE.aerospace-swipe) on 2026-08-28, with omacosy's accumulated
 // fixes folded in: raw MultitouchSupport frames (macOS 26.3 stopped
-// carrying multi-touch data in CGEvent taps), socket recovery and
-// binary resolution after docking, wake re-registration, per-direction
-// command overrides, and shell execution for any direction. Under
-// AeroSpace the horizontal swipes still talk to its socket directly
-// (fast path); under OmniWM every direction runs a command. One engine
-// for both window managers.
+// carrying multi-touch data in CGEvent taps), wake re-registration,
+// per-direction command overrides, and shell execution for any
+// direction. Horizontal next/prev swipes cycle OmniWM workspaces over a
+// held IPC connection; any other direction runs a command.
 //
 #include "Carbon/Carbon.h"
 #include "Cocoa/Cocoa.h"
-#include "aerospace.h"
 #include "config.h"
 #include "omniwm.h"
 #include <pthread.h>
@@ -23,7 +20,6 @@
 #include <pthread.h>
 #include <IOKit/IOKitLib.h>
 
-static aerospace* g_aerospace = NULL;
 static CFTypeRef g_haptic = NULL;
 static Config g_config;
 static pthread_mutex_t g_gesture_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -141,111 +137,6 @@ static void hid_device_appeared(void* refcon, io_iterator_t iter)
 		});
 }
 
-// AeroSpace numbers monitors by arrangement (left to right), so sorting
-// CG displays by x-origin gives the same ids. Returns 0 on failure.
-static int monitor_under_cursor(void)
-{
-	CGEventRef ev = CGEventCreate(NULL);
-	if (!ev)
-		return 0;
-	CGPoint p = CGEventGetLocation(ev);
-	CFRelease(ev);
-
-	CGDirectDisplayID ids[8];
-	uint32_t n = 0;
-	if (CGGetActiveDisplayList(8, ids, &n) != kCGErrorSuccess || !n)
-		return 0;
-
-	// sort by x-origin (tiny n, insertion sort)
-	for (uint32_t i = 1; i < n; ++i)
-		for (uint32_t j = i; j > 0; --j)
-			if (CGDisplayBounds(ids[j]).origin.x < CGDisplayBounds(ids[j - 1]).origin.x) {
-				CGDirectDisplayID t = ids[j];
-				ids[j] = ids[j - 1];
-				ids[j - 1] = t;
-			}
-
-	for (uint32_t i = 0; i < n; ++i)
-		if (CGRectContainsPoint(CGDisplayBounds(ids[i]), p))
-			return (int)i + 1;
-	return 0;
-}
-
-// Step to the neighbouring workspace of the monitor the cursor is on
-// (native-Spaces semantics: the swipe acts where the pointer is, never
-// on the other monitor). Returns false so the caller can fall back to
-// focused-monitor stepping when the cursor's monitor or its visible
-// workspace can't be resolved.
-static bool switch_on_cursor_monitor(const char* ws)
-{
-	int mon = monitor_under_cursor();
-	if (!mon)
-		return false;
-	int dir = strcmp(ws, "next") == 0 ? 1 : strcmp(ws, "prev") == 0 ? -1 : 0;
-	if (!dir)
-		return false;
-
-	char mon_str[16];
-	snprintf(mon_str, sizeof mon_str, "%d", mon);
-
-	const char* vis_args[] = { "list-workspaces", "--monitor", mon_str, "--visible" };
-	char* visible = aerospace_exec(g_aerospace, vis_args, 4, "stdout");
-	if (!visible)
-		return false;
-	visible[strcspn(visible, "\r\n")] = '\0';
-
-	const char* list_args[] = { "list-workspaces", "--monitor", mon_str, "--empty", "no" };
-	char* list = aerospace_exec(g_aerospace, list_args, g_config.skip_empty ? 5 : 3, "stdout");
-	if (!list) {
-		free(visible);
-		return false;
-	}
-
-	char* names[64];
-	int count = 0, cur = -1;
-	for (char* tok = strtok(list, "\r\n"); tok && count < 64; tok = strtok(NULL, "\r\n")) {
-		if (!*tok)
-			continue;
-		names[count] = tok;
-		if (strcmp(tok, visible) == 0)
-			cur = count;
-		count++;
-	}
-
-	bool ok = false;
-	if (count > 0 && cur >= 0) {
-		int next = cur + dir;
-		if (g_config.wrap_around)
-			next = (next + count) % count;
-		if (next >= 0 && next < count && next != cur) {
-			const char* sw_args[] = { "workspace", names[next] };
-			char* result = aerospace_exec(g_aerospace, sw_args, 2, NULL);
-			free(result);
-			printf("Switched monitor %s to workspace '%s'.\n", mon_str, names[next]);
-			ok = true;
-		} else {
-			ok = true; // at the edge without wrap: consume the swipe, do nothing
-		}
-	}
-
-	free(visible);
-	free(list);
-	return ok;
-}
-
-// Raw multitouch contacts emit no CGEvents, so omacosy's focus guard
-// (which bounces workspace switches made without recent user input)
-// can't see a swipe. Stamp a file it checks instead. O_TRUNC on an
-// existing file refreshes its mtime — that IS the timestamp.
-static void stamp_user_intent(void)
-{
-	char path[128];
-	snprintf(path, sizeof path, "/tmp/omacosy-user-intent-%d", getuid());
-	int fd = open(path, O_CREAT | O_WRONLY | O_TRUNC, 0600);
-	if (fd >= 0)
-		close(fd);
-}
-
 static omniwm* g_omni; // held OmniWM IPC connection (lazy)
 static pthread_mutex_t g_omni_lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -261,24 +152,21 @@ static void switch_workspace(const char* ws)
 			g_omni = omniwm_new();
 		int target = g_omni ? omniwm_cycle(g_omni, ws[0] == 'n' ? 1 : -1) : 0;
 		pthread_mutex_unlock(&g_omni_lock);
-		if (target) {
-			stamp_user_intent();
-			printf("Switched workspace (omniwm) to '%d'.\n", target);
-			if (g_config.haptic && g_haptic)
-				haptic_actuate(g_haptic, 3);
+		if (!target) {
+			fprintf(stderr, "omniwm: cycle failed\n");
 			return;
 		}
-		// a stale socket file after OmniWM quit: fall through to the
-		// aerospace path below rather than eating the swipe
-		fprintf(stderr, "omniwm: cycle failed, falling back to aerospace path\n");
+		printf("Switched workspace (omniwm) to '%d'.\n", target);
+		if (g_config.haptic && g_haptic)
+			haptic_actuate(g_haptic, 3);
+		return;
 	}
 	// omacosy: a direction that looks like a COMMAND is run like the
-	// vertical gestures are — OmniWM mode routes horizontal through
-	// omniwmctl, keeping this engine's tuned mid-gesture thresholds
+	// vertical gestures are, so horizontal swipes can route through
+	// omniwmctl and keep this engine's tuned mid-gesture thresholds
 	// (OmniWM's own swipe commits late and cannot be tuned). Called
 	// from fire_horizontal's dispatch_async, so popen may block here.
 	if (strchr(ws, '/')) {
-		stamp_user_intent();
 		FILE* p = popen(ws, "r");
 		if (p) {
 			char drain[256];
@@ -287,44 +175,7 @@ static void switch_workspace(const char* ws)
 		}
 		else
 			fprintf(stderr, "Error: failed to run horizontal swipe command '%s'.\n", ws);
-		return;
 	}
-	stamp_user_intent();
-	if (g_config.cursor_monitor) {
-		// on a transient resolve failure (mid-switch races) CONSUME
-		// the swipe: the old global fallback walked the combined
-		// workspace list and jumped monitors under per-monitor sets
-		if (switch_on_cursor_monitor(ws) && g_config.haptic && g_haptic)
-			haptic_actuate(g_haptic, 3);
-		return;
-	}
-
-	if (g_config.skip_empty || g_config.wrap_around) {
-		char* workspaces = aerospace_list_workspaces(g_aerospace, !g_config.skip_empty);
-		if (!workspaces) {
-			fprintf(stderr, "Error: Unable to retrieve workspace list.\n");
-			return;
-		}
-		char* result = aerospace_workspace(g_aerospace, g_config.wrap_around, ws, workspaces);
-		if (result) {
-			fprintf(stderr, "Error: Failed to switch workspace to '%s'.\n", ws);
-		} else {
-			printf("Switched workspace successfully to '%s'.\n", ws);
-		}
-		free(workspaces);
-		free(result);
-	} else {
-		char* result = aerospace_switch(g_aerospace, ws);
-		if (result) {
-			fprintf(stderr, "Error: Failed to switch workspace: '%s'\n", result);
-		} else {
-			printf("Switched workspace successfully to '%s'.\n", ws);
-		}
-		free(result);
-	}
-
-	if (g_config.haptic && g_haptic)
-		haptic_actuate(g_haptic, 3);
 }
 
 static void reset_gesture_state(gesture_ctx* ctx)
@@ -804,12 +655,6 @@ int main(int argc, const char* argv[])
 			g_config.swipe_right,
 			g_config.swipe_up,
 			g_config.swipe_down);
-
-		g_aerospace = aerospace_new(NULL);
-		if (!g_aerospace) {
-			fprintf(stderr, "Error: Failed to initialize Aerospace client.\n");
-			exit(EXIT_FAILURE);
-		}
 
 		if (g_config.haptic) {
 			g_haptic = haptic_open_default();

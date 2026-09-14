@@ -255,8 +255,8 @@ int omniwm_workspace_numbers(omniwm* c, int** out)
 // the workspace to cycle is the one under the CURSOR: OmniWM's
 // "current display" follows the focused window, and on an empty
 // workspace there is none — a swipe over the empty screen would cycle
-// the OTHER monitor. Same rule the aerospace-era cursor_monitor patch
-// enforced. Falls back to isCurrent when the frames don't resolve.
+// the OTHER monitor. Falls back to isCurrent when the frames don't
+// resolve.
 char* omniwm_active_workspace_under_cursor(omniwm* c)
 {
 	CGEventRef e = CGEventCreate(NULL);

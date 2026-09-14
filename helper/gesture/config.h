@@ -171,10 +171,9 @@ static Config load_config()
 	config.swipe_left = config.natural_swipe ? "next" : "prev";
 	config.swipe_right = config.natural_swipe ? "prev" : "next";
 
-	// Optional overrides. Anything that is not next/prev makes the
-	// horizontal swipe a no-op (switch_workspace refuses unknown
-	// directions before any aerospace call) — omacosy's OmniWM mode
-	// sets "none" so the daemon serves only the vertical gestures
+	// Optional overrides. next and prev cycle workspaces, a string with
+	// a '/' runs as a command, and anything else is a no-op. omacosy
+	// sets both to "", so the daemon serves only the vertical gestures
 	// while OmniWM owns the horizontal ones.
 	item = yyjson_obj_get(root, "swipe_left");
 	if (item && yyjson_is_str(item))

@@ -100,10 +100,10 @@ int main(int argc, char** argv)
 		char* r = omniwm_request(c, "query", payload);
 		if (r) { puts(r); free(r); } else rc = 1;
 	} else if (!strcmp(op, "slot") && argc > 2) {
-		// Super+N semantics: slot N of the display under the CURSOR —
-		// the aerospace-era translation OmniWM's name-global hotkeys
-		// lost (its "4" always means the main set's 4). Each further set
-		// is named 1N, 2N, ... by convention, so base falls out of the cursor
+		// Super+N semantics: slot N of the display under the CURSOR,
+		// which OmniWM's name-global hotkeys cannot express (its "4"
+		// always means the main set's 4). Each further set is named 1N,
+		// 2N, ... by convention, so base falls out of the cursor
 		// display's active workspace.
 		char* cur_s = omniwm_active_workspace_under_cursor(c);
 		rc = 1;

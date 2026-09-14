@@ -5,6 +5,8 @@
   "skip_empty": false,
   "fingers": 4,
   "cursor_monitor": true,
-  "swipe_up": "$HOME/.local/bin/omacosy-overview",
-  "swipe_down": "$HOME/.local/bin/omacosy-overview close"
+  "swipe_left": "",
+  "swipe_right": "",
+  "swipe_up": "$HOME/.local/bin/omacosy-overview >/dev/null 2>&1",
+  "swipe_down": "$HOME/.local/bin/omacosy-overview close >/dev/null 2>&1"
 }

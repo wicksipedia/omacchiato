@@ -370,17 +370,13 @@ fi
 # --- 5. Trackpad gestures (omacosy-gesture) ---------------------------------
 # The gesture engine — absorbed from aerospace-swipe (MIT, notice kept in
 # helper/gesture/LICENSE.aerospace-swipe) with every omacosy fix folded
-# in — runs as a user launch agent. Under AeroSpace the horizontal
-# swipes use its socket directly; under OmniWM each direction runs a
-# command. Config is COPIED (launch agents can't read ~/Documents — TCC).
+# in — runs as a user launch agent. OmniWM owns the horizontal swipes,
+# so this daemon keeps the vertical ones for the overview. Config is
+# COPIED (launch agents can't read ~/Documents — TCC).
 GESTURE_APP="$HOME/.local/share/omacosy/omacosy-gesture.app"
 GESTURE_BIN="$GESTURE_APP/Contents/MacOS/omacosy-gesture"
 mkdir -p "$HOME/.config/omacosy"
-if [ "$WM" = omniwm ]; then
-  cp "$REPO_DIR/config/gesture/config.omniwm.json" "$HOME/.config/omacosy/gesture.json"
-else
-  cp "$REPO_DIR/config/gesture/config.json" "$HOME/.config/omacosy/gesture.json"
-fi
+cp "$REPO_DIR/config/gesture/config.json" "$HOME/.config/omacosy/gesture.json"
 # the aerospace-swipe era: retire its agent, and its clone if it was ours
 if [ -f "$HOME/Library/LaunchAgents/com.acsandmann.swipe.plist" ]; then
   launchctl unload "$HOME/Library/LaunchAgents/com.acsandmann.swipe.plist" 2>/dev/null || true
@@ -413,7 +409,7 @@ if [ -n "$GESTURE_STALE" ]; then
   mkdir -p "$GESTURE_APP/Contents/MacOS"
   clang -std=c99 -O3 -fobjc-arc -arch arm64 \
     -Wno-pointer-integer-compare -Wno-incompatible-pointer-types-discards-qualifiers -Wno-absolute-value \
-    -o "$GESTURE_BIN" "$G/aerospace.c" "$G/omniwm.c" "$G/yyjson.c" "$G/haptic.c" "$G/event_tap.m" "$G/main.m" \
+    -o "$GESTURE_BIN" "$G/omniwm.c" "$G/yyjson.c" "$G/haptic.c" "$G/event_tap.m" "$G/main.m" \
     -framework CoreFoundation -framework IOKit -F/System/Library/PrivateFrameworks -framework MultitouchSupport \
     -framework ApplicationServices -framework Cocoa -ldl \
     || echo "omacosy-gesture build failed"
