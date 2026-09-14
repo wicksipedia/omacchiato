@@ -27,7 +27,7 @@ details are under [What's inside](#whats-inside).
 ## Fresh Mac
 
 ```sh
-git clone https://github.com/paulsp94/omacosy.git ~/.local/share/omacosy &&
+git clone https://github.com/wicksipedia/omacosy.git ~/.local/share/omacosy &&
 cd ~/.local/share/omacosy && ./install.sh
 ```
 
