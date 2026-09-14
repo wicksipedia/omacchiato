@@ -221,7 +221,7 @@ Done. Left in place on purpose:
   - The menu bar returns fully after logging out and back in.
   - Claude desktop's caps-lock dictation shortcut was removed during setup;
     re-enable it in Claude's settings if you used it.
-  - If AeroSpace still appears in System Settings -> General -> Login Items, remove it there.
+  - If AeroSpace or OmniWM still appears in System Settings -> General -> Login Items, remove it there.
   - OmniWM.app is a brew cask like the rest: removed above only when the
     manifest says omacosy installed it; one that predates omacosy stays.
   - Permission entries (Accessibility, Input Monitoring, Screen Recording,

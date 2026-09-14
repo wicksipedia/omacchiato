@@ -50,8 +50,11 @@ if ! command -v brew >/dev/null 2>&1; then
 fi
 
 # Homebrew >=6 refuses third-party taps until explicitly trusted
-brew trust nikitabobko/tap 2>/dev/null || true
 brew trust felixkratz/formulae 2>/dev/null || true
+
+# A Mac with AeroSpace running stays on it. Quitting a running window
+# manager strands the windows it parked off screen.
+if pgrep -xq AeroSpace; then WM=aerospace; else WM=omniwm; fi
 
 log "Installing packages (brew bundle)"
 PRE_FORMULAE="$(brew list --formula 2>/dev/null | sort)"
@@ -283,6 +286,12 @@ cp "$REPO_DIR/config/borders.conf" "$HOME/.config/omacosy/borders.conf"
 printf 'TERMINAL=%s\nBROWSER=%s\nMUSIC=%s\nMESSENGER=%s\n' \
   "$TERMINAL" "$BROWSER" "$MUSIC" "$MESSENGER" > "$HOME/.config/omacosy/apps.conf"
 
+# after apps.conf, so the injected rules launch the user's chosen apps
+if [ "$WM" = omniwm ]; then
+  "$REPO_DIR/bin/omacosy-karabiner-omniwm" install \
+    || log "WARNING: the OmniWM Karabiner rules did not install. Re-run install.sh."
+fi
+
 cat > "$HOME/Library/LaunchAgents/com.omacosy.borders.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -312,7 +321,10 @@ cat > "$HOME/Library/LaunchAgents/com.omacosy.ffm.plist" <<PLIST
 </plist>
 PLIST
 launchctl unload "$HOME/Library/LaunchAgents/com.omacosy.ffm.plist" 2>/dev/null || true
-launchctl load "$HOME/Library/LaunchAgents/com.omacosy.ffm.plist"
+# OmniWM's native focus-follows-mouse replaces this daemon, so it stays unloaded there.
+if [ "$WM" = aerospace ]; then
+  launchctl load "$HOME/Library/LaunchAgents/com.omacosy.ffm.plist"
+fi
 
 
 cat > "$HOME/Library/LaunchAgents/com.omacosy.bar.plist" <<PLIST
@@ -402,7 +414,11 @@ fi
 GESTURE_APP="$HOME/.local/share/omacosy/omacosy-gesture.app"
 GESTURE_BIN="$GESTURE_APP/Contents/MacOS/omacosy-gesture"
 mkdir -p "$HOME/.config/omacosy"
-cp "$REPO_DIR/config/gesture/config.json" "$HOME/.config/omacosy/gesture.json"
+if [ "$WM" = omniwm ]; then
+  cp "$REPO_DIR/config/gesture/config.omniwm.json" "$HOME/.config/omacosy/gesture.json"
+else
+  cp "$REPO_DIR/config/gesture/config.json" "$HOME/.config/omacosy/gesture.json"
+fi
 # the aerospace-swipe era: retire its agent, and its clone if it was ours
 if [ -f "$HOME/Library/LaunchAgents/com.acsandmann.swipe.plist" ]; then
   launchctl unload "$HOME/Library/LaunchAgents/com.acsandmann.swipe.plist" 2>/dev/null || true
@@ -481,17 +497,22 @@ fi
 # --- 7. Services ------------------------------------------------------------
 
 
-# OmniWM trial (this branch): installing NEVER switches the window
-# manager — a half-configured switch once stranded the user on one
-# workspace with no way back. AeroSpace starts as always; moving to
-# OmniWM is an explicit, dead-man-guarded step:
-#
-#   omacosy-wm-switch omniwm      # snapshot, grant-first, auto-revert
-#   omacosy-wm-switch aerospace   # the way back
-log "Starting AeroSpace (switch to OmniWM with: omacosy-wm-switch omniwm)"
-open -a AeroSpace
-sleep 1
-"$(command -v aerospace || echo /opt/homebrew/bin/aerospace)" reload-config 2>/dev/null || true
+# No handover happens here: WM is omniwm only when AeroSpace is not
+# running. omacosy-wm-switch does the guarded handover between two managers.
+if [ "$WM" = omniwm ]; then
+  log "Starting OmniWM (switch to AeroSpace with: omacosy-wm-switch aerospace)"
+  pgrep -xq OmniWM || open -a OmniWM \
+    || log "WARNING: OmniWM did not start. Check the brew bundle output above."
+  osascript -e 'tell application "System Events"
+    if exists login item "AeroSpace" then delete login item "AeroSpace"
+    if not (exists login item "OmniWM") then make new login item at end with properties {path:"/Applications/OmniWM.app", hidden:false}
+  end tell' 2>/dev/null || true
+else
+  log "Starting AeroSpace (switch to OmniWM with: omacosy-wm-switch omniwm)"
+  open -a AeroSpace
+  sleep 1
+  "$(command -v aerospace || echo /opt/homebrew/bin/aerospace)" reload-config 2>/dev/null || true
+fi
 
 # The remapping runs in launchd-managed services; the app itself is only
 # the settings window, and it costs ~92MB resident to leave open. Launch
@@ -504,10 +525,16 @@ else
   open -a Karabiner-Elements
 fi
 
-cat <<'EOF'
+if [ "$WM" = omniwm ]; then
+  STEP1="  1. Grant OmniWM     System Settings -> Privacy & Security -> Accessibility (required) and Input Monitoring (swipes)"
+else
+  STEP1="  1. Grant AeroSpace   System Settings -> Privacy & Security -> Accessibility"
+fi
+
+cat <<EOF
 
 Done. One-time macOS steps if this is a fresh machine:
-  1. Grant AeroSpace   System Settings -> Privacy & Security -> Accessibility
+$STEP1
   2. Karabiner-Elements: approve its driver extension + Input Monitoring
      when prompted (System Settings -> Privacy & Security)
   3. Korren isn't in the Brewfile — build it from the korren repo:

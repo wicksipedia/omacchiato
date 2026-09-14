@@ -22,6 +22,8 @@ A="$(command -v aerospace || echo /opt/homebrew/bin/aerospace)"
 STATE_DIR="$HOME/.local/state/omacosy"
 SNAP="$STATE_DIR/wm-switch-snapshot"
 mkdir -p "$STATE_DIR"
+# uninstall.sh removes only the casks that the manifest records
+mark() { grep -qxF "$1" "$STATE_DIR/manifest" 2>/dev/null || printf '%s\n' "$1" >> "$STATE_DIR/manifest"; }
 
 snapshot() {
   "$A" list-windows --all --format '%{window-id}|%{workspace}|%{app-name}' \
@@ -57,13 +59,11 @@ stop_aerospace_world() {
 
 case "${1:-}" in
 omniwm)
-  # the OmniWM option installs itself on first use — the default
-  # install stays AeroSpace-only and nobody downloads a second WM
-  # they never switch to
   if [ ! -d /Applications/OmniWM.app ]; then
     log "Installing OmniWM (first use of the omniwm option)"
     # 0.6.8 retired the project tap — the cask lives in homebrew/cask
     brew install --cask omniwm || { log "install failed"; exit 1; }
+    mark "brew-cask omniwm"
   fi
   snapshot
   log "Starting OmniWM ALONGSIDE AeroSpace (it stays passive until granted)"
@@ -129,6 +129,16 @@ omniwm)
   fi
   ;;
 aerospace)
+  # AeroSpace is not in the Brewfile, so the first switch installs it.
+  if [ ! -d /Applications/AeroSpace.app ]; then
+    log "Installing AeroSpace (first use of the aerospace option)"
+    brew trust nikitabobko/tap 2>/dev/null || true
+    brew install --cask nikitabobko/tap/aerospace || { log "install failed"; exit 1; }
+    mark "brew-cask aerospace"
+    echo
+    echo "  Grant AeroSpace in System Settings -> Privacy & Security -> Accessibility"
+    echo
+  fi
   log "Stopping OmniWM, starting the AeroSpace world"
   osascript -e 'tell application "System Events"
     if exists login item "OmniWM" then delete login item "OmniWM"

@@ -74,7 +74,7 @@ grant hide themselves rather than half-work.
 | Grant | Who asks | What it does | Without it |
 |---|---|---|---|
 | **Accessibility** | AeroSpace *or* OmniWM, `omacosy-gesture`, `omacosy-bar` (reads the focused app's menus for the app-pill popup), `omacosy-ffm` (AeroSpace mode only) | Move, resize and focus other apps' windows. This is the tiling itself, and it is the broadest permission here. | Nothing tiles. Not optional in practice. |
-| **Input Monitoring** | Karabiner-Elements, `omacosy-gesture` (and OmniWM, under that option) | Karabiner reads keys to remap Caps Lock; `omacosy-gesture` reads raw trackpad contacts, because macOS 26 stopped carrying touch data in normal events. | No Super key, no swipe gestures. |
+| **Input Monitoring** | Karabiner-Elements, `omacosy-gesture`, and OmniWM | Karabiner reads keys to remap Caps Lock; `omacosy-gesture` reads raw trackpad contacts, because macOS 26 stopped carrying touch data in normal events. | No Super key, no swipe gestures. |
 | **Screen Recording** | `omacosy-overview` | Captures a thumbnail per window for the overview cards, including windows the window manager has stashed offscreen. A screenshot of the visible screen could not see those. | Cards fall back to app icons and titles. |
 | **Bluetooth** | `omacosy-bar` | Reads adapter power and the paired-device list for the bluetooth pill and its menu. | The pill hides itself. |
 | **Location** | `omacosy-bar` | Reads **only** the wi-fi network's name, which macOS classes as location data. No coordinate is ever requested; the authorisation itself is what unlocks `CWInterface.ssid()`. | The wi-fi popup's title row reads "wi-fi" instead of your network's name. Everything else is unaffected. |
@@ -142,7 +142,7 @@ Your personal shell config belongs in `~/.zshrc.local`; the repo's
 
 | Piece | Tool | Config |
 |---|---|---|
-| Tiling WM | [AeroSpace](https://github.com/nikitabobko/AeroSpace) *or* [OmniWM](https://github.com/BarutSRB/OmniWM) via `omacosy-wm-switch` | `config/aerospace/aerospace.template.toml`, `config/omniwm/settings.toml` |
+| Tiling WM | [OmniWM](https://github.com/BarutSRB/OmniWM) by default, or [AeroSpace](https://github.com/nikitabobko/AeroSpace) via `omacosy-wm-switch` | `config/aerospace/aerospace.template.toml`, `config/omniwm/settings.toml` |
 | Super key | [Karabiner](https://karabiner-elements.pqrs.org) (Caps Lock → cmd+ctrl+alt) | `config/karabiner/` (copied, not symlinked — TCC) |
 | Status bar, popups, shade | `omacosy-bar` (self-compiled launchd agent, one process draws all of it) | `helper/bar.swift` |
 | Window borders + fullscreen shroud | `omacosy-borders` (self-compiled launchd agent) | `helper/borders.swift`, `config/borders.conf` |
@@ -501,7 +501,7 @@ typing or app shortcuts. Caps Lock tapped alone is Escape.
 | `Super+shift+;` | service mode (`esc` reload, `r` flatten, `⌫` close others) |
 | **Apps and system** | |
 | `Super+enter` / `Super+shift+enter` | terminal / browser |
-| `Super+space` | launcher (Raycast; the OmniWM option opens OmniWM's command palette instead) |
+| `Super+space` | launcher (OmniWM's command palette under OmniWM, Raycast under AeroSpace) |
 | `Super+shift+f` / `+m` / `+g` | files / music / messenger (set in `apps.conf`) |
 | `Super+shift+e` / `+c` / `+y` | Outlook / Teams / a YouTube web app |
 | `Super+shift+t` | next theme |
@@ -662,16 +662,22 @@ off. Instead the bar grows a pill whenever the focused workspace holds
 floats, and **Super+S** or a click on that pill surfaces the next one
 and brings the cursor with it.
 
-## Two window managers (OmniWM option, beta)
+## Two window managers
 
-AeroSpace is the default. [OmniWM](https://github.com/BarutSRB/OmniWM)
-is a newer, signed-and-notarized tiling WM with a native dwindle
-layout — omacosy can run on either, and switching is one command:
+OmniWM is the default: a fresh install runs
+[OmniWM](https://github.com/BarutSRB/OmniWM), a newer,
+signed-and-notarized tiling WM with a native dwindle layout. AeroSpace
+stays available and installs itself on first use. A Mac where
+AeroSpace is already running when `install.sh` runs stays on
+AeroSpace instead, because quitting a running window manager can
+strand the windows it parked off screen. Switching between the two
+afterward is one command:
 
 ```sh
-omacosy-wm-switch omniwm      # installs OmniWM on first use, then
-                              # switches with a guarded handover
-omacosy-wm-switch aerospace   # the way back
+omacosy-wm-switch omniwm      # switches to OmniWM (installs it first
+                              # on an older, AeroSpace-only install)
+omacosy-wm-switch aerospace   # switches back (installs AeroSpace
+                              # first if this machine never had it)
 ```
 
 The switch is deliberately paranoid: it snapshots your windows, waits
@@ -714,15 +720,14 @@ display is missing, OmniWM moves its workspaces to the nearest display. `Super+T
 under the cursor. `Super+Shift+O` and `Super+Shift+Space` throw to the
 workspace on show on the next display to the right.
 
-Honesty section: this option is daily-driven on the author's desk
-(0.6.4, docked multi-monitor, each display running its own nine
-workspaces), and docs/omniwm-port.md carries a ledger of upstream
-quirks found while porting — read it before assuming a weird layout is
-omacosy's fault. AeroSpace remains the longer-tested default.
+Honesty section: OmniWM is daily-driven on a docked multi-monitor desk,
+and docs/omniwm-port.md carries a ledger of upstream quirks found
+while porting — read it before assuming a weird layout is omacosy's
+fault. AeroSpace remains the longer-tested of the two.
 
 ## Focus follows mouse & swipes
 
-Under the OmniWM option this daemon is parked: OmniWM's native
+Under OmniWM this daemon is parked: OmniWM's native
 focus-follows-mouse (with warp-to-focus and hover-raise) replaces it.
 Under AeroSpace, `omacosy-ffm`: hover focuses, with no raise over floating windows, so
 floats stay in front. It is event-driven off mouse movement, so a
@@ -771,9 +776,9 @@ card on an empty chip moves that workspace there instead.
 
 ## Parking the setup
 
-`omacosy-toggle off` returns to a vanilla Mac in one command (AeroSpace
-stops managing, all daemons and the bar stop) without uninstalling;
-`omacosy-toggle on` brings everything back. No argument flips.
+`omacosy-toggle off` returns to a vanilla Mac in one command (the
+window manager stops managing, all daemons and the bar stop) without
+uninstalling; `omacosy-toggle on` brings everything back. No argument flips.
 
 ## Memory use
 

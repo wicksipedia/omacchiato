@@ -1,10 +1,8 @@
 # omacosy — everything the setup needs, installable via `brew bundle`
 
-tap "nikitabobko/tap"        # aerospace
-
 # Window management + bar + borders
-# (OmniWM is NOT here: `omacosy-wm-switch omniwm` installs it on first use)
-cask "aerospace"
+# (AeroSpace is NOT here: `omacosy-wm-switch aerospace` installs it on first use)
+cask "omniwm"
 cask "karabiner-elements"  # Caps Lock -> Super
 cask "ghostty"             # default terminal + floating TUI host (btop)
 cask "raycast"             # Super+Space launcher (the binding assumes it)
