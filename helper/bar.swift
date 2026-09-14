@@ -3629,7 +3629,9 @@ func rebuildSurfaces() {
     let ids = monitorIDs()
     var kept: [BarSurface] = []
     for screen in NSScreen.screens {
-        guard let id = ids[screen.localizedName] else { continue }
+        // With no window manager, draw on every screen anyway: the pills
+        // work, and the chips return when a manager answers.
+        guard let id = ids.isEmpty ? "" : ids[screen.localizedName] else { continue }
         if let existing = surfaces.first(where: { screenID($0.screen) == screenID(screen) }) {
             if existing.monitorID != id {
                 tlog("monitor: \(screen.localizedName) is now \(wm) monitor \(id) (was \(existing.monitorID))")
@@ -3985,6 +3987,14 @@ for event in [NSWorkspace.didLaunchApplicationNotification,
             }
         }
     }
+}
+
+// AeroSpace announces its launch to nobody, so while a surface has no
+// monitor, look for a window manager again every 5 s.
+Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
+    guard surfaces.contains(where: { $0.monitorID.isEmpty }) else { return }
+    rebuildSurfaces()
+    kickRebuild()
 }
 
 // front app: a notification, not a poll and not a script
@@ -4385,7 +4395,7 @@ model.focused = omniwmActive()
         .trimmingCharacters(in: .whitespacesAndNewlines)
 rebuildSurfaces()
 guard !surfaces.isEmpty else {
-    FileHandle.standardError.write("omacosy-bar: no display matched \(omniwmActive() ? "an omniwm" : "an aerospace") monitor\n".data(using: .utf8)!)
+    FileHandle.standardError.write("omacosy-bar: no screen to draw on\n".data(using: .utf8)!)
     exit(1)
 }
 apply(fetchSnapshot()) // blocking is fine here: the run loop has not started
