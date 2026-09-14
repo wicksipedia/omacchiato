@@ -89,11 +89,11 @@ def icon(pr, me):
     ci = ci_state(pr)
     if ci in FAILED or pr["mergeable"] == "CONFLICTING":
         return "💥"
+    if ci in RUNNING:
+        return "🏗️"
     if decision(pr) == "CHANGES_REQUESTED" or open_threads(pr, me):
         return "💬"
-    if decision(pr) == "APPROVED":
-        return "⏳" if ci in RUNNING else "✅"
-    return "⏳"
+    return "✅" if decision(pr) == "APPROVED" else "⏳"
 
 
 def status(pr, me):
@@ -234,7 +234,8 @@ def self_test():
     assert render([pr(1), muted], [], {"a/b#5"})["label"] == "1", "an unsubscribed PR is hidden"
     assert icon(pr(6, reviews=1, decision="APPROVED"), "me") == "✅"
     assert status(pr(6, reviews=1, decision="APPROVED"), "me") == "Ready to merge."
-    assert icon(pr(7, ci="PENDING", reviews=1, decision="APPROVED"), "me") == "⏳"
+    assert icon(pr(7, ci="PENDING", reviews=1, decision="APPROVED"), "me") == "🏗️"
+    assert icon(pr(7, ci="PENDING", reviews=1, threads=("them",)), "me") == "🏗️", "running CI shows before feedback"
     assert icon(pr(8, reviews=1, threads=("them",)), "me") == "💬"
     assert status(pr(8, reviews=1, threads=("them", "them")), "me") == "2 review threads to resolve. Waiting for review."
     assert icon(pr(9, threads=("me",)), "me") == "⏳", "your own thread is not feedback"

@@ -366,14 +366,16 @@ Arguments are extra GitHub search qualifiers. `-repo:owner/name` leaves
 out a repository of automated PRs, and `org:name` keeps one organisation.
 For the icon, the Nerd Font pull request glyph is U+F407.
 
-Each PR gets one mark, for what it needs next:
+Each PR gets one mark, for what it needs next. When more than one
+applies, the first in this list wins:
 
-- ✅ ready to merge: approved, with passing checks and no conflicts
+- 📝 a draft
+- 💥 CI failed, or the branch has merge conflicts
+- 🏗️ CI is running
 - 💬 feedback to resolve: changes requested, or a review thread from
   someone else that nobody has resolved
-- 💥 CI failed, or the branch has merge conflicts
-- ⏳ waiting for a review, or approved with CI still running
-- 📝 a draft
+- ✅ ready to merge: approved, with passing checks and no conflicts
+- ⏳ waiting for a review
 
 The pill turns red while CI fails on any open PR.
 
