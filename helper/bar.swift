@@ -744,7 +744,7 @@ let barPlugins: [BarPlugin] = {
 
 // A hidden pill also skips its provider, so hiding weather stops the
 // wttr.in fetches and hiding bluetooth never touches the Bluetooth grant.
-let rightOrder = (barPlugins.map(\.name) + rightOrderAll).filter { pillModes[$0] != "hide" }
+let rightOrder = (["menubar"] + barPlugins.map(\.name) + rightOrderAll).filter { pillModes[$0] != "hide" }
 let iconOnly = Set(pillModes.filter { $0.value == "icon" }.keys)
 var rightItems: [String: BarItem] = [:]
 // popup rows a plugin last returned, keyed by pill name
@@ -2196,6 +2196,7 @@ func popupRows(for name: String) -> [PopupRow] {
     case "wifi": return wifiRows()
     case "bluetooth": return bluetoothRows()
     case "appmenu": return appMenuRows()
+    case "menubar": return menuBarAppRows()
     default: return pluginRows[name] ?? []
     }
 }
@@ -2206,6 +2207,203 @@ func popupRows(for name: String) -> [PopupRow] {
 // the command runs with no native menu ever appearing. A navigation
 // stack lives for the popup's lifetime; "‹" walks back up.
 var appMenuStack: [(title: String, element: AXUIElement)] = []
+
+// --- menu bar apps -------------------------------------------------------
+// Third-party menu bar icons, read from each app's AXExtrasMenuBar. OmniWM's
+// MenuBarExtrasScanner reads the same attribute on macOS 27.
+struct MenuBarItem {
+    let app: NSRunningApplication
+    let element: AXUIElement
+    let label: String
+    let parked: Bool // the notch hides it: macOS parks such an icon at x = -1
+}
+
+// Call off the main thread: each app costs an Accessibility round trip.
+func menuBarItems() -> [MenuBarItem] {
+    let own = ProcessInfo.processInfo.processIdentifier
+    var items: [MenuBarItem] = []
+    for app in NSWorkspace.shared.runningApplications {
+        guard app.processIdentifier != own,
+              let id = app.bundleIdentifier, !id.hasPrefix("com.apple.") else { continue }
+        let ax = AXUIElementCreateApplication(app.processIdentifier)
+        AXUIElementSetMessagingTimeout(ax, 0.25) // a hung app must not stall the scan
+        var ref: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(ax, "AXExtrasMenuBar" as CFString, &ref) == .success,
+              let extras = ref, CFGetTypeID(extras) == AXUIElementGetTypeID() else { continue }
+        for element in axChildren(extras as! AXUIElement) {
+            let title = axString(element, "AXTitle")
+            items.append(MenuBarItem(app: app, element: element,
+                                     label: title.isEmpty ? axString(element, "AXDescription") : title,
+                                     parked: (axFrame(element)?.minX ?? -1) < 0))
+        }
+    }
+    return items
+}
+
+func axFrame(_ element: AXUIElement) -> CGRect? {
+    var pos: CFTypeRef?, size: CFTypeRef?
+    guard AXUIElementCopyAttributeValue(element, "AXPosition" as CFString, &pos) == .success,
+          AXUIElementCopyAttributeValue(element, "AXSize" as CFString, &size) == .success,
+          let pos, let size else { return nil }
+    var origin = CGPoint.zero, extent = CGSize.zero
+    AXValueGetValue(pos as! AXValue, .cgPoint, &origin)
+    AXValueGetValue(size as! AXValue, .cgSize, &extent)
+    return CGRect(origin: origin, size: extent)
+}
+
+// True when a menu bar point is on a display's top strip and not behind the
+// notch. The notch hides icons that do not fit, and a click there hits
+// nothing.
+func menuBarPointIsClickable(_ point: CGPoint) -> Bool {
+    for screen in NSScreen.screens {
+        guard let id = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else { continue }
+        let bounds = CGDisplayBounds(id) // global, top-left origin, like AX
+        guard bounds.contains(point), point.y - bounds.minY < 60 else { continue }
+        let left = screen.auxiliaryTopLeftArea, right = screen.auxiliaryTopRightArea
+        if left == nil && right == nil { return true } // no notch
+        let x = point.x - bounds.minX + screen.frame.minX
+        return [left, right].compactMap { $0 }.contains { x >= $0.minX && x <= $0.maxX }
+    }
+    return false
+}
+
+// macOS parks the hidden menu bar window just above its display (y = -39 on
+// the main one) and slides it down to show it. True once it is fully in place
+// over the given x.
+func menuBarIsShown(overX x: CGFloat) -> Bool {
+    guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else { return false }
+    for w in list where (w[kCGWindowLayer as String] as? Int) == Int(CGWindowLevelForKey(.mainMenuWindow)) {
+        guard let bounds = w[kCGWindowBounds as String],
+              let frame = CGRect(dictionaryRepresentation: bounds as! CFDictionary),
+              frame.minX <= x, x < frame.maxX else { continue }
+        var display: CGDirectDisplayID = 0
+        var count: UInt32 = 0
+        CGGetDisplaysWithPoint(CGPoint(x: x, y: frame.maxY - 1), 1, &display, &count)
+        if count > 0, abs(frame.minY - CGDisplayBounds(display).minY) < 1 { return true }
+    }
+    return false
+}
+
+// A real click on a menu bar icon, as OmniWM's HiddenBarClickForwarder clicks
+// one. The pointer first moves to the top edge above the icon so the hidden
+// menu bar slides in, then it clicks the icon's centre and moves back.
+// Returns false, and clicks nothing, when the icon has no clickable position.
+// Call off the main thread: it waits for the menu bar to appear.
+func clickMenuBarItem(_ item: MenuBarItem) -> Bool {
+    guard let before = axFrame(item.element),
+          let source = CGEventSource(stateID: .hidSystemState),
+          let start = CGEvent(source: nil)?.location else { return false }
+    func post(_ type: CGEventType, _ at: CGPoint) {
+        let event = CGEvent(mouseEventSource: source, mouseType: type, mouseCursorPosition: at, mouseButton: .left)
+        if type != .mouseMoved { event?.setIntegerValueField(.mouseEventClickState, value: 1) }
+        event?.post(tap: .cghidEventTap)
+    }
+    defer { CGWarpMouseCursorPosition(start) }
+    let t0 = DispatchTime.now().uptimeNanoseconds
+    post(.mouseMoved, CGPoint(x: before.midX, y: 0))
+    let deadline = t0 + 600_000_000
+    while !menuBarIsShown(overX: before.midX), DispatchTime.now().uptimeNanoseconds < deadline {
+        usleep(15_000)
+    }
+    tlog(String(format: "menubar click %@: menu bar ready after %.0f ms", item.app.localizedName ?? "?",
+                Double(DispatchTime.now().uptimeNanoseconds - t0) / 1_000_000))
+    guard let frame = axFrame(item.element) else { return false }
+    let point = CGPoint(x: frame.midX, y: frame.midY)
+    guard menuBarPointIsClickable(point) else { return false }
+    post(.mouseMoved, point)
+    usleep(10_000)
+    post(.leftMouseDown, point)
+    post(.leftMouseUp, point)
+    usleep(50_000)
+    return true
+}
+
+// The popup shows the last scan at once, and a new scan refreshes it.
+var menuBarCache: [MenuBarItem]?
+var menuBarScanning = false
+var menuBarScannedAt = Date.distantPast
+
+// The first line of an icon's label, without the app's name in front:
+// "OneDrive — TinaCMS" becomes "TinaCMS".
+func menuBarLabel(_ raw: String, app: String) -> String {
+    var label = raw.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
+    for sep in [" — ", " - ", ": "] where label.hasPrefix(app + sep) {
+        label = String(label.dropFirst(app.count + sep.count))
+    }
+    return label.trimmingCharacters(in: .whitespaces)
+}
+
+// macOS's "Move focus to status menus" shortcut, Ctrl+F8: it shows the
+// hidden menu bar with keyboard focus on its icons.
+func showMenuBar() {
+    let source = CGEventSource(stateID: .hidSystemState)
+    for down in [true, false] {
+        let key = CGEvent(keyboardEventSource: source, virtualKey: 100, keyDown: down)
+        key?.flags = [.maskControl, .maskSecondaryFn] // a function key carries Fn
+        key?.post(tap: .cghidEventTap)
+    }
+}
+
+func menuBarAppRows() -> [PopupRow] {
+    let opts = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
+    guard AXIsProcessTrustedWithOptions(opts) else {
+        return [PopupRow(text: "grant Accessibility to omacosy-bar", hero: true),
+                PopupRow(text: "System Settings opened the pane — toggle the bar on,", dim: true),
+                PopupRow(text: "then click the pill again", dim: true)]
+    }
+    // refreshPopup() calls back in here, so a finished scan must not start another
+    if !menuBarScanning, Date().timeIntervalSince(menuBarScannedAt) > 2 {
+        menuBarScanning = true
+        DispatchQueue.global(qos: .userInitiated).async {
+            let items = menuBarItems()
+            DispatchQueue.main.async {
+                let keys = { (list: [MenuBarItem]) in list.map { "\($0.app.processIdentifier)|\($0.label)" } }
+                let changed = menuBarCache.map(keys) != keys(items)
+                menuBarCache = items
+                menuBarScanning = false
+                menuBarScannedAt = Date()
+                if changed, openPopup == "menubar" { refreshPopup() }
+            }
+        }
+    }
+    var rows: [PopupRow] = []
+    if let items = menuBarCache {
+        let perApp = Dictionary(grouping: items, by: { $0.app.processIdentifier }).mapValues(\.count)
+        for item in items {
+            let name = item.app.localizedName ?? item.app.bundleIdentifier ?? "?"
+            var text = name
+            // alone, most labels are empty or a symbol name, so a label only
+            // tells two icons from the same app apart
+            if perApp[item.app.processIdentifier, default: 0] > 1 {
+                let label = menuBarLabel(item.label, app: name)
+                if !label.isEmpty { text += " · " + label }
+            }
+            rows.append(PopupRow(image: item.app.icon, text: text, detail: item.parked ? "opens app" : "", action: {
+                closePopup()
+                // A real click, as a hand gives one: AXPress on an icon behind
+                // the notch leaves the menu bar stuck on screen until that app
+                // quits. An icon with nowhere to click opens its app instead.
+                DispatchQueue.global(qos: .userInitiated).async {
+                    guard item.parked || !clickMenuBarItem(item) else { return }
+                    tlog("menubar: \(name) has no clickable icon, opening the app")
+                    DispatchQueue.main.async {
+                        guard let url = item.app.bundleURL else { return }
+                        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+                    }
+                }
+            }))
+        }
+        if items.isEmpty { rows.append(PopupRow(text: "No menu bar apps running", dim: true)) }
+    } else {
+        rows.append(PopupRow(text: "Looking…", dim: true))
+    }
+    rows.append(PopupRow(separator: true))
+    rows.append(PopupRow(text: "Show menu bar", detail: "⌃F8", dim: true, action: {
+        closePopup()
+        showMenuBar()
+    }))
+    return rows
+}
 
 private func axChildren(_ element: AXUIElement) -> [AXUIElement] {
     var ref: CFTypeRef?
@@ -4198,6 +4396,7 @@ for name in [NSNotification.Name.NSProcessInfoPowerStateDidChange,
 refreshPowerMode()
 updateBrightness()
 updateWifi()
+set("menubar") { $0.icon = "\u{F003B}" }
 if rightOrder.contains("weather") { updateWeather() }
 startPlugins()
 repaint()

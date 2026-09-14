@@ -213,8 +213,9 @@ Tahoe bug, most often poked by a Focus mode's menu-bar icon),
 ### Choosing pills
 
 `~/.config/omacosy/bar-pills.conf` sets what each right-cluster pill does,
-one `<name> = <mode>` per line. The names are `weather`, `wifi`,
-`bluetooth`, `brightness`, `volume`, `battery`, `clock` and `activity`.
+one `<name> = <mode>` per line. The names are `menubar`, `weather`,
+`wifi`, `bluetooth`, `brightness`, `volume`, `battery`, `clock` and
+`activity`.
 The modes are `hide` and `icon`. `volume` also takes `muted`, and `battery`
 takes `time`. Lines starting with `#` are comments.
 
@@ -396,6 +397,15 @@ startup and does no config-file or image-file I/O while it draws.
   nothing. Click to open Music. Centered on flat displays, left cluster
   on notched ones (per-display notch detection via
   `NSScreen.safeAreaInsets`), hidden when Music isn't running.
+- **Menu bar apps**: the grid pill lists the third-party apps that have an
+  icon in the hidden macOS menu bar. A click on a row gives that icon a real
+  click: the pointer moves to the top edge so the menu bar slides in (about
+  0.25 s), the bar clicks the icon, and the pointer moves back. An icon that
+  the notch hides has nowhere to click, so its row says `opens app` and opens
+  the app instead. `Show menu bar ⌃F8` shows the menu bar with keyboard focus
+  on its icons. The bar does not use Accessibility's `AXPress` here: a press
+  on an icon behind the notch left the menu bar stuck on screen until that
+  app quit.
 - **Bluetooth**: device menu (click to connect/disconnect), power
   toggle.
 - **WiFi**: the pill is the icon alone; the popup names the network and
