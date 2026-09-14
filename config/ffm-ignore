@@ -1,8 +1,0 @@
-# omacosy-ffm ignore list — hovering these apps never moves focus
-# (one app name per line, as shown in the window owner / cmd-tab;
-# omarchy does the same for JetBrains IDEs whose popups break on
-# hover-focus)
-#
-# IntelliJ IDEA
-# PyCharm
-# GoLand

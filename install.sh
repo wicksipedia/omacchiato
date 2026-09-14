@@ -249,18 +249,17 @@ launchctl unload "$HOME/Library/LaunchAgents/com.omacosy.borders.plist" 2>/dev/n
 rm -f "$HOME/Library/LaunchAgents/com.omacosy.borders.plist" "$HOME/.local/bin/omacosy-borders" \
   "$HOME/.config/omacosy/borders.conf"
 
-# focus-follows-mouse daemon (own binary so helper rebuilds never
-# invalidate its Accessibility grant); runs as a launchd agent
-if [ ! -x "$HOME/.local/bin/omacosy-ffm" ] || [ "$REPO_DIR/helper/ffm.swift" -nt "$HOME/.local/bin/omacosy-ffm" ]; then
-  log "Building omacosy-ffm (grant Accessibility when prompted)"
-  swiftc -O -F /System/Library/PrivateFrameworks -framework SkyLight -o "$HOME/.local/bin/omacosy-ffm" "$REPO_DIR/helper/ffm.swift"
-fi
+# omacosy-ffm is gone: OmniWM has its own focus-follows-mouse setting
+# (followsMouse). An older install still has the daemon and its agent.
+launchctl bootout "gui/$(id -u)/com.omacosy.ffm" 2>/dev/null || true
+launchctl unload "$HOME/Library/LaunchAgents/com.omacosy.ffm.plist" 2>/dev/null || true
+rm -f "$HOME/Library/LaunchAgents/com.omacosy.ffm.plist" "$HOME/.local/bin/omacosy-ffm" \
+  "$HOME/.config/omacosy/ffm-ignore"
 
 # stable code identity so TCC grants survive rebuilds (skipped when no
 # signing identity is present — then re-grant after each rebuild)
 if security find-identity -p codesigning -v 2>/dev/null | grep -q "Apple Development"; then
   codesign -f -s "Apple Development" --identifier com.omacosy.helper "$HOME/.local/bin/omacosy-helper" 2>/dev/null || true
-  codesign -f -s "Apple Development" --identifier com.omacosy.ffm "$HOME/.local/bin/omacosy-ffm" 2>/dev/null || true
   # the BUNDLE is signed now; the identifier is what grants key on
   codesign -f -s "Apple Development" --identifier com.omacosy.bar "$BAR_APP" 2>/dev/null || true
   codesign -f -s "Apple Development" --identifier com.omacosy.overview "$HOME/.local/bin/omacosy-overview" 2>/dev/null || true
@@ -277,12 +276,10 @@ fi
 # would be overwritten and every rebuild would invalidate the
 # Accessibility grant again)
 
-# hover-ignore list (launchd agents can't read ~/Documents — copied)
 mkdir -p "$HOME/.config/omacosy"
-cp "$REPO_DIR/config/ffm-ignore" "$HOME/.config/omacosy/ffm-ignore"
-# app choices, RESOLVED (apps.local.conf already applied), for the same
-# reason: the bar's activity pill launches $TERMINAL and cannot read the
-# repo from a launchd agent when the clone is TCC-protected
+# app choices, RESOLVED (apps.local.conf already applied) and copied: the
+# bar's activity pill launches $TERMINAL and cannot read the repo from a
+# launchd agent when the clone is TCC-protected
 printf 'TERMINAL=%s\nBROWSER=%s\nMUSIC=%s\nMESSENGER=%s\n' \
   "$TERMINAL" "$BROWSER" "$MUSIC" "$MESSENGER" > "$HOME/.config/omacosy/apps.conf"
 
@@ -291,26 +288,6 @@ if [ "$WM" = omniwm ]; then
   "$REPO_DIR/bin/omacosy-karabiner-omniwm" install \
     || log "WARNING: the OmniWM Karabiner rules did not install. Re-run install.sh."
 fi
-
-cat > "$HOME/Library/LaunchAgents/com.omacosy.ffm.plist" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key><string>com.omacosy.ffm</string>
-  <key>ProgramArguments</key><array><string>$HOME/.local/bin/omacosy-ffm</string></array>
-  <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><true/>
-  <key>StandardErrorPath</key><string>/tmp/omacosy-ffm.err</string>
-</dict>
-</plist>
-PLIST
-launchctl unload "$HOME/Library/LaunchAgents/com.omacosy.ffm.plist" 2>/dev/null || true
-# OmniWM's native focus-follows-mouse replaces this daemon, so it stays unloaded there.
-if [ "$WM" = aerospace ]; then
-  launchctl load "$HOME/Library/LaunchAgents/com.omacosy.ffm.plist"
-fi
-
 
 cat > "$HOME/Library/LaunchAgents/com.omacosy.bar.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
