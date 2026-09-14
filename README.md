@@ -323,6 +323,37 @@ neither. That payload has only the five-hour and weekly windows, and after
 a window rolls over with no session running it reports `--` rather than a
 percentage for a window that no longer exists.
 
+### GitHub pull requests pill
+
+`omacosy-github-prs` lists the open pull requests you authored. It needs
+the GitHub CLI, signed in with `gh auth login`. The pill shows how many
+PRs are open and adds `!` when one of them has an update. The popup groups
+the PRs by repository. Each PR row starts with its CI state, and the line
+under it says what the PR waits for. Clicking either line opens the PR. To
+drop a PR from the list, unsubscribe from its notifications on GitHub.
+
+```
+[github]
+command = omacosy-github-prs -repo:owner/bots
+interval = 120
+```
+
+Arguments are extra GitHub search qualifiers. `-repo:owner/name` leaves
+out a repository of automated PRs, and `org:name` keeps one organisation.
+For the icon, the Nerd Font pull request glyph is U+F407.
+
+The CI marks are ✅ passed, ⏳ running, ❌ failed and ⚪ no checks. The
+pill turns red while CI fails on any open PR.
+
+An update is an unread GitHub notification on the PR. GitHub marks the
+notification read when you open the PR, so the `!` goes at the next run
+after you look. A PR merged (🟣) or closed (⚫) in the last week stays in
+the list while its notification is unread.
+
+To find those notifications the script reads every page of your unread
+inbox, about half a second per 50, while the search runs. When GitHub is
+out of reach, the popup keeps the last list and says when it was fetched.
+
 ### Microphone and Keep Awake pills
 
 `omacosy-keep-awake` is another example pill. It shows a cup while
