@@ -11,15 +11,15 @@ this one repo.
 
 ![The omacosy desktop — themed bar over the osaka-jade wallpaper](docs/screenshots/desktop.jpg)
 
-The whole environment idles at about **157MB** of memory. Numbers per
+The whole environment idles at about **306MB** of memory under OmniWM. Numbers per
 process in [Memory use](#memory-use).
 
 Most of it is seven small signed binaries (Swift and C) built by the installer,
 because several of the existing tools are broken on macOS 26. The
 details are under [What's inside](#whats-inside).
 
-> Built for macOS 26 (Tahoe) on one desk: a MacBook Pro plus one
-> external display. It tries to generalize (display roles instead of
+> Built for macOS 26 (Tahoe), and used daily on macOS 27, on one desk:
+> a MacBook Pro plus two external displays. It tries to generalize (display roles instead of
 > hardware names, per-display notch detection), but so far it has only
 > run on this machine. The permission setup is real work. Issues and
 > PRs welcome; support promises are not made.
@@ -227,7 +227,7 @@ Tahoe bug, most often poked by a Focus mode's menu-bar icon),
 
 `~/.config/omacosy/bar-pills.conf` sets what each right-cluster pill does,
 one `<name> = <mode>` per line. The names are `menubar`, `weather`,
-`wifi`, `bluetooth`, `brightness`, `volume`, `battery`, `clock` and
+`wifi`, `bluetooth`, `brightness`, `volume`, `mic`, `battery`, `clock` and
 `activity`.
 The modes are `hide` and `icon`. `volume` also takes `muted`, and `battery`
 takes `time`. Lines starting with `#` are comments.
@@ -572,15 +572,18 @@ switches the focused monitor's slot N (via `omacosy-ws`);
 the window to the same slot on the other monitor. Windows open on the
 workspace you're on; nothing is auto-assigned by app.
 
-**Unplugging folds the second display's workspaces into the first.**
-AeroSpace parks 11–19 on the remaining display, but `Super+N` and
+**Unplugging keeps every workspace reachable.** Under OmniWM, a
+workspace whose display is gone moves to the nearest display, and
+`Super+N` still reaches it. Under AeroSpace, the remaining display gets
+11–19, but `Super+N` and
 `Super+Tab` only match single-digit slots, so without help every window
 on a secondary workspace would be stranded where no keybinding reaches
 it. On a monitor-count change the bar runs `omacosy-ws-collapse`: each
 occupied guest workspace empties into the lowest free 1–9 slot,
 occupied slots are never touched, and every moved window is recorded
-with its origin. Plug the display back in and they go home
-individually, so anything you opened while undocked stays put.
+with its origin. Under OmniWM the script runs only when one display
+remains. Plug the display back in and they go home individually, so
+anything you opened while undocked stays put.
 
 ## Themes
 
@@ -739,7 +742,8 @@ Under OmniWM the plumbing changes shape: `Super+N`/`Hyper+N` route
 through Karabiner into `omacosy-omni` (a held-socket IPC client) so
 slots resolve on the display under your cursor — OmniWM's native
 hotkeys are name-global and would always hit the main set — at the
-cost of ~40 ms per chord. `Hyper+arrows` swap tiles; OmniWM's own
+cost of a shell command per chord (the IPC round trip itself takes
+about 4 ms). `Hyper+arrows` swap tiles; OmniWM's own
 directional move *stacks* windows into a group, which stays available
 on `ctrl+opt+shift+arrows`.
 
@@ -831,35 +835,33 @@ uninstalling; `omacosy-toggle on` brings everything back. No argument flips.
 
 ## Memory use
 
-About **157MB** of physical footprint (what Activity Monitor calls
-Memory) across WM, bar, three background daemons, the gesture daemon and
-Karabiner, measured docked to a second display. Resident set size reads
-~322MB, but RSS counts each process's share of the same shared system
-frameworks more than once, so footprint is the number to compare.
-(Measured in AeroSpace mode; OmniWM mode is a wash — its ~44MB WM
-replaces AeroSpace plus the parked `omacosy-ffm`.)
-Largest first:
+About **306MB** of physical footprint (what Activity Monitor calls
+Memory) across OmniWM, the bar, the overview and border daemons, the
+gesture daemon and Karabiner's two user processes. It was measured on
+2026-09-14 under OmniWM, docked to two external displays. Footprint is
+the number to compare: resident set size counts each process's share of
+the shared system frameworks more than once. Karabiner's three root
+processes need root to measure, so they are not in the total; their
+resident size is about 39MB. Largest first:
 
-| | footprint | RSS |
-|---|---|---|
-| `omacosy-overview` | 36MB | 46MB |
-| `omacosy-bar` | 32MB | 55MB |
-| AeroSpace | 24MB | 85MB |
-| Karabiner (4 processes) | 24MB | 61MB |
-| `omacosy-borders` | 19MB | 29MB |
-| `omacosy-gesture` | 13MB | 22MB |
-| `omacosy-ffm` | 10MB | 24MB |
+| | footprint |
+|---|---|
+| OmniWM | 169MB |
+| Karabiner (2 user processes) | 47MB |
+| `omacosy-bar` | 42MB |
+| `omacosy-overview` | 24MB |
+| `omacosy-borders` | 13MB |
+| `omacosy-gesture` | 11MB |
 
-On one display the same set measured ~155MB; the bar and the border
-overlay each draw per-screen, and AeroSpace carries a second workspace
-set. The figures move with uptime. `omacosy-overview` caches a
+Upstream measured the AeroSpace set at about 157MB, with AeroSpace at
+24MB and `omacosy-ffm` at 10MB, so OmniWM alone takes more than that
+whole set did. The figures move with uptime. `omacosy-overview` caches a
 half-resolution capture per window shown, so it starts near 9MB and
-settles around 37MB; it plateaus there rather than climbing, because
-the cache is refiltered to the visible set on each open. AeroSpace
-drifts the other way, reading higher the longer it runs. Packaging the
-bar as an `.app` (which is what unlocks the wi-fi network name) cost
-about 1MB; the bundle is a directory and an Info.plist, not a second
-copy of anything.
+settles between about 25MB and 37MB. It plateaus there rather than
+climbing, because it filters the cache to the visible set on each open.
+Packaging the bar as an `.app` (which is what unlocks the wi-fi network
+name) cost about 1MB; the bundle is a directory and an Info.plist, not a
+second copy of anything.
 
 ## Back to a normal Mac
 
