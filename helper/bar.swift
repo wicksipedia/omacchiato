@@ -2242,12 +2242,14 @@ func menuBarItems() -> [MenuBarItem] {
 
 func axFrame(_ element: AXUIElement) -> CGRect? {
     var pos: CFTypeRef?, size: CFTypeRef?
+    var origin = CGPoint.zero, extent = CGSize.zero
+    // the cast to AXValue is unchecked, so check the type ID before it
     guard AXUIElementCopyAttributeValue(element, "AXPosition" as CFString, &pos) == .success,
           AXUIElementCopyAttributeValue(element, "AXSize" as CFString, &size) == .success,
-          let pos, let size else { return nil }
-    var origin = CGPoint.zero, extent = CGSize.zero
-    AXValueGetValue(pos as! AXValue, .cgPoint, &origin)
-    AXValueGetValue(size as! AXValue, .cgSize, &extent)
+          let pos, let size,
+          CFGetTypeID(pos) == AXValueGetTypeID(), CFGetTypeID(size) == AXValueGetTypeID(),
+          AXValueGetValue(pos as! AXValue, .cgPoint, &origin),
+          AXValueGetValue(size as! AXValue, .cgSize, &extent) else { return nil }
     return CGRect(origin: origin, size: extent)
 }
 
