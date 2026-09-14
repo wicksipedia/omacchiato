@@ -93,7 +93,7 @@ def icon(pr, me):
         return "💬"
     if decision(pr) == "APPROVED":
         return "⏳" if ci in RUNNING else "✅"
-    return "🙋"
+    return "⏳"
 
 
 def status(pr, me):
@@ -228,7 +228,7 @@ def self_test():
     assert texts[1].startswith("🟣 #3 ") and texts[2].strip() == "Merged.", texts
     assert texts[3].startswith("💥 #2 ") and len(texts[3]) == len("💥 #2 ") + TITLE_MAX, texts
     assert texts[4].strip() == "CI failed. Approved.", texts
-    assert texts[5].startswith("🙋 #1 ") and texts[6].strip() == "Waiting for a first review.", texts
+    assert texts[5].startswith("⏳ #1 ") and texts[6].strip() == "Waiting for a first review.", texts
     assert render([pr(1)], [], set())["label"] == "1"
     muted = dict(pr(5), viewerSubscription="UNSUBSCRIBED")
     assert render([pr(1), muted], [], {"a/b#5"})["label"] == "1", "an unsubscribed PR is hidden"
@@ -237,7 +237,7 @@ def self_test():
     assert icon(pr(7, ci="PENDING", reviews=1, decision="APPROVED"), "me") == "⏳"
     assert icon(pr(8, reviews=1, threads=("them",)), "me") == "💬"
     assert status(pr(8, reviews=1, threads=("them", "them")), "me") == "2 review threads to resolve. Waiting for review."
-    assert icon(pr(9, threads=("me",)), "me") == "🙋", "your own thread is not feedback"
+    assert icon(pr(9, threads=("me",)), "me") == "⏳", "your own thread is not feedback"
     assert icon(dict(pr(10), mergeable="CONFLICTING"), "me") == "💥"
     print("ok")
 

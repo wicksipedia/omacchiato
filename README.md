@@ -372,8 +372,7 @@ Each PR gets one mark, for what it needs next:
 - 💬 feedback to resolve: changes requested, or a review thread from
   someone else that nobody has resolved
 - 💥 CI failed, or the branch has merge conflicts
-- 🙋 waiting for a review
-- ⏳ approved, with CI still running
+- ⏳ waiting for a review, or approved with CI still running
 - 📝 a draft
 
 The pill turns red while CI fails on any open PR.
