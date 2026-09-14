@@ -137,8 +137,13 @@ TERMINAL=Korren
 BROWSER=Arc
 ```
 
+The music app only sets what `Super+shift+m` opens. The media pill
+reads Apple Music whichever app you pick.
+
 Your personal shell config belongs in `~/.zshrc.local`; the repo's
-`zshrc` wires the CLI stack and sources it.
+`zshrc` wires the CLI stack and sources it. Put an alias or setting
+that must override the CLI stack in `~/.zshrc.after`, which `zshrc`
+sources last.
 
 ## What's inside
 
@@ -148,7 +153,7 @@ Your personal shell config belongs in `~/.zshrc.local`; the repo's
 | Super key | [Karabiner](https://karabiner-elements.pqrs.org) (Caps Lock → cmd+ctrl+alt) | `config/karabiner/` (copied, not symlinked — TCC) |
 | Status bar, popups, shade | `omacosy-bar` (self-compiled launchd agent, one process draws all of it) | `helper/bar.swift` |
 | Window borders + fullscreen shroud | `omacosy-borders` (self-compiled launchd agent) | `helper/borders.swift`, `config/borders.conf` |
-| Focus follows mouse | `omacosy-ffm` (self-compiled launchd agent; parked under OmniWM, whose native ffm takes over) | `helper/ffm.swift`, `config/ffm-ignore` |
+| Focus follows mouse | `omacosy-ffm` (self-compiled launchd agent, AeroSpace only; under OmniWM, focus follows clicks and keys) | `helper/ffm.swift`, `config/ffm-ignore` |
 | Trackpad gestures | `omacosy-gesture` (self-compiled launchd agent; engine absorbed from [aerospace-swipe](https://github.com/acsandmann/aerospace-swipe), MIT) | `helper/gesture/`, `config/gesture/` (live copy: `~/.config/omacosy/gesture.json`) |
 | Workspace overview | `omacosy-overview` (self-compiled resident daemon) | `helper/overview.swift` |
 | Dwindle split direction | AeroSpace: `on-focus-changed` hook running `omacosy-helper split-hint`; OmniWM: native dwindle + a preselect in `omacosy-spawn` (omarchy's right/below insertion) | `config/aerospace/aerospace.template.toml`, `helper/main.swift` |
@@ -157,7 +162,7 @@ Your personal shell config belongs in `~/.zshrc.local`; the repo's
 | Park/restore the stack | `omacosy-toggle` | `bin/omacosy-toggle` |
 | System glue | `omacosy-helper` (self-compiled) | `helper/main.swift` |
 | Prompt | starship | `config/starship.toml` |
-| Shell | zsh | `zsh/zshrc` + your `~/.zshrc.local` |
+| Shell | zsh | `zsh/zshrc` + your `~/.zshrc.local` and `~/.zshrc.after` |
 | CLI stack | fzf, eza, zoxide, ripgrep, bat, lazygit, btop | wired in `zsh/zshrc` |
 
 Why so much of it is self-built:
@@ -187,7 +192,7 @@ Why so much of it is self-built:
 - **`omacosy-bar`** holds the window model in memory and subscribes to
   the system's own publishers: SkyLight for window churn, IOBluetooth
   for connects, SCDynamicStore for the network, IOPS for battery,
-  CoreAudio for volume, DisplayServices for brightness, Spotify's own
+  CoreAudio for volume, DisplayServices for brightness, Apple Music's own
   broadcast for the track. It polls for nothing macOS announces; its
   only timers are the weather fetch and the clock. A workspace switch
   repaints in 2.5 ms because it asks no one anything; the shell bar it
@@ -309,9 +314,14 @@ one, because an absent `icon` falls back to the glyph the config names.
 `omacosy-claude-usage` ships as an example. It colours the pill by how far
 into the five-hour window you are, and opens a popup with that window, the
 weekly one, each per-model weekly window, and any extra usage credits.
+Each bar has a tick at the share of its window that has passed, and its
+colour compares the two. It is green at or near an even pace, yellow more
+than 5 points ahead, and red more than 20 points ahead or at 90% used.
 
-The first row reports Claude's service status from status.claude.com and
-opens the status page when clicked.
+The first row reports the status of the Claude Code component on
+status.claude.com and opens the status page when clicked. It ignores the
+page's overall rating, which also drops when another Claude product has a
+problem.
 
 It reads Anthropic's OAuth usage endpoint with the Claude CLI's own token,
 caching the answer for five minutes, because only that endpoint carries the
@@ -324,6 +334,18 @@ statusline payload saved by `omacosy-claude-statusline`, which needs
 neither. That payload has only the five-hour and weekly windows, and after
 a window rolls over with no session running it reports `--` rather than a
 percentage for a window that no longer exists.
+
+To save that payload, make `omacosy-claude-statusline` the statusline
+command in `~/.claude/settings.json`, followed by the statusline command
+you already use. With nothing after it, the script only saves the
+payload.
+
+```json
+"statusLine": {
+  "type": "command",
+  "command": "$HOME/.local/share/omacosy/bin/omacosy-claude-statusline ~/.claude/statusline.sh"
+}
+```
 
 ### GitHub pull requests pill
 
@@ -503,6 +525,8 @@ typing or app shortcuts. Caps Lock tapped alone is Escape.
 | **Layout** | |
 | `Super+w` | close window |
 | `Super+t` | toggle floating |
+| `Super+backtick` | OmniWM: show or hide scratchpad 1 |
+| `Super+shift+backtick` | OmniWM: send the focused window to scratchpad 1 |
 | `Super+j` | toggle split direction |
 | `Super+-` / `Super+=` | narrower / wider. OmniWM: the column under niri, the split under dwindle |
 | `Super+shift+-` / `Super+shift+=` | OmniWM: shorter / taller, in either layout |
@@ -738,8 +762,9 @@ fault. AeroSpace remains the longer-tested of the two.
 
 ## Focus follows mouse & swipes
 
-Under OmniWM this daemon is parked: OmniWM's native
-focus-follows-mouse (with warp-to-focus and hover-raise) replaces it.
+Under OmniWM this daemon is parked, and focus follows clicks and keys
+only, because `followsMouse` is off in `config/omniwm/settings.toml`.
+When a key moves focus, OmniWM moves the pointer to the focused window.
 Under AeroSpace, `omacosy-ffm`: hover focuses, with no raise over floating windows, so
 floats stay in front. It is event-driven off mouse movement, so a
 parked cursor never steals focus from a launching window. It never
@@ -760,7 +785,10 @@ swipe left or right scrolls the columns and focuses the column it stops
 on, and a fast flick can pass more than one column. The daemon keeps
 only the 4-finger swipe up for the overview. `macos-defaults.sh` turns
 off the system's 3-finger swipe between full-screen apps so the two do
-not fight.
+not fight. The finger counts are in the `[gestures]` table of
+`config/omniwm/settings.toml`. An existing `~/.config/omniwm/settings.toml`
+keeps its own values, so set `fingerCount = 3` and
+`workspaceSwipeFingerCount = 4` there to match.
 
 ## Workspace overview
 
