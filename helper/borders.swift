@@ -241,8 +241,9 @@ var omniwmCheckedAt = Date.distantPast
 func omniwmActive() -> Bool {
     if Date().timeIntervalSince(omniwmCheckedAt) < 0.5 { return omniwmCached }
     omniwmCheckedAt = Date()
+    // a prefix, so the dev build (com.barut.OmniWM.dev) counts too
     omniwmCached = NSWorkspace.shared.runningApplications.contains {
-        $0.bundleIdentifier == "com.barut.OmniWM"
+        $0.bundleIdentifier?.hasPrefix("com.barut.OmniWM") == true
     }
     return omniwmCached
 }

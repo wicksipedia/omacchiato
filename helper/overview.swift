@@ -175,8 +175,9 @@ func aerospace(_ args: [String]) -> String {
 // in-process lookup, cheap enough to be the whole detection.
 let omniwmBundleID = "com.barut.OmniWM"
 
+// Match by prefix: the dev build, com.barut.OmniWM.dev, uses the same socket.
 func omniwmActive() -> Bool {
-    !NSRunningApplication.runningApplications(withBundleIdentifier: omniwmBundleID).isEmpty
+    NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier?.hasPrefix(omniwmBundleID) == true }
 }
 
 let omniwmctlBin = ["/opt/homebrew/bin/omniwmctl",

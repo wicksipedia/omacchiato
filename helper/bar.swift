@@ -105,8 +105,13 @@ func aerospace(_ args: [String]) -> String {
 // in-process lookup, cheap enough to be the whole detection.
 let omniwmBundleID = "com.barut.OmniWM"
 
+// Match by prefix: the dev build, com.barut.OmniWM.dev, uses the same socket.
+func isOmniWM(_ app: NSRunningApplication) -> Bool {
+    app.bundleIdentifier?.hasPrefix(omniwmBundleID) == true
+}
+
 func omniwmActive() -> Bool {
-    !NSRunningApplication.runningApplications(withBundleIdentifier: omniwmBundleID).isEmpty
+    NSWorkspace.shared.runningApplications.contains(where: isOmniWM)
 }
 
 let omniwmctlBin = ["/opt/homebrew/bin/omniwmctl",
@@ -3969,7 +3974,7 @@ for event in [NSWorkspace.didLaunchApplicationNotification,
               NSWorkspace.didTerminateApplicationNotification] {
     NSWorkspace.shared.notificationCenter.addObserver(forName: event, object: nil, queue: .main) { note in
         guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-              app.bundleIdentifier == omniwmBundleID else { return }
+              isOmniWM(app) else { return }
         let launched = event == NSWorkspace.didLaunchApplicationNotification
         tlog("wm: OmniWM \(launched ? "launched" : "quit")")
         if launched { startOmniWatch() } else { stopOmniWatch() }
