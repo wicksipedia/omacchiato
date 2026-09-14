@@ -61,7 +61,7 @@ one whose branch has diverged, rather than deciding either for you. It
 pulls the remote branch that your branch tracks, so a clone of a fork
 updates from the fork.
 
-There is no background update check. The bar makes exactly one network
+There is no background update check. By default the bar makes one network
 call (the weather), and a daemon polling GitHub on a timer would
 quietly make that two. Nothing here contacts the network unless you
 run it.
@@ -75,13 +75,15 @@ grant hide themselves rather than half-work.
 
 | Grant | Who asks | What it does | Without it |
 |---|---|---|---|
-| **Accessibility** | AeroSpace *or* OmniWM, `omacosy-gesture`, `omacosy-bar` (reads the focused app's menus for the app-pill popup), `omacosy-ffm` (AeroSpace mode only) | Move, resize and focus other apps' windows. This is the tiling itself, and it is the broadest permission here. | Nothing tiles. Not optional in practice. |
+| **Accessibility** | AeroSpace *or* OmniWM, `omacosy-gesture`, `omacosy-bar` (reads the focused app's menus for the app-pill popup, and reads and clicks other apps' menu bar icons for the menu bar apps pill), `omacosy-ffm` (AeroSpace mode only) | Move, resize and focus other apps' windows. This is the tiling itself, and it is the broadest permission here. | Nothing tiles. Not optional in practice. |
 | **Input Monitoring** | Karabiner-Elements, `omacosy-gesture`, and OmniWM | Karabiner reads keys to remap Caps Lock; `omacosy-gesture` reads raw trackpad contacts, because macOS 26 stopped carrying touch data in normal events. | No Super key, no swipe gestures. |
-| **Screen Recording** | `omacosy-overview` | Captures a thumbnail per window for the overview cards, including windows the window manager has stashed offscreen. A screenshot of the visible screen could not see those. | Cards fall back to app icons and titles. |
+| **Screen Recording** | `omacosy-overview`; OmniWM (optional) | Captures a thumbnail per window for the overview cards, including windows the window manager has stashed offscreen. A screenshot of the visible screen could not see those. OmniWM uses it for its own overview thumbnails, the image of a window you drag, and Hidden Bar icons. | Cards fall back to app icons and titles. OmniWM starts without it. |
 | **Bluetooth** | `omacosy-bar` | Reads adapter power and the paired-device list for the bluetooth pill and its menu. | The pill hides itself. |
 | **Location** | `omacosy-bar` | Reads **only** the wi-fi network's name, which macOS classes as location data. No coordinate is ever requested; the authorisation itself is what unlocks `CWInterface.ssid()`. | The wi-fi popup's title row reads "wi-fi" instead of your network's name. Everything else is unaffected. |
-| **Automation** | `omacosy-bar`, `theme-set` | Apple Events to **Music** (the current track at startup, and its artwork, for the media pill), to **Ghostty** (reloading its colours after a theme change) and to **System Events** (sleep, lock and restart from the Apple menu; setting the wallpaper). | The media pill has no artwork; those menu rows do nothing. |
+| **Automation** | `omacosy-bar`, `theme-set`, and the terminal that runs `install.sh` or `omacosy-wm-switch` | Apple Events to **Music** (the current track at startup, and its artwork, for the media pill), to **Ghostty** (reloading its colours after a theme change) and to **System Events** (sleep, lock and restart from the Apple menu; setting the wallpaper; adding the window manager as a login item). | The media pill has no artwork; those menu rows do nothing; the window manager does not start at login until you add it in System Settings > General > Login Items. |
 | **Files and Folders** | `omacosy-bar` | Only if your clone lives in `~/Documents`, `~/Desktop` or `~/Downloads`. The bar reads its palette from the theme directory inside the repo, and macOS walls launchd agents off from those folders. | The bar **hangs at startup** waiting on the prompt. Clone to `~/.local/share/omacosy` and this never comes up. |
+| **Keychain** | `omacosy-claude-usage`, only if you add the Claude pill | Reads the Claude Code sign-in token from your login keychain with `security`, to ask Anthropic for your usage. It never writes to the keychain and never refreshes the token. If macOS asks, allow `security` to read the item. | The pill falls back to the statusline payload, which has only the five-hour and weekly windows. |
+| **Allow in the Background** | `install.sh` (launch agents for the bar, borders, gestures and, under AeroSpace, `omacosy-ffm`) | macOS lists the agents under System Settings > General > Login Items & Extensions. They start at login and restart if they quit. | The parts whose switch is off do not run. |
 
 More on **Location**, because it sounds worse than it is: it buys
 exactly one string. The bar requests authorisation and then reads
@@ -95,11 +97,14 @@ Refuse the grant and you lose the name, nothing else.
 
 - **No telemetry, no analytics, no crash reporting.** Nothing is sent
   anywhere about you or this machine.
-- **One network call**, ever: `https://wttr.in/?format=j1` on a long
-  timer, for the weather pill. wttr.in infers your city from the IP the
-  request arrives on; no coordinates are gathered or sent, and the bar
-  holds no location API. Delete the weather pill and nothing leaves the
-  machine.
+- **One network call by default**: `https://wttr.in/?format=j1` on a
+  long timer, for the weather pill. wttr.in infers your city from the IP
+  the request arrives on; no coordinates are gathered or sent, and the
+  bar holds no location API. Delete the weather pill and nothing leaves
+  the machine. The example pills that you can add in `bar-plugins.conf`
+  contact more hosts: the Claude pill calls `api.anthropic.com` and
+  `status.claude.com`, and the GitHub pill calls `api.github.com`
+  through `gh`.
 - **omacosy's own binaries never run as root.** `install.sh` uses no
   sudo, installs no LaunchDaemon, and every helper it builds runs as
   you, in your login session.
@@ -117,7 +122,8 @@ Refuse the grant and you lose the name, nothing else.
   listen-only (`1 << NSEventTypeGesture`, `kCGEventTapOptionListenOnly`),
   so it cannot see or alter a keystroke. Debug logs
   (`/tmp/omacosy-*.log`) carry window titles, app names and workspace
-  numbers, never input.
+  numbers, never input. The menu bar apps pill posts mouse clicks and
+  one key chord (Ctrl+F8), and reads no keys.
 
 Grants are tied to a binary's code signature. With an Apple Development
 identity present, `install.sh` signs every helper with a stable
