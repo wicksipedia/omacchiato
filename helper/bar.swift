@@ -8,7 +8,7 @@
 //
 // The shape of the answer is in the data flow. sketchybar learns that a
 // workspace changed, forks a shell script, and that script spawns five
-// `aerospace` CLI calls (~23 ms each) to ask what happened — 220 ms
+// window-manager CLI calls (~23 ms each) to ask what happened — 220 ms
 // before a pixel moves. This daemon already holds the window model in
 // memory, fed by the same SkyLight notifications the other daemons use,
 // so a workspace switch touches no subprocess at all: update one field,
@@ -52,7 +52,7 @@ func DSRegisterBrightnessNotifications(_ display: CGDirectDisplayID, _ context: 
 @_silgen_name("IOBluetoothPreferenceGetControllerPowerState")
 func BTGetPower() -> Int32
 
-// --- SkyLight window events (borders.swift recipe) ------------------------
+// --- SkyLight window events -----------------------------------------------
 
 typealias NotifyProc = @convention(c) (UInt32, UnsafeMutableRawPointer?, Int, UnsafeMutableRawPointer?) -> Void
 
@@ -82,27 +82,9 @@ let EVENT_WINDOW_DESTROY: UInt32 = 1326
 
 // --- plumbing -------------------------------------------------------------
 
-let aerospaceBin = ["/opt/homebrew/bin/aerospace", "/usr/local/bin/aerospace"]
-    .first { FileManager.default.isExecutableFile(atPath: $0) } ?? "aerospace"
-
-@discardableResult
-func aerospace(_ args: [String]) -> String {
-    let p = Process()
-    p.executableURL = URL(fileURLWithPath: aerospaceBin)
-    p.arguments = args
-    let pipe = Pipe()
-    p.standardOutput = pipe
-    p.standardError = FileHandle.nullDevice
-    guard (try? p.run()) != nil else { return "" }
-    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-    p.waitUntilExit()
-    return String(data: data, encoding: .utf8) ?? ""
-}
-
-// The OTHER window manager. omacosy-wm-switch can hand the session from
-// AeroSpace to OmniWM (and back) while this daemon runs, so which one is
-// asked is decided per use, never cached: the running-app check is an
-// in-process lookup, cheap enough to be the whole detection.
+// OmniWM can start or quit while this daemon runs, so whether it is up is
+// decided per use, never cached: the running-app check is an in-process
+// lookup, cheap enough to be the whole detection.
 let omniwmBundleID = "com.barut.OmniWM"
 
 // Match by prefix: the dev build, com.barut.OmniWM.dev, uses the same socket.
@@ -160,15 +142,11 @@ func omniQuery(_ name: String, _ args: [String] = []) -> [String: Any]? {
     return result["payload"] as? [String: Any]
 }
 
-// click-to-jump, whichever WM is listening. OmniWM's focus-name resolves
-// a numeric raw workspace ID across all monitors, which is exactly what a
-// chip on either display means.
+// click-to-jump. OmniWM's focus-name resolves a numeric raw workspace ID
+// across all monitors, which is exactly what a chip on either display
+// means.
 func focusWorkspace(_ ws: String) {
-    if omniwmActive() {
-        omniwmctl(["workspace", "focus-name", ws])
-    } else {
-        aerospace(["workspace", ws])
-    }
+    omniwmctl(["workspace", "focus-name", ws])
 }
 
 let logURL = URL(fileURLWithPath: "/tmp/omacosy-bar.log")
@@ -408,60 +386,20 @@ struct Snapshot {
     var perMonitor: [String: (workspaces: [String], visible: String)] = [:]
     var soleApp: [String: String] = [:]
     var occupied: Set<String> = []
-    var focused = "" // omniwm only — under aerospace the fast path owns it
+    var focused = ""
 }
 
 let rebuildQueue = DispatchQueue(label: "com.omacosy.bar.rebuild")
 
+// with no window manager the snapshot is empty, and the bar draws no chips
 func fetchSnapshot() -> Snapshot {
-    omniwmActive() ? omniwmSnapshot() : aerospaceSnapshot()
+    omniwmActive() ? omniwmSnapshot() : Snapshot()
 }
 
-func aerospaceSnapshot() -> Snapshot {
-    var s = Snapshot()
-    // ONE call for every monitor's set and which of them is visible: the
-    // old loop spent two subprocesses per display, so docking doubled it
-    // to four and the rebuild grew with the display count — on a path a
-    // window move now waits behind
-    var sets: [String: [String]] = [:]
-    var visible: [String: String] = [:]
-    for line in aerospace(["list-workspaces", "--all", "--format",
-                           "%{workspace}|%{monitor-id}|%{workspace-is-visible}"])
-        .split(separator: "\n") {
-        let f = line.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
-        guard f.count >= 3 else { continue }
-        sets[f[1], default: []].append(f[0])
-        if f[2] == "true" { visible[f[1]] = f[0] }
-    }
-    for id in surfaces.map({ $0.monitorID }) {
-        s.perMonitor[id] = (sets[id] ?? [], visible[id] ?? "")
-    }
-
-    var sole: [String: String] = [:]
-    var count: [String: Int] = [:]
-    for line in aerospace(["list-windows", "--all", "--format",
-                           "%{workspace}|%{app-name}|%{window-layout}"]).split(separator: "\n") {
-        let f = line.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
-        guard f.count >= 3 else { continue }
-        guard f[2] != "floating" else { continue }
-        s.occupied.insert(f[0])
-        if let existing = sole[f[0]] {
-            if existing != f[1] { count[f[0]] = 2 }
-        } else {
-            sole[f[0]] = f[1]
-            count[f[0]] = 1
-        }
-    }
-    s.soleApp = sole.filter { count[$0.key] == 1 }
-    return s
-}
-
-// The same answers out of omniwmctl, on the same two-subprocess budget:
-// workspaces arrive with their display and visibility in one query, and
-// the windows query brings the app names the sole-app chips need. The
-// snapshot also carries focus — OmniWM has no exec-on-workspace-change
-// hook to feed /tmp/omacosy-bar-ws, so it rides the slow path here and
-// the watch stream below covers the fast one.
+// The answers out of omniwmctl: workspaces arrive with their display in
+// one query, and the windows query brings the app names the sole-app
+// chips need. The snapshot also carries focus: it rides the slow path
+// here, and the workspace-bar stream below covers the fast one.
 func omniwmSnapshot() -> Snapshot {
     var s = Snapshot()
     var sets: [String: [String]] = [:]
@@ -535,15 +473,6 @@ func apply(_ s: Snapshot) -> Bool {
     if model.soleApp != s.soleApp { model.soleApp = s.soleApp; changed = true }
     if !s.focused.isEmpty, model.focused != s.focused { model.focused = s.focused; changed = true }
     return changed
-}
-
-
-// FAST path: a workspace switch changes focus and nothing else. No CLI,
-// no IPC, no shell — every surface already knows the rest, and the one
-// that owns the workspace also now shows it.
-func setFocused(_ ws: String) {
-    model.focused = ws
-    for surface in surfaces where surface.mine.contains(ws) { surface.visible = ws }
 }
 
 // --- media (Apple Music announces itself; the title needs no subprocess) --
@@ -2587,11 +2516,11 @@ extension String {
 }
 
 // --- cheatsheet (Super+K) --------------------------------------------------
-// Rendered from the LIVE config of whichever WM is running — aerospace.toml
-// or OmniWM's settings.toml — never from a list kept here: a cheatsheet
-// that can disagree with the keys is worse than no cheatsheet. The
-// config's own section comments become the headings, so the grouping is
-// the author's rather than a second opinion about it.
+// Rendered from the LIVE config — OmniWM's settings.toml and omacosy's
+// Karabiner rules — never from a list kept here: a cheatsheet that can
+// disagree with the keys is worse than no cheatsheet. The config's own
+// section comments become the headings, so the grouping is the author's
+// rather than a second opinion about it.
 
 struct CheatEntry {
     let group: String
@@ -2599,97 +2528,10 @@ struct CheatEntry {
     let action: String
 }
 
-// "cmd-ctrl-alt-shift-1" -> "Super+Shift+1". Super IS cmd-ctrl-alt here
-// (Caps Lock sends it), so it is collapsed back into the one key the
-// user actually presses.
-func prettyKey(_ raw: String) -> String {
-    var rest = raw
-    var parts: [String] = []
-    if rest.hasPrefix("cmd-ctrl-alt-") {
-        parts.append("Super")
-        rest = String(rest.dropFirst("cmd-ctrl-alt-".count))
-    }
-    while let dash = rest.firstIndex(of: "-") {
-        let mod = String(rest[rest.startIndex..<dash])
-        guard ["shift", "ctrl", "alt", "cmd"].contains(mod) else { break }
-        parts.append(mod == "cmd" ? "Cmd" : mod.capitalized)
-        rest = String(rest[rest.index(after: dash)...])
-    }
-    parts.append(rest.count == 1 ? rest.uppercased() : rest.capitalized)
-    return parts.joined(separator: "+")
-}
-
-// The command IS the description — printing it keeps this honest. Only
-// the noise a reader cannot use is removed, by rule and not per binding.
-func prettyAction(_ raw: String) -> String {
-    var s = raw
-    // the binary's directory AND its omacosy- prefix go together: doing
-    // them separately rewrote /tmp/omacosy-bar-cheatsheet into a path
-    // that does not exist, which is worse than the noise
-    for noise in ["exec-and-forget ", "\(NSHomeDirectory())/.local/bin/omacosy-",
-                  "$HOME/.local/bin/omacosy-", "\(NSHomeDirectory())/.local/bin/",
-                  "$HOME/.local/bin/", "/usr/bin/", "/bin/"] {
-        s = s.replacingOccurrences(of: noise, with: "")
-    }
-    return s.trimmingCharacters(in: .whitespaces)
-}
-
-func cheatEntries() -> [CheatEntry] {
-    omniwmActive() ? omniwmCheatEntries() : aerospaceCheatEntries()
-}
-
-func aerospaceCheatEntries() -> [CheatEntry] {
-    let path = "\(NSHomeDirectory())/.config/aerospace/aerospace.toml"
-    guard let text = try? String(contentsOfFile: path, encoding: .utf8) else { return [] }
-    var entries: [CheatEntry] = []
-    var group = ""
-    var inSection = false
-    var lastWasComment = false
-    for raw in text.split(separator: "\n", omittingEmptySubsequences: false) {
-        let line = raw.trimmingCharacters(in: .whitespaces)
-        if line.hasPrefix("[") {
-            inSection = line == "[mode.main.binding]"
-            continue
-        }
-        guard inSection else { continue }
-        if line.hasPrefix("#") {
-            // only the FIRST line of a comment block is a heading; the
-            // rest is prose explaining why, which belongs in the config
-            if !lastWasComment {
-                var title = String(line.dropFirst()).trimmingCharacters(in: .whitespaces)
-                // "(omarchy: ...)" is a provenance note, not part of the
-                // heading; a colon or full stop starts the explanation
-                if let p = title.range(of: " (omarchy") { title = String(title[..<p.lowerBound]) }
-                if let c = title.firstIndex(where: { $0 == ":" || $0 == "." }) {
-                    title = String(title[..<c])
-                }
-                title = title.trimmingCharacters(in: .whitespaces)
-                if title.count > 34 { title = String(title.prefix(33)) + "…" }
-                group = title
-            }
-            lastWasComment = true
-            continue
-        }
-        lastWasComment = false
-        guard let eq = line.firstIndex(of: "="), line.first?.isLetter == true else { continue }
-        let key = line[line.startIndex..<eq].trimmingCharacters(in: .whitespaces)
-        // read BETWEEN the quotes: a trailing `# comment` on the line is
-        // config prose, not part of the command
-        let value = line[line.index(after: eq)...].trimmingCharacters(in: .whitespaces)
-        guard let q = value.first, q == "'" || q == "\"",
-            let close = value.dropFirst().firstIndex(of: q)
-        else { continue }
-        let action = String(value[value.index(after: value.startIndex)..<close])
-        guard !key.isEmpty, !action.isEmpty else { continue }
-        entries.append(CheatEntry(group: group, key: prettyKey(key), action: prettyAction(action)))
-    }
-    return entries
-}
-
-// "Control+Option+Command+Shift+1" -> "Super+Shift+1" — the same collapse
-// prettyKey does for aerospace's cmd-ctrl-alt, in OmniWM's spelling. The
-// key names arrive already capitalised; only " Arrow" is dropped, so the
-// arrows read "Left" the way the aerospace sheet prints them.
+// "Control+Option+Command+Shift+1" -> "Super+Shift+1". Super IS
+// Control+Option+Command here (Caps Lock sends it), so it is collapsed
+// back into the one key the user actually presses. The key names arrive
+// already capitalised; only " Arrow" is dropped, so the arrows read "Left".
 func prettyOmniKey(_ raw: String) -> String {
     var rest = raw
     var parts: [String] = []
@@ -2776,8 +2618,8 @@ func omniwmCheatEntries() -> [CheatEntry] {
             // not the one about to be read (a half-read table keeps its
             // keys — TOML allows comments between them)
             if !binding.isEmpty, !id.isEmpty { flush() }
-            // first line of a comment block is a heading, same rule as the
-            // aerospace parser — the "---" ruler decoration is trimmed off
+            // only the FIRST line of a comment block is a heading; the
+            // rest is prose, and the "---" ruler decoration is trimmed off
             if !lastWasComment {
                 var title = String(line.dropFirst())
                     .trimmingCharacters(in: CharacterSet(charactersIn: "- "))
@@ -2818,10 +2660,10 @@ func omniwmCheatEntries() -> [CheatEntry] {
         let gb = sectionOrder.firstIndex(of: b.1.group) ?? 99
         return ga != gb ? ga < gb : a.0 < b.0
     }.map { $0.1 }
-    // the exec chords live in Karabiner while OmniWM runs (its hotkeys
-    // cannot exec) — the sheet must show them or half the muscle-memory
-    // map is invisible. Read our own injected rules back by their
-    // description prefix.
+    // the exec chords live in Karabiner, because OmniWM's hotkeys cannot
+    // exec — the sheet must show them or half the muscle-memory map is
+    // invisible. Read our own injected rules back by their description
+    // prefix.
     entries.append(contentsOf: karabinerExecCheatEntries())
     return entries
 }
@@ -3012,9 +2854,9 @@ func hideCheatsheet() {
 
 func toggleCheatsheet() {
     if cheatWindow != nil { hideCheatsheet(); return }
-    let entries = cheatEntries()
+    let entries = omniwmCheatEntries()
     guard !entries.isEmpty else {
-        tlog("cheatsheet: no bindings parsed from \(omniwmActive() ? "omniwm settings.toml" : "aerospace.toml")")
+        tlog("cheatsheet: no bindings parsed from omniwm settings.toml")
         return
     }
     let view = CheatsheetView(frame: .zero)
@@ -3562,7 +3404,7 @@ final class BarSurface {
         window.hasShadow = false
         // Below normal windows, where sketchybar's own windows sat. Verified:
         // the bar still renders there and still receives clicks — AppKit
-        // honours a negative level, and aerospace's outer.top gap keeps
+        // honours a negative level, and OmniWM's top outer gap keeps
         // tiled windows off the strip (a tiled window measures y=42 here
         // against the bar's 0..34).
         //
@@ -3596,36 +3438,25 @@ func screenID(_ screen: NSScreen) -> CGDirectDisplayID {
     (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value ?? 0
 }
 
-// AeroSpace monitor ids are NOT stable across a hotplug — undock and the
-// built-in stops being monitor 2 and becomes monitor 1 — so they are
-// resolved by display NAME every time the screens change. A cached id
-// answers "Invalid monitor ID" and the snapshot comes back empty, which
-// renders as the last set the bar knew, stale and silent.
-func monitorIDs() -> [String: String] { // display name -> WM monitor id
-    // OmniWM names monitors with NSScreen.localizedName (Monitor.current()
-    // in its source), so the same name join works; its ids stay opaque
-    // ("display:…") and only ever meet the query payloads they came from.
-    if omniwmActive() {
-        var map: [String: String] = [:]
-        if let list = omniQuery("displays", ["--fields", "id,name"])?["displays"]
-            as? [[String: Any]] {
-            for d in list {
-                if let id = d["id"] as? String, let name = d["name"] as? String { map[name] = id }
-            }
-        }
-        return map
-    }
+// Monitor ids are resolved by display NAME every time the screens change,
+// never cached: a stale id makes the snapshot come back empty, which
+// renders as the last set the bar knew, stale and silent. OmniWM names
+// monitors with NSScreen.localizedName (Monitor.current() in its source),
+// so the name join works; its ids stay opaque ("display:…") and only ever
+// meet the query payloads they came from.
+func monitorIDs() -> [String: String] { // display name -> OmniWM display id
+    guard omniwmActive() else { return [:] }
     var map: [String: String] = [:]
-    for line in aerospace(["list-monitors", "--format", "%{monitor-id}|%{monitor-name}"])
-        .split(separator: "\n") {
-        let f = line.split(separator: "|").map(String.init)
-        if f.count == 2 { map[f[1]] = f[0] }
+    if let list = omniQuery("displays", ["--fields", "id,name"])?["displays"]
+        as? [[String: Any]] {
+        for d in list {
+            if let id = d["id"] as? String, let name = d["name"] as? String { map[name] = id }
+        }
     }
     return map
 }
 
 func rebuildSurfaces() {
-    let wm = omniwmActive() ? "omniwm" : "aerospace"
     let ids = monitorIDs()
     var kept: [BarSurface] = []
     for screen in NSScreen.screens {
@@ -3634,14 +3465,14 @@ func rebuildSurfaces() {
         guard let id = ids.isEmpty ? "" : ids[screen.localizedName] else { continue }
         if let existing = surfaces.first(where: { screenID($0.screen) == screenID(screen) }) {
             if existing.monitorID != id {
-                tlog("monitor: \(screen.localizedName) is now \(wm) monitor \(id) (was \(existing.monitorID))")
+                tlog("monitor: \(screen.localizedName) is now monitor \(id) (was \(existing.monitorID))")
                 existing.monitorID = id
             }
             existing.screen = screen
             existing.place()
             kept.append(existing)
         } else {
-            tlog("surface: \(screen.localizedName) -> \(wm) monitor \(id)\(screen.safeAreaInsets.top > 0 ? " (notched)" : "")")
+            tlog("surface: \(screen.localizedName) -> monitor \(id)\(screen.safeAreaInsets.top > 0 ? " (notched)" : "")")
             kept.append(BarSurface(screen: screen, monitorID: id))
         }
     }
@@ -3665,15 +3496,14 @@ func repaint() {
 
 // --- fullscreen ------------------------------------------------------------
 // sketchybar gets this for free: its windows sit at layer -20, below
-// normal windows, so a fullscreen window simply covers them while
-// aerospace's outer gap keeps tiled windows off the strip. This bar sits
-// above windows (it has to, to be visible while stacked under sketchybar
-// for comparison), so it has to decide for itself.
+// normal windows, so a fullscreen window simply covers them while the
+// window manager's outer gap keeps tiled windows off the strip. This bar
+// sits above windows (it has to, to be visible while stacked under
+// sketchybar for comparison), so it has to decide for itself.
 //
-// The test is borders.swift's, and for the same reason: `fullscreen
-// --no-outer-gaps` and macOS native fullscreen are indistinguishable from
-// out here, and both should take the strip. A managed window never starts
-// at the display's top edge — the bar owns it.
+// A window manager's fullscreen and macOS native fullscreen look the same
+// from out here, and both should take the strip. A managed window never
+// starts at the display's top edge — the bar owns it.
 
 func safeTop(for display: CGRect) -> CGFloat {
     let primaryH = NSScreen.screens.first?.frame.height ?? 0
@@ -3715,8 +3545,8 @@ func fullscreenDisplays() -> Set<CGDirectDisplayID> {
             // notched display the notch inset (32) and the gap a tiled
             // window leaves for the bar (33) are the same edge, so an
             // ordinary tiled Arc reads as fullscreen. WIDTH is what
-            // separates them — `--no-outer-gaps` means exactly that, the
-            // window takes the side gaps too, and a tiled one never does.
+            // separates them: a fullscreen window takes the side gaps
+            // too, and a tiled one never does.
             if rect.origin.y - display.origin.y < inset + 3,
                rect.height >= display.height - inset - 6,
                rect.width >= display.width - 2 {
@@ -3735,11 +3565,7 @@ func fullscreenDisplays() -> Set<CGDirectDisplayID> {
 // resting level of -20 is what hides it in the first place — and it drops
 // back down when the pointer leaves.
 let barBaseLevel = NSWindow.Level(rawValue: -20)
-// Revealed, the bar has to clear omacosy-borders' fullscreen shroud, which
-// sits at .screenSaver (1000) and blacks out the camera strip so that
-// aerospace-fullscreen reads as true fullscreen on a notched display.
-// At .statusBar the shroud covered all but the bottom 2 px of the bar —
-// which looked like macOS chrome winning, and was our own daemon.
+// above .screenSaver (1000), so an overlay at that level cannot cover it
 let barRevealLevel = NSWindow.Level(rawValue: 1002)
 let revealEdge: CGFloat = 2 // how close to the top edge counts as asking
 var revealed = false
@@ -3782,7 +3608,7 @@ func updateBarVisibility() {
     for surface in surfaces {
         let hide = covered.contains(screenID(surface.screen)) && !revealed
         // unconditional either way: isVisible can desync from the window
-        // server, which is how borders.swift ended up with a stuck shroud
+        // server
         if hide {
             surface.window.orderOut(nil)
             if openPopup != nil { closePopup() }
@@ -3794,13 +3620,11 @@ func updateBarVisibility() {
 
 // --- signals --------------------------------------------------------------
 
-// Workspace switches arrive as a one-line file written by aerospace's
-// exec-on-workspace-change hook (a bash builtin redirect — no extra
-// process). A regular file, deliberately: a FIFO with no reader would
-// block the hook and wedge workspace switching if this daemon died.
-// borders.swift's watcher, same reasons: .attrib catches a symlink swap
-// that .write alone misses, and a delete/rename re-arms instead of going
-// deaf for the rest of the daemon's life.
+// Pokes arrive as writes to a regular file. A regular file, deliberately:
+// a FIFO with no reader would block the writer if this daemon died.
+// .attrib catches a symlink swap that .write alone misses, and a
+// delete/rename re-arms instead of going deaf for the rest of the
+// daemon's life.
 func watch(_ path: String, create: Bool, handler: @escaping () -> Void) {
     if create, !FileManager.default.fileExists(atPath: path) {
         FileManager.default.createFile(atPath: path, contents: nil)
@@ -3839,23 +3663,9 @@ watch(movedPath, create: true) {
     kickRebuild()
 }
 
-let wsPath = "/tmp/omacosy-bar-ws"
-watch(wsPath, create: true) {
-    let t0 = DispatchTime.now().uptimeNanoseconds
-    guard let text = try? String(contentsOfFile: wsPath, encoding: .utf8) else { return }
-    let ws = text.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !ws.isEmpty, ws != model.focused else { return }
-    setFocused(ws)
-    repaint()
-    kickVisibility()
-    let ms = Double(DispatchTime.now().uptimeNanoseconds - t0) / 1_000_000
-    tlog(String(format: "switch %@ %.2f ms", ws, ms))
-}
-
 // --- omniwm fast path -------------------------------------------------------
-// OmniWM has no exec-on-workspace-change hook to write the file above,
-// and a switch between two EMPTY workspaces moves no windows, so SkyLight
-// says nothing either. OmniWM publishes instead: its active-workspace
+// A switch between two EMPTY workspaces moves no windows, so SkyLight says
+// nothing. OmniWM publishes instead: its active-workspace
 // channel emits one event per change. `watch … --exec /bin/cat` rather
 // than `subscribe` because subscribe pretty-prints multi-line JSON while
 // watch hands its child exactly one NDJSON line per event, and the child
@@ -3966,12 +3776,9 @@ func stopOmniWatch() {
     p.terminate()
 }
 
-// The WM itself can change under the bar: omacosy-wm-switch quits one and
-// launches the other, and OmniWM.app appearing or vanishing is the
-// signal. Monitor ids have to be re-resolved — the two WMs name the same
-// display differently ("2" vs "display:…") — and the retries cover the
-// incoming WM still booting when the first attempt asks; a switch that
-// reverts fires this again from the other side.
+// OmniWM can start or quit under the bar, and OmniWM.app appearing or
+// vanishing is the signal. Monitor ids have to be re-resolved, and the
+// retries cover OmniWM still booting when the first attempt asks.
 for event in [NSWorkspace.didLaunchApplicationNotification,
               NSWorkspace.didTerminateApplicationNotification] {
     NSWorkspace.shared.notificationCenter.addObserver(forName: event, object: nil, queue: .main) { note in
@@ -3989,8 +3796,9 @@ for event in [NSWorkspace.didLaunchApplicationNotification,
     }
 }
 
-// AeroSpace announces its launch to nobody, so while a surface has no
-// monitor, look for a window manager again every 5 s.
+// The retries above stop at 15 s, and OmniWM's socket can take longer to
+// answer after a settings migration. So while a surface has no monitor,
+// look for OmniWM again every 5 s.
 Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
     guard surfaces.contains(where: { $0.monitorID.isEmpty }) else { return }
     rebuildSurfaces()
@@ -4011,17 +3819,15 @@ NSWorkspace.shared.notificationCenter.addObserver(
     tlog(String(format: "frontapp %@ %.2f ms", name, ms))
 }
 
-// Displays come and go: re-resolve which aerospace monitor this screen is
+// Displays come and go: re-resolve which OmniWM display this screen is
 // now, move the window onto it, and rebuild. Screen parameters arrive
-// before the arrangement settles, so give it a beat (borders.swift learnt
-// the same lesson with a stale CG-to-Cocoa flip after a replug).
+// before the arrangement settles, so give it a beat.
 //
-// This is also where the guest set gets folded and unfolded. Undocked,
-// AeroSpace parks workspaces 11-19 on the one display, and omacosy-ws
-// only ever matches single-digit slots — so anything left on a guest
-// workspace is unreachable by Super+N or Super+Tab until a display
-// comes back. omacosy-ws-collapse moves those windows into the empty
-// 1-9 slots and remembers where they came from.
+// This is also where a second display's set gets folded and unfolded.
+// Undocked, OmniWM moves that set's workspaces to the one display, but
+// their windows stay on two-digit workspaces that Super+N does not reach
+// from there. omacosy-ws-collapse moves those windows into the empty 1-9
+// slots and remembers where they came from.
 //
 // It used to be driven by sketchybar's display_change.sh, which went
 // out with sketchybar; nothing has called it since, so the first undock
@@ -4042,7 +3848,7 @@ NotificationCenter.default.addObserver(
         // the 1 s grace can still lose the race with the WM adopting
         // the new display — its monitor id resolves to nothing and the
         // screen stays barless (the Dell did, on replug). Same retry
-        // ladder the WM-switch path uses.
+        // ladder the OmniWM launch observer uses.
         for delay in [3.0, 8.0] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                 rebuildSurfaces()
@@ -4056,12 +3862,9 @@ NotificationCenter.default.addObserver(
         monitorCount = now
         let op = now == 1 ? "collapse" : (wasSingle ? "restore" : "")
         guard !op.isEmpty else { return }
-        // both WMs: OmniWM re-routes guest WORKSPACES on unplug but
-        // strands their windows "after 9" — ws-collapse has an omniwm
-        // branch that folds and restores them through omacosy-omni
         tlog("displays: \(now) — running ws-collapse \(op)")
-        // off-main: it shells out to aerospace per window, and restore
-        // deliberately sleeps while aerospace re-adopts the monitor
+        // off-main: it makes IPC calls per window, and sleeps between
+        // moves while OmniWM settles
         DispatchQueue.global(qos: .userInitiated).async {
             _ = shell("\(NSHomeDirectory())/.local/bin/omacosy-ws-collapse", [op])
             DispatchQueue.main.async { kickRebuild() }
@@ -4098,8 +3901,7 @@ func kickRebuild() {
 let cid = SLSMainConnectionID()
 // move and resize only fire for SUBSCRIBED windows, and going fullscreen
 // is a resize — so the subscription set is kept equal to every normal
-// window, refreshed whenever one is created or destroyed (borders.swift's
-// recipe, and its reason).
+// window, refreshed whenever one is created or destroyed.
 var subscribed: Set<UInt32> = []
 func rebuildSubscriptions() {
     guard let list = CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID) as? [[String: Any]]
@@ -4386,13 +4188,11 @@ if rightOrder.contains("weather") {
 // --- go -------------------------------------------------------------------
 
 model.frontApp = NSWorkspace.shared.frontmostApplication?.localizedName ?? ""
-// startup only: from here the fast paths keep it — the hook file under
-// aerospace, the watch stream under omniwm
+// startup only: from here the workspace-bar stream keeps it
 model.focused = omniwmActive()
     ? ((omniQuery("workspaces", ["--focused", "--fields", "raw-name"])?["workspaces"]
         as? [[String: Any]])?.first?["rawName"] as? String ?? "")
-    : aerospace(["list-workspaces", "--focused"])
-        .trimmingCharacters(in: .whitespacesAndNewlines)
+    : ""
 rebuildSurfaces()
 guard !surfaces.isEmpty else {
     FileHandle.standardError.write("omacosy-bar: no screen to draw on\n".data(using: .utf8)!)
@@ -4418,6 +4218,6 @@ if rightOrder.contains("weather") { updateWeather() }
 startPlugins()
 repaint()
 primeMedia()
-startOmniWatch() // a no-op under aerospace; the WM observer handles switches
+startOmniWatch() // a no-op until OmniWM runs; the WM observer starts it then
 tlog("omacosy-bar up on " + surfaces.map { "\($0.screen.localizedName)=m\($0.monitorID)\($0.notched ? " (notched)" : "")" }.joined(separator: ", "))
 app.run()

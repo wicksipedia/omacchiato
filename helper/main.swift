@@ -14,8 +14,6 @@
 //                           (headphones/speaker/mic/keyboard/pointer/
 //                           combo/phone/watch/device) for popup icons
 //   bt connect <address> / bt disconnect <address>
-//   input-age               seconds since the last deliberate user input
-//                           (keys/clicks/scroll), for the focus guard
 //   brightness              print the built-in display's brightness (0-100)
 //   brightness set <0-100>  set it (DisplayServices — built-in/Apple
 //                           displays only; external DDC is out of scope)
@@ -167,8 +165,8 @@ case "ghostty-reload":
     print("\(reloaded)/\(targets)")
 
 case "displays":
-    // arrangement-ordered (left to right, matching AeroSpace/sketchybar
-    // numbering): "<index><TAB><1 if notched else 0>"
+    // arrangement-ordered (left to right):
+    // "<index><TAB><1 if notched else 0>"
     let screens = NSScreen.screens.sorted { $0.frame.origin.x < $1.frame.origin.x }
     for (i, scr) in screens.enumerated() {
         let notched = scr.safeAreaInsets.top > 0 ? 1 : 0
@@ -277,18 +275,6 @@ case "brightness":
     }
     print(Int((level * 100).rounded()))
 
-case "input-age":
-    // seconds since the last DELIBERATE user input (keys, clicks,
-    // scroll — not mouse motion). The focus guard uses this to tell a
-    // user-driven workspace switch from an app yanking focus to
-    // itself.
-    let types: [CGEventType] = [.keyDown, .leftMouseDown, .rightMouseDown,
-        .otherMouseDown, .scrollWheel]
-    let age = types
-        .map { CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: $0) }
-        .min() ?? .infinity
-    print(String(format: "%.2f", age))
-
 case "omniwm-overview-close":
     // Swipe-down's half of the overview gesture. OmniWM rejects every
     // IPC command while its overview is open (ignored_overview), so no
@@ -318,122 +304,6 @@ case "omniwm-overview-close":
             let app = NSRunningApplication(processIdentifier: pid) else { continue }
         app.activate()
         break
-    }
-
-case "split-hint":
-    // Hyprland's dwindle splits the focused window along its longer
-    // edge; AeroSpace has no such layout and no window geometry in its
-    // config language, so the direction is chosen here and applied with
-    // `split` while the next window still does not exist. AeroSpace
-    // then places that window correctly on its first pass — correcting
-    // the tree afterwards is what made the screen lay out twice.
-    //
-    // Driven by aerospace.toml's on-focus-changed hook, which names the
-    // window in AEROSPACE_WINDOW_ID — hover focus included: AeroSpace
-    // does track the focus omacosy-ffm moves. The frame comes from the
-    // window list rather than the Accessibility API, so this needs no
-    // grant of its own.
-    //
-    // `--window-id` rather than "the focused window": this runs a few
-    // hundred ms after the focus change, and a window that opens inside
-    // that gap takes focus with it. Naming the window keeps a late hint
-    // on the one it was computed for instead of retargeting the
-    // newcomer.
-    guard let idStr = ProcessInfo.processInfo.environment["AEROSPACE_WINDOW_ID"],
-        let wid = UInt32(idStr) else { exit(0) }
-    // A NEW window fires this hook too (it takes focus on open), and at
-    // that moment its frame is still wherever the app spawned it —
-    // AeroSpace has not tiled it yet. Waiting for the frame to settle
-    // costs ~400ms, and spamming Super+Enter opens windows faster than
-    // that, so waiting loses the race and the spiral falls apart.
-    //
-    // So new windows are not read, they are PREDICTED. Splitting a slot
-    // makes both halves' geometry known without looking: split a
-    // 1708x1389 slot vertically and the next slot is 1708x694. A state
-    // file carries the last hinted window's slot and direction; a hook
-    // for a NEWER window id (CGWindowIDs are issued in increasing
-    // order) chains off it instantly. The hint then lands ~45ms after
-    // the focus change — faster than any app can open its next window.
-    //
-    // Refocusing an EXISTING window (hover, keyboard) reads the frame
-    // directly: it already sits in its slot, no waiting needed. The
-    // slow settle-wait survives only as the fallback when there is no
-    // fresh state to chain from (first window in a burst).
-    // State is one line: "wid w h ts". A 3s TTL bounds how stale a
-    // chain can get (manual resizes, closes, and workspace switches
-    // invalidate predictions; a burst of opens never lives that long).
-    func frame() -> (CGFloat, CGFloat, CGFloat, CGFloat)? {
-        guard let list = CGWindowListCopyWindowInfo(.optionIncludingWindow, wid) as? [[String: Any]],
-            let b = list.first?[kCGWindowBounds as String] as? [String: CGFloat],
-            let x = b["X"], let y = b["Y"],
-            let w = b["Width"], let h = b["Height"] else { return nil }
-        return (x, y, w, h)
-    }
-    let splitWidthMultiplier: CGFloat = 1.4
-    let statePath = "/tmp/omacosy-split-state-\(getuid())"
-    let now = Date().timeIntervalSince1970
-    var state: (wid: UInt32, w: CGFloat, h: CGFloat)?
-    if let line = try? String(contentsOfFile: statePath, encoding: .utf8) {
-        let f = line.split(separator: " ").compactMap { Double($0) }
-        if f.count == 4, now - f[3] < 3 { state = (UInt32(f[0]), CGFloat(f[1]), CGFloat(f[2])) }
-    }
-    var w: CGFloat
-    var h: CGFloat
-    var how: String
-    if let s = state, wid > s.wid {
-        // fresh spawn inside a burst: its slot is the half left over
-        // from the split we just issued on the previous window
-        if s.w >= s.h * splitWidthMultiplier { w = s.w / 2; h = s.h } else { w = s.w; h = s.h / 2 }
-        how = "predicted"
-    } else if state != nil, let f = frame() {
-        // an existing window refocused mid-burst: its frame is settled
-        (w, h) = (f.2, f.3)
-        how = "read"
-    } else {
-        // no fresh chain to ride: wait for the frame to stop moving.
-        // "Two equal samples" alone is not enough — an untiled window's
-        // frame equals itself — so a new window must MOVE (get tiled)
-        // before its frame is trusted, while a hover-focused window that
-        // never moves is accepted after a short grace. Full bounds, not
-        // just size: a spawning terminal inherits the last window's
-        // size, so only the position reliably changes on tile.
-        var sample = frame()
-        var moved = false
-        for tick in 1...16 {
-            usleep(75_000)
-            let next = frame()
-            if let a = sample, let b = next, a != b { moved = true }
-            if next == nil || (moved && next! == sample!) { sample = next; break }
-            sample = next
-            if !moved && tick >= 5 { break }
-        }
-        guard let f = sample else { exit(0) }
-        (w, h) = (f.2, f.3)
-        how = moved ? "settled" : "static"
-    }
-    // Direction: Hyprland's rule is `stack when h * multiplier > w`
-    // (dwindle:split_width_multiplier, default 1.0). At 1.0 an
-    // ultrawide's half-slot (1712x1389) is still wider than tall, so
-    // the spiral goes side-by-side twice before it ever stacks. 1.4
-    // makes that half-slot stack first, which restores the 16:9
-    // left/down/left cadence on a 3440-wide display without changing
-    // behavior on displays where the half is already taller than wide.
-    let dir = w >= h * splitWidthMultiplier ? "horizontal" : "vertical"
-    let aerospaceBin = ["/opt/homebrew/bin/aerospace", "/usr/local/bin/aerospace"]
-        .first { FileManager.default.isExecutableFile(atPath: $0) } ?? "aerospace"
-    let split = Process()
-    split.executableURL = URL(fileURLWithPath: aerospaceBin)
-    split.arguments = ["split", "--window-id", idStr, dir]
-    split.standardError = FileHandle.nullDevice
-    try? split.run()
-    split.waitUntilExit()
-    try? "\(wid) \(w) \(h) \(now)".write(toFile: statePath, atomically: true, encoding: .utf8)
-    if let d = "\(Date().timeIntervalSince1970) wid=\(idStr) \(Int(w))x\(Int(h)) (\(how)) -> \(dir == "horizontal" ? "h" : "v") rc=\(split.terminationStatus)\n".data(using: .utf8),
-        let fh = FileHandle(forWritingAtPath: "/tmp/omacosy-split-hint.log") ?? {
-            FileManager.default.createFile(atPath: "/tmp/omacosy-split-hint.log", contents: nil)
-            return FileHandle(forWritingAtPath: "/tmp/omacosy-split-hint.log")
-        }() {
-        fh.seekToEndOfFile(); fh.write(d); fh.closeFile()
     }
 
 case "audio":
@@ -513,5 +383,5 @@ case "bt":
     }
 
 default:
-    fail("usage: omacosy-helper cursor | displays | wallpaper <path> | audio ... | bt ... | brightness [set <0-100>] | input-age")
+    fail("usage: omacosy-helper cursor | displays | wallpaper <path> | audio ... | bt ... | brightness [set <0-100>]")
 }

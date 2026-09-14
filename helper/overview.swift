@@ -1,8 +1,7 @@
 // omacosy-overview — the workspace overview Mission Control can't be.
-// AeroSpace/OmniWM workspaces aren't Spaces, so MC shows one
-// undifferentiated window pile; this overlay asks the running window
-// manager itself (AeroSpace CLI or OmniWM IPC, decided per use) and
-// draws a card per non-empty workspace with LIVE window previews
+// OmniWM workspaces aren't Spaces, so MC shows one undifferentiated
+// window pile; this overlay asks OmniWM itself over IPC and draws a
+// card per non-empty workspace with LIVE window previews
 // (ScreenCaptureKit — captures work even for offscreen-stashed windows),
 // composed into an approximated tile layout. Click a card or press its
 // digit to switch; Esc, backdrop click, losing key, or swiping up
@@ -19,7 +18,7 @@
 import AppKit
 import ScreenCaptureKit
 
-// Private SkyLight focus — same primitive omacosy-ffm uses. Keyboard
+// Private SkyLight focus. Keyboard
 // events only reach the ACTIVE app's key window, and cooperative
 // activation silently refuses a background daemon poked from the
 // swipe helper — so the overlay focuses ITSELF the way the window
@@ -72,8 +71,8 @@ func rememberFront() {
 // pipeline forever (found at load average 190 after six days).
 let stateDir = NSString(string: "~/.local/state/omacosy").expandingTildeInPath
 let pidPath = "\(stateDir)/overview.pid"
-// raised while the overlay is on screen — omacosy-ffm stands down so
-// hover-focus can't steal key from under the user's click
+// raised while the overlay is on screen: omacosy-gesture then ignores
+// horizontal swipes, whose lift-off would switch workspaces under it
 let activeFlag = "/tmp/omacosy-overlay-active-\(getuid())"
 let isDaemon = CommandLine.arguments.contains("--daemon")
 let showOnLaunch = CommandLine.arguments.contains("--show")
@@ -121,9 +120,9 @@ if let out = try? { () -> String in
 }
 try? FileManager.default.createDirectory(atPath: stateDir, withIntermediateDirectories: true)
 try? "\(getpid())".write(toFile: pidPath, atomically: true, encoding: .utf8)
-// a previous instance that died visible leaves the truce flag up,
-// which silently disables ffm and dwindle — this daemon owns the
-// flag, and at startup the overlay is definitely not on screen
+// a previous instance that died visible leaves the flag up — this
+// daemon owns the flag, and at startup the overlay is definitely not on
+// screen
 unlink(activeFlag)
 // pre-bridged C strings: a signal handler may only use
 // async-signal-safe calls (unlink yes, FileManager/exit no)
@@ -149,30 +148,11 @@ func tlog(_ m: String) {
     }
 }
 
-// --- aerospace ----------------------------------------------------------
-
-let aerospaceBin = ["/opt/homebrew/bin/aerospace", "/usr/local/bin/aerospace"]
-    .first { FileManager.default.isExecutableFile(atPath: $0) } ?? "aerospace"
-
-func aerospace(_ args: [String]) -> String {
-    let p = Process()
-    p.executableURL = URL(fileURLWithPath: aerospaceBin)
-    p.arguments = args
-    let pipe = Pipe()
-    p.standardOutput = pipe
-    p.standardError = FileHandle.nullDevice
-    guard (try? p.run()) != nil else { return "" }
-    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-    p.waitUntilExit()
-    return String(data: data, encoding: .utf8) ?? ""
-}
-
 // --- omniwm --------------------------------------------------------------
 
-// The OTHER window manager. omacosy-wm-switch can hand the session from
-// AeroSpace to OmniWM (and back) while this daemon runs, so which one is
-// asked is decided per use, never cached: the running-app check is an
-// in-process lookup, cheap enough to be the whole detection.
+// OmniWM can start or quit while this daemon runs, so whether it is up is
+// decided per use, never cached: the running-app check is an in-process
+// lookup, cheap enough to be the whole detection.
 let omniwmBundleID = "com.barut.OmniWM"
 
 // Match by prefix: the dev build, com.barut.OmniWM.dev, uses the same socket.
@@ -257,7 +237,7 @@ func opaqueCGWindowId(_ opaque: String) -> UInt32 {
     return UInt32(last) ?? 0
 }
 
-// --- snapshot (either WM) -------------------------------------------------
+// --- snapshot --------------------------------------------------------------
 
 struct Win {
     let id: UInt32   // CGWindowID — what thumbnails and slpsFocus key on
@@ -267,8 +247,7 @@ struct Win {
     let bundle: String
 }
 
-// numeric workspace ids first in value order, then names lexically —
-// both WMs share the numbering convention (1-9 main, second set guest)
+// numeric workspace ids first in value order, then names lexically
 func wsLess(_ a: String, _ b: String) -> Bool {
     switch (Int(a), Int(b)) {
     case let (x?, y?): return x < y
@@ -278,89 +257,30 @@ func wsLess(_ a: String, _ b: String) -> Bool {
     }
 }
 
-// aerospace monitor ids follow left-to-right arrangement order, same
-// as sorting CG displays by x-origin (the swipe daemon's rule)
-func monitorUnderCursor() -> Int {
-    guard let e = CGEvent(source: nil) else { return 1 }
-    let pt = e.location
-    var ids = [CGDirectDisplayID](repeating: 0, count: 8)
-    var n: UInt32 = 0
-    guard CGGetActiveDisplayList(8, &ids, &n) == .success, n > 0 else { return 1 }
-    let sorted = (0..<Int(n)).map { ids[$0] }.sorted {
-        CGDisplayBounds($0).origin.x < CGDisplayBounds($1).origin.x
-    }
-    for (i, d) in sorted.enumerated() where CGDisplayBounds(d).contains(pt) { return i + 1 }
-    return 1
-}
-
-// the omniwm side of monitorUnderCursor(): OmniWM refs displays by NAME
-// (NSScreen.localizedName — Monitor.current() in its source), joined
-// against `query displays` inside omniwmSnapshot. AppKit coords here,
-// same rule showOverlay uses to pick its screen.
+// OmniWM refs displays by NAME (NSScreen.localizedName — Monitor.current()
+// in its source), joined against `query displays` inside omniwmSnapshot.
+// AppKit coords here, same rule showOverlay uses to pick its screen.
 func cursorScreenName() -> String {
     let mouse = NSEvent.mouseLocation
     return (NSScreen.screens.first { $0.frame.contains(mouse) } ?? NSScreen.main!).localizedName
 }
 
-func snapshotWorkspaces(mon: Int, screenName: String)
+func snapshotWorkspaces(screenName: String)
     -> (order: [String], wins: [String: [Win]], focused: String, all: [String]) {
-    omniwmActive() ? omniwmSnapshot(screenName: screenName) : aerospaceSnapshot(mon: mon)
+    omniwmActive() ? omniwmSnapshot(screenName: screenName) : ([], [:], "", [])
 }
 
-func aerospaceSnapshot(mon: Int) -> (order: [String], wins: [String: [Win]], focused: String, all: [String]) {
-    // one CLI round-trip: windows carry their workspace's focused flag
-    var wins: [String: [Win]] = [:]
-    var focused = ""
-    for line in aerospace(["list-windows", "--all", "--format",
-        "%{workspace}\t%{window-id}\t%{app-name}\t%{window-title}\t%{app-bundle-path}\t%{workspace-is-focused}"])
-        .split(separator: "\n") {
-        let f = line.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
-        guard f.count >= 6, !f[0].isEmpty, let wid = UInt32(f[1]) else { continue }
-        wins[f[0], default: []].append(Win(id: wid, wmId: f[1], app: f[2], title: f[3], bundle: f[4]))
-        if f[5] == "true" { focused = f[0] }
-    }
-    if focused.isEmpty { // focused workspace holds no windows
-        focused = aerospace(["list-workspaces", "--focused"])
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-    var order = Array(wins.keys)
-    if !focused.isEmpty, !order.contains(focused) { order.append(focused) }
-    order.sort(by: wsLess)
-    // per-monitor sets: the overview shows the CURSOR monitor's nine
-    // workspaces only (main: 1-9, secondary: 11-19); digits address
-    // slots (the name's last digit)
-    var all = aerospace(["list-workspaces", "--monitor", String(mon)])
-        .split(separator: "\n").map(String.init)
-    if all.isEmpty { all = order }
-    let monSet = Set(all)
-    for k in wins.keys where !monSet.contains(k) { wins.removeValue(forKey: k) }
-    order = order.filter { monSet.contains($0) }
-    // "you are here" on THIS monitor = its visible workspace
-    let vis = aerospace(["list-workspaces", "--monitor", String(mon), "--visible"])
-        .trimmingCharacters(in: .whitespacesAndNewlines)
-    if !vis.isEmpty { focused = vis }
-    // single display: both sets live on this monitor, and the guest
-    // set's EMPTY workspaces would render as duplicate slot digits in
-    // the chip row (11-19 all show their last digit). Same rule as
-    // the bar: hide empty guests, keep any that hold windows or focus.
-    if NSScreen.screens.count == 1 {
-        all = all.filter { $0.count == 1 || wins[$0] != nil || $0 == focused }
-    }
-    return (order, wins, focused, all)
-}
-
-// The same snapshot out of omniwmctl, three queries: displays to turn
+// The snapshot out of omniwmctl, three queries: displays to turn
 // the cursor's screen name into the "display:N" ref the workspace
 // payloads carry, workspaces for sets/visibility/focus, windows for the
 // cards.
 func omniwmSnapshot(screenName: String)
     -> (order: [String], wins: [String: [Win]], focused: String, all: [String]) {
     // three IPC round-trips at ~36 ms each: run them CONCURRENTLY so the
-    // cards fill in one round-trip's time, not three (the aerospace
-    // path is a single 30 ms call and this used to feel slower). The
-    // displays query is also the only reliable source for the visible
-    // workspace — the workspaces query's isVisible/isFocused go dark on
-    // EMPTY workspaces (the bar hit the same trap).
+    // cards fill in one round-trip's time, not three. The displays query
+    // is also the only reliable source for the visible workspace — the
+    // workspaces query's isVisible/isFocused go dark on EMPTY workspaces
+    // (the bar hit the same trap).
     var displaysP: [String: Any]?
     var wsP: [String: Any]?
     var winP: [String: Any]?
@@ -430,8 +350,9 @@ func omniwmSnapshot(screenName: String)
     order = order.filter { monSet.contains($0) }
     // "you are here" on THIS monitor = its visible workspace
     if !visible.isEmpty { focused = visible }
-    // single display: hide empty guest-set workspaces, same rule as the
-    // aerospace path (OmniWM's second set is 14-17 here, also multi-char)
+    // single display: a guest set's EMPTY workspaces (multi-digit names)
+    // would repeat slot digits in the chip row. Hide them, and keep any
+    // that hold windows or focus.
     if NSScreen.screens.count == 1 {
         all = all.filter { $0.count == 1 || wins[$0] != nil || $0 == focused }
     }
@@ -510,7 +431,7 @@ func refreshThumbs(_ ids: [UInt32]) {
             let filter = SCContentFilter(desktopIndependentWindow: scw)
             guard var img = try? await SCScreenshotManager.captureImage(
                 contentFilter: filter, configuration: cfg) else { continue }
-            // captures racing AeroSpace's stash/settle move come back
+            // captures racing the window manager's stash/settle move come back
             // with the content in a corner of a padded canvas — crop
             // to the opaque bounding box so slots always fill
             img = croppedToContent(img)
@@ -630,9 +551,6 @@ func switchTo(_ ws: String) {
             // re-focusing the active workspace answers not_found — benign
             let out = omniwmctl(["workspace", "focus-name", ws])
             tlog("omniwmctl workspace focus-name \(ws) -> '\(out.trimmingCharacters(in: .whitespacesAndNewlines).prefix(160))'")
-        } else {
-            let out = aerospace(["workspace", ws])
-            tlog("aerospace workspace \(ws) -> '\(out.trimmingCharacters(in: .whitespacesAndNewlines))'")
         }
     }
 }
@@ -649,11 +567,6 @@ func focusWindow(_ w: Win, in ws: String) {
     DispatchQueue.global().async {
         if omniwmActive() {
             omniwmctl(["window", "navigate", w.wmId]) // switches workspace if needed
-        } else {
-            // workspace first: the switch must land even if focusing a
-            // just-unhidden window is refused mid-settle
-            _ = aerospace(["workspace", ws])
-            _ = aerospace(["focus", "--window-id", w.wmId])
         }
     }
 }
@@ -669,8 +582,8 @@ func omniFocusSettled(_ wid: String) -> Bool {
     return false
 }
 
-// AeroSpace/OmniWM workspaces cannot be renamed or resequenced — the
-// name IS the position. So what a drag reorders is their CONTENT: sliding a
+// A workspace's name IS its position (Super+N reaches workspace N), so
+// what a drag reorders is their CONTENT: sliding a
 // card left rotates the windows through every slot between where it
 // was and where it landed, and the row reads in the dragged order
 // afterwards. `slots` is the row's workspace names in position order,
@@ -729,21 +642,6 @@ func reorderWorkspaces(from slots: [String], to order: [String]) {
                     omniwmctl(["command", "move-to-workspace", slot])
                 }
             }
-        } else {
-            var wins: [String: [String]] = [:]
-            for line in aerospace(["list-windows", "--all", "--format",
-                "%{workspace}\t%{window-id}"]).split(separator: "\n") {
-                let f = line.split(separator: "\t").map(String.init)
-                guard f.count == 2 else { continue }
-                wins[f[0], default: []].append(f[1])
-            }
-            // every move reads that ONE snapshot, so a window that lands
-            // in a slot which is itself a source is not picked up twice
-            for (slot, src) in moves {
-                for wid in wins[src] ?? [] {
-                    _ = aerospace(["move-node-to-workspace", "--window-id", wid, slot])
-                }
-            }
         }
         // a rotation between hidden workspaces moves nothing on screen,
         // so the bar's workspace icons have no event to learn from
@@ -755,8 +653,8 @@ func reorderWorkspaces(from slots: [String], to order: [String]) {
                 slpsFocus(pid: getpid(), wid: UInt32(win.windowNumber))
             }
             rebuildCards()
-            // aerospace's own focus pass lands after ours; the truce
-            // holds until it has settled
+            // the window manager's own focus pass can land after ours;
+            // the truce holds until it has settled
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { reordering = false }
         }
     }
@@ -767,10 +665,9 @@ func reorderWorkspaces(from slots: [String], to order: [String]) {
 // fresh snapshot
 func rebuildCards() {
     guard overlayVisible, let content = win.contentView as? ContentView else { return }
-    let mon = monitorUnderCursor()
     let screenName = cursorScreenName()
     DispatchQueue.global().async {
-        let snap = snapshotWorkspaces(mon: mon, screenName: screenName)
+        let snap = snapshotWorkspaces(screenName: screenName)
         DispatchQueue.main.async {
             guard overlayVisible, win.contentView === content else { return }
             buildOverlay(snap, into: content)
@@ -997,9 +894,9 @@ func label(_ text: String, size: CGFloat, weight: NSFont.Weight, color: NSColor)
     return l
 }
 
-// approximated tile layout for a preview canvas: AeroSpace only knows
-// real frames for the visible workspace (hidden ones sit at stash
-// positions), so slots mimic the default h_tiles split
+// approximated tile layout for a preview canvas: only the visible
+// workspace has real frames (hidden ones sit at stash positions), so
+// slots mimic a plain side-by-side split
 func slotRects(_ n: Int, in r: NSRect) -> [NSRect] {
     let g: CGFloat = 4
     switch n {
@@ -1228,7 +1125,7 @@ func showOverlay() {
     guard !overlayVisible else { return }
     overlayVisible = true
     // the backdrop orders front IMMEDIATELY — everything data-driven
-    // (aerospace query, icons, thumbnails) fills in asynchronously, so
+    // (OmniWM query, icons, thumbnails) fills in asynchronously, so
     // the swipe response is the window server's latency, nothing else
     let mouse = NSEvent.mouseLocation
     let screen = NSScreen.screens.first { $0.frame.contains(mouse) } ?? NSScreen.main!
@@ -1290,10 +1187,9 @@ func showOverlay() {
     win.makeKeyAndOrderFront(nil)
     win.makeFirstResponder(placeholder)
     slpsFocus(pid: getpid(), wid: UInt32(win.windowNumber))
-    let mon = monitorUnderCursor()
     let screenName = screen.localizedName
     DispatchQueue.global().async {
-        let snap = snapshotWorkspaces(mon: mon, screenName: screenName)
+        let snap = snapshotWorkspaces(screenName: screenName)
         DispatchQueue.main.async {
             guard overlayVisible, let c = win.contentView as? ContentView else { return }
             buildOverlay(snap, into: c)
