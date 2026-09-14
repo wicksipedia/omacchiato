@@ -1,24 +1,23 @@
 #!/bin/bash
-# omacosy-spawn <App> — open a new window of App, serialized so the
-# dwindle split hint keeps up.
+# omacosy-spawn <App> — open a new window of App on the omarchy side of
+# the focused tile, one spawn at a time.
 #
-# The split hint runs AFTER a window exists (on-focus-changed), so two
-# windows created at the same instant both land before any hint can
-# shape them — spamming Super+Enter used to produce a flat pile. No
-# post-hoc hint can win that race; the fix is on this side: take a
-# lock, open ONE window, and wait until omacosy-helper split-hint has
-# stamped it into the state file (its first field is the newest hinted
-# window id, and ids only grow) before letting the next spawn go.
-# Spam then becomes a rapid, clean sequence instead of a simultaneous
-# mess. Worst case the wait gives up after 2s so a broken hint chain
-# can never wedge the terminal key.
+# OmniWM's dwindle insertion side is not omarchy's: with smartSplit off a
+# new window goes RIGHT in horizontal splits and ABOVE in vertical ones
+# (frames are y-up; "second child" lands at the top), while Hyprland's
+# force_split=2 is right/below — so the spiral never read as the omarchy
+# staircase. OmniWM's one-shot `preselect <dir>` fixes the side per
+# spawn: apply its own orientation rule (height * splitWidthMultiplier >
+# width -> vertical) to the focused tile and preselect down/right. No
+# state, no prediction — one query and one command, through a sanctioned
+# API. Spawns are serialized (lock + wait for the window to appear) so a
+# burst becomes a clean staircase instead of splitting the same cell over
+# and over.
 APP="$1"
 [ -n "$APP" ] || exit 1
 
-# macOS ships no flock; mkdir is the portable atomic lock. Both WM
-# paths need the same serialization, so it is taken ONCE here. A
-# holder that died is stolen after ~5s so the terminal key can never
-# go dead.
+# macOS ships no flock; mkdir is the portable atomic lock. A holder that
+# died is stolen after ~5s so the terminal key can never go dead.
 LOCK="/tmp/omacosy-spawn-$(id -u).lock.d"
 for i in $(seq 120); do
   mkdir "$LOCK" 2>/dev/null && break
@@ -27,49 +26,17 @@ for i in $(seq 120); do
 done
 trap 'rmdir "$LOCK" 2>/dev/null' EXIT
 
-# Under OmniWM the split is native, but its insertion side is not
-# omarchy's: with smartSplit off a new window goes RIGHT in horizontal
-# splits and ABOVE in vertical ones (frames are y-up; "second child"
-# lands at the top), while Hyprland's force_split=2 is right/below —
-# so the spiral never read as the omarchy staircase. OmniWM's one-shot
-# `preselect <dir>` fixes the side per spawn: apply its own
-# orientation rule (height * splitWidthMultiplier > width -> vertical)
-# to the focused tile and preselect down/right. No state, no
-# prediction — one query and one command, through a sanctioned API.
-# Spawns are still serialized (lock + wait for the window to appear)
-# so a burst becomes a clean staircase instead of splitting the same
-# cell over and over.
-# a live OmniWM answers its socket in ~3 ms; pgrep -f scanned every
-# process for 31 ms per call, and a stale socket after a crash cannot
-# fool a real request the way a file test could
-wm_is_omniwm() { "$HOME/.local/bin/omacosy-omni" active >/dev/null 2>&1; }
-if wm_is_omniwm; then
-  OMNI="$HOME/.local/bin/omacosy-omni"
-  mult="$(sed -n 's/^splitWidthMultiplier = //p' "$HOME/.config/omniwm/settings.toml" 2>/dev/null | head -1)"
-  "$OMNI" preselect-for-focused "${mult:-1.4}" >/dev/null 2>&1 || true
-  before="$("$OMNI" window-count 2>/dev/null || echo 0)"
-  # the next spawn may go once this window exists: a windows-changed
-  # subscription says so the moment it does. Subscribed BEFORE the
-  # open — `open -na` can block until the app is up, and a window that
-  # registered before the subscription would never be seen (measured:
-  # one spawn in three hit the cap that way). 2 s cap so a launch that
-  # never shows a window cannot wedge the terminal key.
-  "$OMNI" wait-window "$before" 2000 >/dev/null 2>&1 &
-  waiter=$!
-  open -na "$APP"
-  wait "$waiter" 2>/dev/null || true
-  exit 0
-fi
-
-STATE="/tmp/omacosy-split-state-$(id -u)"
-
-
-prev=0
-[ -f "$STATE" ] && prev=$(cut -d' ' -f1 "$STATE")
+OMNI="$HOME/.local/bin/omacosy-omni"
+mult="$(sed -n 's/^splitWidthMultiplier = //p' "$HOME/.config/omniwm/settings.toml" 2>/dev/null | head -1)"
+"$OMNI" preselect-for-focused "${mult:-1.4}" >/dev/null 2>&1 || true
+before="$("$OMNI" window-count 2>/dev/null || echo 0)"
+# the next spawn may go once this window exists: a windows-changed
+# subscription says so the moment it does. Subscribed BEFORE the
+# open — `open -na` can block until the app is up, and a window that
+# registered before the subscription would never be seen (measured:
+# one spawn in three hit the cap that way). 2 s cap so a launch that
+# never shows a window cannot wedge the terminal key.
+"$OMNI" wait-window "$before" 2000 >/dev/null 2>&1 &
+waiter=$!
 open -na "$APP"
-for _ in $(seq 40); do
-  cur=0
-  [ -f "$STATE" ] && cur=$(cut -d' ' -f1 "$STATE")
-  [ "${cur%.*}" -gt "${prev%.*}" ] 2>/dev/null && exit 0
-  sleep 0.05
-done
+wait "$waiter" 2>/dev/null || true

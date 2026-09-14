@@ -14,14 +14,14 @@ MANIFEST="$HOME/.local/state/omacosy/manifest"
 have() { [ -f "$MANIFEST" ] && grep -qxF "$1" "$MANIFEST"; }
 
 # --- 1. Stop the stack ------------------------------------------------------
-# Quitting the window manager restores windows it was managing —
-# whichever of the two is running (the OmniWM trial branch may have
-# either live; pkill backstops OmniWM's quit handler).
-log "Stopping AeroSpace/OmniWM, the bar, borders"
-osascript -e 'quit app "AeroSpace"' 2>/dev/null || true
+# Quitting the window manager restores the windows it was managing
+# (pkill backstops OmniWM's quit handler).
+log "Stopping OmniWM and the bar"
 osascript -e 'quit app "OmniWM"' 2>/dev/null || true
 pkill -f OmniWM.app 2>/dev/null || true
 osascript -e 'quit app "Karabiner-Elements"' 2>/dev/null || true
+# borders, ffm and dwindle are retired, but an install that never ran a
+# newer install.sh can still have them
 launchctl unload "$HOME/Library/LaunchAgents/com.omacosy.borders.plist" 2>/dev/null || true
 rm -f "$HOME/Library/LaunchAgents/com.omacosy.borders.plist" "$HOME/.local/bin/omacosy-borders"
 launchctl unload "$HOME/Library/LaunchAgents/com.omacosy.ffm.plist" 2>/dev/null || true
@@ -127,6 +127,7 @@ grep '^copied-config ' "$MANIFEST" 2>/dev/null | sed 's/^copied-config //' |
 
 restore "$HOME/.zshrc"
 restore "$HOME/.config/starship.toml"
+# retired, but an older install may have backed up the user's own copy
 restore "$HOME/.config/aerospace"
 restore "$HOME/.config/omniwm"
 restore "$HOME/.config/ghostty"
@@ -155,7 +156,8 @@ if [ ! -e "$HOME/.zshrc" ] && [ -f "$HOME/Documents/config/.dotfiles/zshrc" ]; t
 fi
 
 # theme-set / theme-next out of ~/.local/bin — only when they are OUR
-# symlinks (a user's own script of the same name survives)
+# symlinks (a user's own script of the same name survives). Retired
+# scripts stay in the list, because an older install linked them.
 for t in theme-set theme-next theme-bg-next omacosy-ws omacosy-toggle omacosy-focus-guard omacosy-ws-collapse omacosy-float omacosy-cycle omacosy-update omacosy-spawn omacosy-layout omacosy-wm-switch omacosy-karabiner-omniwm; do
   target="$(readlink "$HOME/.local/bin/$t" 2>/dev/null || true)"
   case "$target" in *omacosy*) rm -f "$HOME/.local/bin/$t" ;; esac
@@ -221,7 +223,8 @@ Done. Left in place on purpose:
   - The menu bar returns fully after logging out and back in.
   - Claude desktop's caps-lock dictation shortcut was removed during setup;
     re-enable it in Claude's settings if you used it.
-  - If AeroSpace or OmniWM still appears in System Settings -> General -> Login Items, remove it there.
+  - If OmniWM still appears in System Settings -> General -> Login Items,
+    remove it there.
   - OmniWM.app is a brew cask like the rest: removed above only when the
     manifest says omacosy installed it; one that predates omacosy stays.
   - Permission entries (Accessibility, Input Monitoring, Screen Recording,

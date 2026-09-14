@@ -3,6 +3,5 @@
 /omacosy-bar.app/
 /omacosy-gesture.app/
 config/apps.local.conf
-config/aerospace/aerospace.toml
 __pycache__/
 CLAUDE.local.md

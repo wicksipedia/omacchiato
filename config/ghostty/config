@@ -15,8 +15,9 @@ config-file = ?~/.config/omacosy/ghostty-theme
 # Pin the initial size of NEW windows (in cells). Ghostty otherwise
 # inherits the previous window's size, and under a tiling WM that is
 # usually the full screen — so every spawn played its open animation at
-# full size over the whole layout before AeroSpace tiled it. Small and
-# fixed, the pre-tile moment is a brief unobtrusive window instead.
+# full size over the whole layout before the window manager tiled it.
+# Small and fixed, the pre-tile moment is a brief unobtrusive window
+# instead.
 window-width = 100
 window-height = 30
 

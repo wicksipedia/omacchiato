@@ -1,17 +1,16 @@
 #!/usr/bin/env bash
-# omacosy-karabiner-omniwm <install|remove> — the exec chords under OmniWM.
+# omacosy-karabiner-omniwm <install|remove> — the exec chords.
 #
 # OmniWM's hotkey system has no exec/shell command (verified against
 # HotkeyCommand.swift: window-management cases only), so every chord
 # that RUNS something — terminal, launcher, apps, theme, lock, the
-# cheatsheet — dies with aerospace.toml when AeroSpace stops. Karabiner
-# is already resident for Caps Lock and its complex modifications run
-# shell_command, so the exec layer moves there while OmniWM is active.
+# cheatsheet — lives in Karabiner instead. Karabiner is already
+# resident for Caps Lock, and its complex modifications run
+# shell_command.
 #
-# Injected/removed by omacosy-wm-switch on each handover — the rules
-# must NOT be active under AeroSpace, whose own bindings already grab
-# these chords (both firing would double every launch). Karabiner
-# live-reloads karabiner.json, so injection applies instantly.
+# install.sh runs `install` after it copies karabiner.json and writes
+# apps.conf. Each run replaces the rules that an earlier run added.
+# Karabiner live-reloads karabiner.json, so the rules apply at once.
 #
 # Super = Caps Lock = command+control+option (the existing remap), so
 # the chords arrive as ordinary modifier combos.
@@ -77,8 +76,8 @@ rules = slot_rules + [
     # parked — swap the two lines to go back)
     rule("launcher", "spacebar", SUPER, cmd="/opt/homebrew/bin/omniwmctl command open-command-palette >/dev/null 2>&1"),
     rule("overview", "o", SUPER, cmd=f"{home}/.local/bin/omacosy-overview"),
-    # aerospace-era throws: to the OTHER monitor, not a direction —
-    # resolved per-press by omacosy-omni from the display arrangement
+    # throws go to the OTHER display, not a direction — resolved
+    # per-press by omacosy-omni from the display arrangement
     rule("throw window to other monitor", "o", SHIFT, cmd=f"{home}/.local/bin/omacosy-omni throw-window >/dev/null 2>&1"),
     rule("throw workspace to other monitor", "spacebar", SHIFT, cmd=f"{home}/.local/bin/omacosy-omni throw-workspace >/dev/null 2>&1"),
     # slot-scoped cycling (1-9 stays 1-9): OmniWM's own next/prev walks

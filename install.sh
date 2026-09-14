@@ -20,7 +20,7 @@ have() { grep -qxF "$1" "$MANIFEST" 2>/dev/null; }
 export MANIFEST
 
 # Configs are SYMLINKED into the repo so edits go live — but TCC walls
-# launchd consumers (the bar, AeroSpace, and the shells they spawn)
+# launchd consumers (the bar and the shells it spawns)
 # off from ~/Documents, ~/Desktop and ~/Downloads. A clone there makes
 # every symlinked config unreadable on a machine without Full Disk
 # Access, so such clones get COPIES instead (re-run install.sh after
@@ -48,13 +48,6 @@ if ! command -v brew >/dev/null 2>&1; then
   # tell uninstall.sh that homebrew is ours to remove
   mark "installed-homebrew"
 fi
-
-# Homebrew >=6 refuses third-party taps until explicitly trusted
-brew trust felixkratz/formulae 2>/dev/null || true
-
-# A Mac with AeroSpace running stays on it. Quitting a running window
-# manager strands the windows it parked off screen.
-if pgrep -xq AeroSpace; then WM=aerospace; else WM=omniwm; fi
 
 log "Installing packages (brew bundle)"
 PRE_FORMULAE="$(brew list --formula 2>/dev/null | sort)"
@@ -109,14 +102,15 @@ link() {
   fi
 }
 
-# generate aerospace.toml from the template + app choices
+# app choices for the Karabiner app chords
 #
 # These are READ, not sourced. apps.local.conf is a file the README
 # invites you to paste values into, and `source` would execute whatever
-# is in it. The values then go through sed into single-quoted TOML
-# strings, so a name carrying a quote or a newline could close the
-# string and add its own aerospace command: anything outside a plain app
-# name is refused rather than substituted.
+# is in it. The values then land in ~/.config/omacosy/apps.conf, which
+# omacosy-karabiner-omniwm sources, and inside single-quoted shell
+# commands in the Karabiner rules. A name carrying a quote or a newline
+# could close the string and run its own command, so anything outside a
+# plain app name is refused rather than substituted.
 read_apps() {
   local f="$1" line k v
   [ -f "$f" ] || return 0
@@ -140,14 +134,10 @@ read_apps() {
 }
 read_apps "$REPO_DIR/config/apps.conf"
 read_apps "$REPO_DIR/config/apps.local.conf"
-sed -e "s|@TERMINAL@|$TERMINAL|g" -e "s|@BROWSER@|$BROWSER|g" \
-    -e "s|@MUSIC@|$MUSIC|g" -e "s|@MESSENGER@|$MESSENGER|g" \
-  "$REPO_DIR/config/aerospace/aerospace.template.toml" > "$REPO_DIR/config/aerospace/aerospace.toml"
 
 log "Linking configs"
 link "$REPO_DIR/zsh/zshrc"           "$HOME/.zshrc"
 link "$REPO_DIR/config/starship.toml" "$HOME/.config/starship.toml"
-link "$REPO_DIR/config/aerospace"    "$HOME/.config/aerospace"
 # ghostty reads this AND its Application Support config, so personal
 # settings there survive
 link "$REPO_DIR/config/ghostty"      "$HOME/.config/ghostty"
@@ -185,7 +175,7 @@ for agent in Karabiner-Menu Karabiner-NotificationWindow; do
 done
 pkill -f "Karabiner-Menu|Karabiner-NotificationWindow" 2>/dev/null || true
 
-# theme scripts on PATH (aerospace's theme chord calls ~/.local/bin/theme-next)
+# theme scripts on PATH (the Karabiner theme chord calls ~/.local/bin/theme-next)
 mkdir -p "$HOME/.local/bin"
 
 # tiny compiled helper (cursor position, wallpaper) — replaces the
@@ -233,10 +223,9 @@ cp "$REPO_DIR/helper/bar-info.plist" "$BAR_APP/Contents/Info.plist"
 mark "built-bar-app"
 rm -f "$HOME/.local/bin/omacosy-bar"   # the pre-bundle binary, if any
 
-# omacosy-dwindle is gone: the spiral is three on-window-detected rules
-# now. A machine upgrading from an older install still has the daemon
-# and its agent, and leaving it running would join every new window a
-# second time.
+# omacosy-dwindle is gone. A machine upgrading from an older install
+# still has the daemon and its agent, and leaving it running would join
+# every new window a second time.
 launchctl bootout "gui/$(id -u)/com.omacosy.dwindle" 2>/dev/null || true
 launchctl unload "$HOME/Library/LaunchAgents/com.omacosy.dwindle.plist" 2>/dev/null || true
 rm -f "$HOME/Library/LaunchAgents/com.omacosy.dwindle.plist" "$HOME/.local/bin/omacosy-dwindle"
@@ -255,6 +244,23 @@ launchctl bootout "gui/$(id -u)/com.omacosy.ffm" 2>/dev/null || true
 launchctl unload "$HOME/Library/LaunchAgents/com.omacosy.ffm.plist" 2>/dev/null || true
 rm -f "$HOME/Library/LaunchAgents/com.omacosy.ffm.plist" "$HOME/.local/bin/omacosy-ffm" \
   "$HOME/.config/omacosy/ffm-ignore"
+
+# The scripts that served only AeroSpace are gone, so an older install's
+# links to them in ~/.local/bin point nowhere. Only links into this repo
+# are removed.
+for t in omacosy-wm-switch omacosy-focus-guard omacosy-layout omacosy-float omacosy-cycle; do
+  case "$(readlink "$HOME/.local/bin/$t" 2>/dev/null)" in
+    "$REPO_DIR"/*) rm -f "$HOME/.local/bin/$t" ;;
+  esac
+done
+# So is its config: the link, the copy in a TCC-protected clone, and
+# the aerospace.toml that an older install.sh generated in the repo.
+if [ -L "$HOME/.config/aerospace" ] && [ "$(readlink "$HOME/.config/aerospace")" = "$REPO_DIR/config/aerospace" ]; then
+  rm "$HOME/.config/aerospace"
+fi
+if have "copied-config $HOME/.config/aerospace"; then rm -rf "$HOME/.config/aerospace"; fi
+rm -f "$REPO_DIR/config/aerospace/aerospace.toml"
+rmdir "$REPO_DIR/config/aerospace" 2>/dev/null || true
 
 # stable code identity so TCC grants survive rebuilds (skipped when no
 # signing identity is present — then re-grant after each rebuild)
@@ -284,10 +290,8 @@ printf 'TERMINAL=%s\nBROWSER=%s\nMUSIC=%s\nMESSENGER=%s\n' \
   "$TERMINAL" "$BROWSER" "$MUSIC" "$MESSENGER" > "$HOME/.config/omacosy/apps.conf"
 
 # after apps.conf, so the injected rules launch the user's chosen apps
-if [ "$WM" = omniwm ]; then
-  "$REPO_DIR/bin/omacosy-karabiner-omniwm" install \
-    || log "WARNING: the OmniWM Karabiner rules did not install. Re-run install.sh."
-fi
+"$REPO_DIR/bin/omacosy-karabiner-omniwm" install \
+  || log "WARNING: the OmniWM Karabiner rules did not install. Re-run install.sh."
 
 cat > "$HOME/Library/LaunchAgents/com.omacosy.bar.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -317,15 +321,10 @@ link "$REPO_DIR/bin/omacosy-claude-usage" "$HOME/.local/bin/omacosy-claude-usage
 link "$REPO_DIR/bin/omacosy-github-prs" "$HOME/.local/bin/omacosy-github-prs"
 link "$REPO_DIR/bin/omacosy-keep-awake" "$HOME/.local/bin/omacosy-keep-awake"
 link "$REPO_DIR/bin/omacosy-ws" "$HOME/.local/bin/omacosy-ws"
-link "$REPO_DIR/bin/omacosy-focus-guard" "$HOME/.local/bin/omacosy-focus-guard"
 link "$REPO_DIR/bin/omacosy-ws-collapse" "$HOME/.local/bin/omacosy-ws-collapse"
 link "$REPO_DIR/bin/omacosy-update" "$HOME/.local/bin/omacosy-update"
 link "$REPO_DIR/bin/omacosy-spawn" "$HOME/.local/bin/omacosy-spawn"
-link "$REPO_DIR/bin/omacosy-wm-switch" "$HOME/.local/bin/omacosy-wm-switch"
 link "$REPO_DIR/bin/omacosy-karabiner-omniwm" "$HOME/.local/bin/omacosy-karabiner-omniwm"
-link "$REPO_DIR/bin/omacosy-layout" "$HOME/.local/bin/omacosy-layout"
-link "$REPO_DIR/bin/omacosy-float" "$HOME/.local/bin/omacosy-float"
-link "$REPO_DIR/bin/omacosy-cycle" "$HOME/.local/bin/omacosy-cycle"
 
 # --- 3. omarchy theme convention -------------------------------------------
 # Canonical theme state lives at ~/.config/omarchy/current/theme (what the
@@ -454,23 +453,21 @@ fi
 
 # --- 7. Services ------------------------------------------------------------
 
-
-# No handover happens here: WM is omniwm only when AeroSpace is not
-# running. omacosy-wm-switch does the guarded handover between two managers.
-if [ "$WM" = omniwm ]; then
-  log "Starting OmniWM (switch to AeroSpace with: omacosy-wm-switch aerospace)"
+# OmniWM does not start beside another window manager, and quitting one
+# strands the windows it parked off screen, so a running AeroSpace is
+# left for the user to quit. Its login item goes, or it would take the
+# next login.
+if pgrep -xq AeroSpace; then
+  log "WARNING: AeroSpace is running. Quit it, then start OmniWM: open -a OmniWM"
+else
+  log "Starting OmniWM"
   pgrep -xq OmniWM || open -a OmniWM \
     || log "WARNING: OmniWM did not start. Check the brew bundle output above."
-  osascript -e 'tell application "System Events"
-    if exists login item "AeroSpace" then delete login item "AeroSpace"
-    if not (exists login item "OmniWM") then make new login item at end with properties {path:"/Applications/OmniWM.app", hidden:false}
-  end tell' 2>/dev/null || true
-else
-  log "Starting AeroSpace (switch to OmniWM with: omacosy-wm-switch omniwm)"
-  open -a AeroSpace
-  sleep 1
-  "$(command -v aerospace || echo /opt/homebrew/bin/aerospace)" reload-config 2>/dev/null || true
 fi
+osascript -e 'tell application "System Events"
+  if exists login item "AeroSpace" then delete login item "AeroSpace"
+  if not (exists login item "OmniWM") then make new login item at end with properties {path:"/Applications/OmniWM.app", hidden:false}
+end tell' 2>/dev/null || true
 
 # The remapping runs in launchd-managed services; the app itself is only
 # the settings window, and it costs ~92MB resident to leave open. Launch
@@ -483,16 +480,10 @@ else
   open -a Karabiner-Elements
 fi
 
-if [ "$WM" = omniwm ]; then
-  STEP1="  1. Grant OmniWM     System Settings -> Privacy & Security -> Accessibility (required) and Input Monitoring (swipes)"
-else
-  STEP1="  1. Grant AeroSpace   System Settings -> Privacy & Security -> Accessibility"
-fi
-
 cat <<EOF
 
 Done. One-time macOS steps if this is a fresh machine:
-$STEP1
+  1. Grant OmniWM     System Settings -> Privacy & Security -> Accessibility (required) and Input Monitoring (swipes)
   2. Karabiner-Elements: approve its driver extension + Input Monitoring
      when prompted (System Settings -> Privacy & Security)
   3. Korren isn't in the Brewfile — build it from the korren repo:

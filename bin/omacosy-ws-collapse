@@ -4,37 +4,30 @@
 # on replug. Called by omacosy-bar when the monitor count changes
 # (it is the one long-lived process already watching for that).
 #
-# collapse: every non-empty guest workspace (two-digit id) empties
-#   into the lowest EMPTY 1-9 slot — used slots are never touched.
-#   Each moved window is recorded with its origin, so restore is
-#   per-window: windows opened while undocked stay wherever the user
-#   put them.
-# restore: recorded windows go back to their origin workspaces
-#   (aerospace's force-assignment has already returned those
-#   workspaces to the secondary monitor); the map is consumed.
+# collapse: with one display left, every non-empty guest workspace
+#   (two-digit id) empties into the lowest EMPTY 1-9 slot — used slots
+#   are never touched. Each moved window is recorded with its origin, so
+#   restore is per-window: windows opened while undocked stay wherever
+#   the user put them.
+# restore: recorded windows go back to their origin workspaces; the map
+#   is consumed.
+#
+# OmniWM re-routes guest WORKSPACES to the main display on unplug, but
+# their windows stay on two-digit workspaces "after 9". No move-by-id
+# exists, so each window is focused (verified) and then moved; the dance
+# is the same one the overview's drag-reorder uses.
 export PATH="/opt/homebrew/bin:$PATH"
-
-# a live OmniWM answers its socket in ~3 ms; pgrep -f scanned every
-# process for 31 ms per call, and a stale socket after a crash cannot
-# fool a real request the way a file test could
-wm_is_omniwm() { "$HOME/.local/bin/omacosy-omni" active >/dev/null 2>&1; }
 
 STATE_DIR="$HOME/.local/state/omacosy"
 MAP="$STATE_DIR/collapse-map"
 mkdir -p "$STATE_DIR"
 
-if wm_is_omniwm; then
-  # OmniWM re-routes guest WORKSPACES to the main display on unplug,
-  # but their windows stay on two-digit workspaces "after 9" — the
-  # same fold as aerospace, done through omacosy-omni. No move-by-id
-  # exists, so each window is focused (verified) and then moved; the
-  # dance is the same one the overview's drag-reorder uses.
-  OMNI="$HOME/.local/bin/omacosy-omni"
-  case "${1:-}" in
-    collapse)
-      NDISP="$("$OMNI" query displays 2>/dev/null | /usr/bin/python3 -c 'import sys,json;print(len(json.load(sys.stdin)["result"]["payload"]["displays"]))' 2>/dev/null)" || exit 0
-      [ "$NDISP" = 1 ] || exit 0
-      "$OMNI" query windows id,workspace,app 2>/dev/null | /usr/bin/python3 -c '
+OMNI="$HOME/.local/bin/omacosy-omni"
+case "${1:-}" in
+  collapse)
+    NDISP="$("$OMNI" query displays 2>/dev/null | /usr/bin/python3 -c 'import sys,json;print(len(json.load(sys.stdin)["result"]["payload"]["displays"]))' 2>/dev/null)" || exit 0
+    [ "$NDISP" = 1 ] || exit 0
+    "$OMNI" query windows id,workspace,app 2>/dev/null | /usr/bin/python3 -c '
 import sys, json
 wins = json.load(sys.stdin)["result"]["payload"]["windows"]
 used = set(); guests = {}
@@ -52,92 +45,33 @@ for gws in sorted(guests):
     for wid in guests[gws]:
         print(f"{wid}	{t}	{gws}")
 ' | while IFS=$'	' read -r wid target gws; do
-        [ -n "$wid" ] || continue
-        "$OMNI" focus-window "$wid" >/dev/null 2>&1 || continue
-        sleep 0.4
-        FOC="$("$OMNI" query focused-window 2>/dev/null | /usr/bin/python3 -c 'import sys,json;print((json.load(sys.stdin)["result"]["payload"].get("window") or {}).get("id",""))' 2>/dev/null)"
-        [ "$FOC" = "$wid" ] || continue
-        "$OMNI" command move-to-workspace "{\"workspaceNumber\":$target}" >/dev/null 2>&1 &&
-          printf '%s	%s
+      [ -n "$wid" ] || continue
+      "$OMNI" focus-window "$wid" >/dev/null 2>&1 || continue
+      sleep 0.4
+      FOC="$("$OMNI" query focused-window 2>/dev/null | /usr/bin/python3 -c 'import sys,json;print((json.load(sys.stdin)["result"]["payload"].get("window") or {}).get("id",""))' 2>/dev/null)"
+      [ "$FOC" = "$wid" ] || continue
+      "$OMNI" command move-to-workspace "{\"workspaceNumber\":$target}" >/dev/null 2>&1 &&
+        printf '%s	%s
 ' "$wid" "$gws" >>"$MAP"
-        sleep 0.3
-        echo "$(date '+%F %T') collapsed (omniwm) window -> $target (from $gws)" >>/tmp/omacosy-ws-collapse.log
-      done
-      : > /tmp/omacosy-bar-moved
-      ;;
-    restore)
-      [ -s "$MAP" ] || exit 0
-      mv "$MAP" "$MAP.run" 2>/dev/null || exit 0
-      sleep 1
-      while IFS=$'	' read -r wid gws; do
-        [ -n "$wid" ] && [ -n "$gws" ] || continue
-        "$OMNI" focus-window "$wid" >/dev/null 2>&1 || continue
-        sleep 0.4
-        "$OMNI" command move-to-workspace "{\"workspaceNumber\":$gws}" >/dev/null 2>&1 &&
-          echo "$(date '+%F %T') restored (omniwm) window -> $gws" >>/tmp/omacosy-ws-collapse.log
-        sleep 0.3
-      done <"$MAP.run"
-      rm -f "$MAP.run"
-      : > /tmp/omacosy-bar-moved
-      ;;
-    *) echo "usage: omacosy-ws-collapse <collapse|restore>" >&2; exit 2 ;;
-  esac
-  exit 0
-fi
-
-case "${1:-}" in
-  collapse)
-    [ "$(aerospace list-monitors 2>/dev/null | wc -l | tr -d ' ')" = 1 ] || exit 0
-    # empty single-digit slots, ascending — the merge targets. A
-    # failed probe MUST abort: display reconfiguration is exactly
-    # when aerospace is busiest, and mistaking "CLI error" for
-    # "empty" would dump guest windows onto an occupied workspace.
-    TARGETS=()
-    for s in 1 2 3 4 5 6 7 8 9; do
-      if ! WOUT="$(aerospace list-windows --workspace "$s" --format '%{window-id}' 2>&1)"; then
-        echo "$(date '+%F %T') collapse aborted: ws $s probe failed" >>/tmp/omacosy-ws-collapse.log
-        exit 0
-      fi
-      [ -z "$WOUT" ] && TARGETS+=("$s")
+      sleep 0.3
+      echo "$(date '+%F %T') collapsed (omniwm) window -> $target (from $gws)" >>/tmp/omacosy-ws-collapse.log
     done
-    ti=0
-    for gws in $(aerospace list-workspaces --all 2>/dev/null | grep -E '^[0-9]{2}$'); do
-      WINS="$(aerospace list-windows --workspace "$gws" --format '%{window-id}' 2>/dev/null)"
-      [ -z "$WINS" ] && continue
-      # out of empty slots: this guest workspace stays put (the bar
-      # shows it with its full number)
-      [ "$ti" -ge "${#TARGETS[@]}" ] && break
-      T="${TARGETS[$ti]}"
-      ti=$((ti + 1))
-      for wid in $WINS; do
-        aerospace move-node-to-workspace --window-id "$wid" "$T" 2>/dev/null &&
-          printf '%s\t%s\n' "$wid" "$gws" >>"$MAP"
-      done
-      echo "$(date '+%F %T') collapsed $gws -> $T" >>/tmp/omacosy-ws-collapse.log
-    done
-    # moving between two HIDDEN workspaces emits no SkyLight event
-    # (nothing on screen changed), so poke the bar directly
     : > /tmp/omacosy-bar-moved
     ;;
   restore)
     [ -s "$MAP" ] || exit 0
-    # claim the map atomically FIRST: a monitor flap can fire a new
-    # collapse while restore runs, and its fresh records must land in
-    # a fresh map — not be swallowed by our final rm
     mv "$MAP" "$MAP.run" 2>/dev/null || exit 0
-    # let aerospace finish adopting the reattached monitor (its
-    # force-assignment moves the guest workspaces back first)
     sleep 1
-    while IFS=$'\t' read -r wid gws; do
+    while IFS=$'	' read -r wid gws; do
       [ -n "$wid" ] && [ -n "$gws" ] || continue
-      aerospace move-node-to-workspace --window-id "$wid" "$gws" 2>/dev/null &&
-        echo "$(date '+%F %T') restored $wid -> $gws" >>/tmp/omacosy-ws-collapse.log
+      "$OMNI" focus-window "$wid" >/dev/null 2>&1 || continue
+      sleep 0.4
+      "$OMNI" command move-to-workspace "{\"workspaceNumber\":$gws}" >/dev/null 2>&1 &&
+        echo "$(date '+%F %T') restored (omniwm) window -> $gws" >>/tmp/omacosy-ws-collapse.log
+      sleep 0.3
     done <"$MAP.run"
     rm -f "$MAP.run"
     : > /tmp/omacosy-bar-moved
     ;;
-  *)
-    echo "usage: omacosy-ws-collapse <collapse|restore>" >&2
-    exit 2
-    ;;
+  *) echo "usage: omacosy-ws-collapse <collapse|restore>" >&2; exit 2 ;;
 esac
