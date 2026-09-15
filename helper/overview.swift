@@ -429,12 +429,12 @@ func refreshThumbs(_ ids: [UInt32]) {
             cfg.height = Int(scw.frame.height / 2)
             cfg.showsCursor = false
             let filter = SCContentFilter(desktopIndependentWindow: scw)
-            guard var img = try? await SCScreenshotManager.captureImage(
+            guard let raw = try? await SCScreenshotManager.captureImage(
                 contentFilter: filter, configuration: cfg) else { continue }
             // captures racing the window manager's stash/settle move come back
             // with the content in a corner of a padded canvas — crop
             // to the opaque bounding box so slots always fill
-            img = croppedToContent(img)
+            let img = croppedToContent(raw)
             await MainActor.run {
                 thumbs[wid] = img
                 if let v = thumbViews[wid] {

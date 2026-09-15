@@ -2368,7 +2368,10 @@ func recentItemIcon(_ title: String, section: String) -> NSImage? {
     if section == "Applications" {
         if let app = NSWorkspace.shared.runningApplications.first(where: { $0.localizedName == title }),
            let icon = app.icon { return icon }
-        if let path = NSWorkspace.shared.fullPath(forApplication: title) {
+        // no current API finds an app by name, so look in the usual folders
+        let dirs = ["/Applications", "/System/Applications", "/System/Applications/Utilities",
+                    NSHomeDirectory() + "/Applications"]
+        if let path = dirs.map({ "\($0)/\(title).app" }).first(where: { FileManager.default.fileExists(atPath: $0) }) {
             return NSWorkspace.shared.icon(forFile: path)
         }
         return nil

@@ -399,7 +399,8 @@ fi
 # ~3 ms launch; no grants involved, so it is simply rebuilt when stale)
 G="$REPO_DIR/helper/gesture"
 if [ ! -x "$HOME/.local/bin/omacosy-omni" ] || find "$G/omniwm.c" "$G/omniwm.h" "$G/omnicli.c" "$G/yyjson.c" "$G/yyjson.h" -newer "$HOME/.local/bin/omacosy-omni" 2>/dev/null | grep -q .; then
-  clang -std=c99 -O2 -arch arm64 -o "$HOME/.local/bin/omacosy-omni" "$G/omniwm.c" "$G/yyjson.c" "$G/omnicli.c" -framework ApplicationServices -framework CoreFoundation \
+  # C11 lets yyjson.h and omniwm.h both declare the yyjson typedefs
+  clang -std=c11 -O2 -arch arm64 -o "$HOME/.local/bin/omacosy-omni" "$G/omniwm.c" "$G/yyjson.c" "$G/omnicli.c" -framework ApplicationServices -framework CoreFoundation \
     || echo "omacosy-omni build failed"
 fi
 GESTURE_STALE=""
@@ -411,7 +412,7 @@ if [ -n "$GESTURE_STALE" ]; then
   launchctl unload "$HOME/Library/LaunchAgents/com.omacosy.gesture.plist" 2>/dev/null || true
   G="$REPO_DIR/helper/gesture"
   mkdir -p "$GESTURE_APP/Contents/MacOS"
-  clang -std=c99 -O3 -fobjc-arc -arch arm64 \
+  clang -std=c11 -O3 -fobjc-arc -arch arm64 \
     -Wno-pointer-integer-compare -Wno-incompatible-pointer-types-discards-qualifiers -Wno-absolute-value \
     -o "$GESTURE_BIN" "$G/omniwm.c" "$G/yyjson.c" "$G/haptic.c" "$G/event_tap.m" "$G/main.m" \
     -framework CoreFoundation -framework IOKit -F/System/Library/PrivateFrameworks -framework MultitouchSupport \
