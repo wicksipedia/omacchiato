@@ -2992,7 +2992,6 @@ let padLeft: CGFloat = 10
 let chipBox: CGFloat = 20
 let chipPad: CGFloat = 2
 let pillHeight: CGFloat = 26
-let chipPillHeight: CGFloat = 20
 let radius: CGFloat = 4
 let gap: CGFloat = 10
 // horizontal breathing room inside a pill, each side
@@ -3186,12 +3185,10 @@ final class BarView: NSView {
             // other screen's bar: docked, it never matched there and
             // the laptop had no "you are here" at all.
             if ws == surface.visible {
-                let pill = NSRect(x: box.minX, y: (barHeight - chipPillHeight) / 2,
-                                  width: chipBox, height: chipPillHeight)
                 palette.accent.setFill()
-                NSBezierPath(roundedRect: pill, xRadius: radius, yRadius: radius).fill()
+                NSBezierPath(ovalIn: NSRect(x: box.midX - 2, y: 2, width: 4, height: 4)).fill()
             }
-            let tint: NSColor = ws == surface.visible ? palette.barBG : palette.muted
+            let tint: NSColor = ws == surface.visible ? palette.accent : palette.muted
             switch workspaceIconConfig.icon(for: ws) {
             case .some(.glyph(let glyph)):
                 drawIcon(glyph, iconFont, tint, centeredIn: box)

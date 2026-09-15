@@ -464,7 +464,7 @@ startup and does no config-file or image-file I/O while it draws.
   taller than the screen scroll. The one thing the auto-hidden native
   bar still owned, gone.
 - **Workspaces**: one segmented capsule per monitor showing only that
-  monitor's workspaces; accent pill on the focused one; click to jump.
+  monitor's workspaces; an accent dot under the one on show; click to jump.
 - **Media**: album art + artist and track (Apple Music). A title too
   long for the pill scrolls, moved by Core Animation so the bar redraws
   nothing. Click to open Music. Centered on flat displays, left cluster
