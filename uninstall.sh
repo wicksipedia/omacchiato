@@ -161,7 +161,7 @@ fi
 # theme-set / theme-next out of ~/.local/bin — only when they are OUR
 # symlinks (a user's own script of the same name survives). Retired
 # scripts stay in the list, because an older install linked them.
-for t in theme-set theme-next theme-bg-next omacosy-ws omacosy-toggle omacosy-focus-guard omacosy-ws-collapse omacosy-float omacosy-cycle omacosy-update omacosy-spawn omacosy-layout omacosy-wm-switch omacosy-karabiner-omniwm; do
+for t in theme-set theme-next theme-bg-next omacosy-ws omacosy-toggle omacosy-focus-guard omacosy-ws-collapse omacosy-float omacosy-cycle omacosy-update omacosy-spawn omacosy-layout omacosy-wm-switch omacosy-karabiner-omniwm omacosy-omniwmctl; do
   target="$(readlink "$HOME/.local/bin/$t" 2>/dev/null || true)"
   case "$target" in *omacosy*) rm -f "$HOME/.local/bin/$t" ;; esac
 done

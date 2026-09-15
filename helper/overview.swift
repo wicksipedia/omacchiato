@@ -160,9 +160,8 @@ func omniwmActive() -> Bool {
     NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier?.hasPrefix(omniwmBundleID) == true }
 }
 
-let omniwmctlBin = ["/opt/homebrew/bin/omniwmctl",
-                    "/Applications/OmniWM.app/Contents/MacOS/omniwmctl"]
-    .first { FileManager.default.isExecutableFile(atPath: $0) } ?? "omniwmctl"
+// the wrapper finds omniwmctl in the Homebrew link, the release app or a dev build
+let omniwmctlBin = NSHomeDirectory() + "/.local/bin/omacosy-omniwmctl"
 
 @discardableResult
 func omniwmctl(_ args: [String]) -> String {

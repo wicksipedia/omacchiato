@@ -181,7 +181,9 @@ The design and the test results are in
   chords and replaces its own rules on each run. `install.sh` copies
   `config/karabiner/karabiner.json` over the live file, so it must add
   the OmniWM rules after that copy and after it writes `apps.conf`.
-- `omniwmctl` is at `/opt/homebrew/bin/omniwmctl`. `omacosy-omni`
+- The Karabiner rules, the bar and the overview run `omniwmctl` through
+  `bin/omacosy-omniwmctl`, which finds it in the Homebrew link, the
+  release app or a dev build. `omacosy-omni`
   (`helper/gesture/omnicli.c`) is a fast IPC client for the scripts.
   OmniWM rejects all IPC while its overview is open.
 - OmniWM does not start while another window manager runs. It shows a
