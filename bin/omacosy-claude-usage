@@ -18,6 +18,7 @@ you out. On an expired or rejected token it falls back instead.
 """
 import json
 import os
+import shutil
 import subprocess
 import textwrap
 import time
@@ -242,6 +243,21 @@ def health_rows(entry):
     return rows
 
 
+def tokens_row():
+    """A row that opens tokscale in a terminal. The terminal starts with the
+    system PATH, so the command carries the directory node lives in: npx
+    starts with `#!/usr/bin/env node` and dies without it."""
+    # a fixed path first: fnm's per-shell directory is gone by the next login
+    npx = next((p for p in [os.path.join(HOME, ".local/share/fnm/aliases/default/bin/npx"),
+                            "/opt/homebrew/bin/npx", "/usr/local/bin/npx"]
+                if os.access(p, os.X_OK)), None) or shutil.which("npx")
+    if not npx:
+        return None
+    path = "%s:/opt/homebrew/bin:/usr/bin:/bin" % os.path.dirname(npx)
+    return {"text": "Token usage", "detail": "tokscale",
+            "terminal": "/usr/bin/env PATH=%s npx tokscale" % path}
+
+
 def health_icon(status):
     """Decorate the configured icon when the service is not healthy."""
     base = os.environ.get("OMACOSY_PILL_ICON", "")
@@ -378,6 +394,9 @@ def with_health(payload):
         payload["rows"] = payload["rows"][:1] + health + [{"separator": True}] + payload["rows"][2:]
     if icon:
         payload["icon"] = icon
+    tokens = tokens_row()
+    if tokens:
+        payload["rows"] += [{"separator": True}, tokens]
     return payload
 
 

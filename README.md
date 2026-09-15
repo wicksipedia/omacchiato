@@ -334,6 +334,9 @@ problem. When an open incident affects Claude Code, the rows below it show
 the incident's title, its state and the time of its latest update. A click
 on those rows opens the incident page.
 
+The last row opens `tokscale` in a terminal with `npx tokscale`, which
+breaks your token use down by model, day and month.
+
 It reads Anthropic's OAuth usage endpoint with the Claude CLI's own token,
 caching the answer for five minutes, because only that endpoint carries the
 per-model and credit figures. It never refreshes the token and never writes
