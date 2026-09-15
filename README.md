@@ -569,6 +569,7 @@ keys still work.
 | `Ctrl+Alt+z` | zoom the pane |
 | `Ctrl+Alt+[` / `Ctrl+Alt+]` | previous / next tab |
 | `Ctrl+Alt+t` / `Ctrl+Alt+w` | new tab / close tab |
+| `Ctrl+Alt+shift+t` | rename tab |
 | `Ctrl+Alt+up` / `Ctrl+Alt+down` | previous / next space |
 
 **On the modifier space.** omarchy layers `Super+Ctrl` and `Super+Alt`

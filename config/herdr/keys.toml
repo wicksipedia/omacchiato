@@ -11,6 +11,7 @@ zoom = ["prefix+z", "ctrl+alt+z"]
 previous_tab = ["prefix+p", "ctrl+alt+["]
 next_tab = ["prefix+n", "ctrl+alt+]"]
 new_tab = ["prefix+c", "ctrl+alt+t"]
+rename_tab = ["prefix+shift+t", "ctrl+alt+shift+t"]
 close_tab = ["prefix+shift+x", "ctrl+alt+w"]
 previous_workspace = "ctrl+alt+up"
 next_workspace = "ctrl+alt+down"
