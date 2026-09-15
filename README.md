@@ -328,7 +328,9 @@ than 5 points ahead, and red more than 20 points ahead or at 90% used.
 The first row reports the status of the Claude Code component on
 status.claude.com and opens the status page when clicked. It ignores the
 page's overall rating, which also drops when another Claude product has a
-problem.
+problem. When an open incident affects Claude Code, the rows below it show
+the incident's title, its state and the time of its latest update. A click
+on those rows opens the incident page.
 
 It reads Anthropic's OAuth usage endpoint with the Claude CLI's own token,
 caching the answer for five minutes, because only that endpoint carries the

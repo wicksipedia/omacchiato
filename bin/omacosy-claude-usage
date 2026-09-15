@@ -19,6 +19,7 @@ you out. On an expired or rejected token it falls back instead.
 import json
 import os
 import subprocess
+import textwrap
 import time
 import urllib.error
 import urllib.request
@@ -46,6 +47,7 @@ FRESH_S = 300          # re-ask the endpoint at most this often
 SERVE_STALE_S = 900    # keep serving a cached body this long past FRESH_S
 BACKOFF_S = 300        # after a failure, wait this long before trying again
 TIMEOUT_S = 5          # the pill must not hang on a slow network
+WRAP = 40              # split incident text into rows this long, to keep the popup narrow
 
 NOW = time.time()
 
@@ -180,15 +182,53 @@ def component_status(summary):
     return summary.get("status") or {}
 
 
-def health_row(entry):
+def open_incidents(summary):
+    """Unresolved incidents that name Claude Code, or name no component."""
+    found = []
+    for i in summary.get("incidents") or []:
+        names = [c.get("name") for c in i.get("components") or []]
+        if names and COMPONENT not in names:
+            continue
+        latest = (i.get("incident_updates") or [{}])[0]
+        found.append({"name": i.get("name", ""),
+                      "status": latest.get("status") or i.get("status", ""),
+                      "at": latest.get("created_at"),
+                      "url": i.get("shortlink") or STATUS_PAGE})
+    return found
+
+
+def local_time(value):
+    try:
+        return datetime.fromisoformat(value).astimezone().strftime("%H:%M")
+    except (TypeError, ValueError):
+        return ""
+
+
+def incident_rows(incident):
+    url = incident["url"]
+    rows = [{"text": line, "url": url}
+            for line in textwrap.wrap(incident["name"], WRAP, max_lines=3, placeholder=" …")]
+    when = " · ".join(filter(None, [incident["status"].capitalize(), local_time(incident["at"])]))
+    if when:
+        rows.append({"text": when, "dim": True, "url": url})
+    return rows
+
+
+def health_rows(entry):
     age = NOW - entry.get("code_health_at", 0)
     status = entry.get("code_health")
-    if status is None or age >= FRESH_S:
+    # a cache written before incidents were saved has no incident list
+    if status is None or age >= FRESH_S or "code_incidents" not in entry:
         try:
-            status = component_status(get_json(STATUS_ENDPOINT))
-            entry["code_health"], entry["code_health_at"] = status, NOW
+            summary = get_json(STATUS_ENDPOINT)
+            status = component_status(summary)
+            entry.update({"code_health": status, "code_health_at": NOW,
+                          "code_incidents": open_incidents(summary)})
             write_cache(entry)
         except (urllib.error.URLError, OSError, ValueError):
+            # an old cache would otherwise retry on every run until the page answers
+            entry.setdefault("code_incidents", [])
+            write_cache(entry)
             if status is None:
                 return None
     text = status.get("description")
@@ -196,7 +236,10 @@ def health_row(entry):
         return None
     indicator = status.get("indicator")
     colour = {"none": "green", "minor": "yellow"}.get(indicator, "red")
-    return {"text": text, "detail": "status", "color": colour, "url": STATUS_PAGE}
+    rows = [{"text": text, "detail": "status", "color": colour, "url": STATUS_PAGE}]
+    for n, incident in enumerate(entry.get("code_incidents") or []):
+        rows += ([{"separator": True}] if n else []) + incident_rows(incident)
+    return rows
 
 
 def health_icon(status):
@@ -326,13 +369,13 @@ def render_capture(limits):
 
 
 entry = read_cache() or {}
-health = health_row(entry)
+health = health_rows(entry)
 icon = health_icon(entry.get("code_health"))
 
 
 def with_health(payload):
     if health:
-        payload["rows"] = payload["rows"][:1] + [health, {"separator": True}] + payload["rows"][2:]
+        payload["rows"] = payload["rows"][:1] + health + [{"separator": True}] + payload["rows"][2:]
     if icon:
         payload["icon"] = icon
     return payload
