@@ -557,6 +557,20 @@ Screenshots, clipboard and app switching stay macOS's own
 (`Cmd+Shift+3/4/5`, `Cmd+C/V`, `Cmd+Tab`). `Alt+Tab` above works on
 windows, which macOS's own switcher does not.
 
+**herdr.** If herdr is installed and `~/.config/herdr/config.toml` has
+no `[keys]` table, `install.sh` adds the keys in
+`config/herdr/keys.toml`. They need no `ctrl+b` prefix, and the prefix
+keys still work.
+
+| Chord | Action |
+|---|---|
+| `Ctrl+Alt+h/j/k/l` | focus the pane in that direction |
+| `Ctrl+Alt+d` / `Ctrl+Alt+shift+d` | split right / split down |
+| `Ctrl+Alt+z` | zoom the pane |
+| `Ctrl+Alt+[` / `Ctrl+Alt+]` | previous / next tab |
+| `Ctrl+Alt+t` / `Ctrl+Alt+w` | new tab / close tab |
+| `Ctrl+Alt+up` / `Ctrl+Alt+down` | previous / next space |
+
 **On the modifier space.** omarchy layers `Super+Ctrl` and `Super+Alt`
 on top of `Super`. This setup cannot: Super IS `cmd+ctrl+alt`, so those
 modifiers are already spent and Shift is the only layer left, two

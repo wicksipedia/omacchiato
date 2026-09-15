@@ -151,6 +151,19 @@ fi
 mkdir -p "$HOME/.config/omniwm"
 [ -e "$HOME/.config/omniwm/settings.toml" ] || cp "$REPO_DIR/config/omniwm/settings.toml" "$HOME/.config/omniwm/settings.toml"
 
+# Add the omacosy keys only to a herdr config with no keys table, so keys
+# that the user set stay.
+if command -v herdr >/dev/null 2>&1; then
+  HERDR_CFG="$HOME/.config/herdr/config.toml"
+  mkdir -p "$(dirname "$HERDR_CFG")"
+  touch "$HERDR_CFG"
+  if ! grep -qE '^[[:space:]]*\[\[?keys[].]' "$HERDR_CFG"; then
+    printf '\n' >> "$HERDR_CFG"
+    cat "$REPO_DIR/config/herdr/keys.toml" >> "$HERDR_CFG"
+    herdr server reload-config >/dev/null 2>&1 || true
+  fi
+fi
+
 # Karabiner is COPIED, not symlinked: its background services can't read
 # configs living under ~/Documents (TCC folder protection) without Full
 # Disk Access. The repo copy is the source of truth on install.
