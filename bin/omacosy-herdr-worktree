@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# omacosy-herdr-worktree — open a herdr worktree off a base branch you pick.
+# herdr's own New worktree dialog always branches off HEAD.
+set -euo pipefail
+
+dir="${HERDR_ACTIVE_PANE_CWD:-$PWD}"
+
+fail() {
+  printf '%s\n' "$1"
+  read -rsn1 -p "Press a key to close."
+  exit 1
+}
+
+command -v fzf >/dev/null || fail "fzf not found. Run: brew install fzf"
+git -C "$dir" rev-parse --git-dir >/dev/null 2>&1 || fail "Not a git repository: $dir"
+
+# Skip symbolic refs such as origin/HEAD.
+refs=$(git -C "$dir" for-each-ref --sort=-committerdate \
+  --format='%(if)%(symref)%(then)%(else)%(refname:short)%(end)' refs/heads refs/remotes |
+  grep -v '^$' || true)
+[ -n "$refs" ] || fail "No branches in $dir yet"
+base=$(printf '%s\n' "$refs" | fzf --prompt='base branch> ' --no-multi) || exit 0
+
+read -rp "New branch off $base: " branch
+[ -n "$branch" ] || exit 0
+
+if [ -n "${HERDR_ACTIVE_WORKSPACE_ID:-}" ]; then
+  where=(--workspace "$HERDR_ACTIVE_WORKSPACE_ID")
+else
+  where=(--cwd "$dir")
+fi
+out=$("${HERDR_BIN_PATH:-herdr}" worktree create "${where[@]}" --base "$base" --branch "$branch" --focus 2>&1) ||
+  fail "$out"

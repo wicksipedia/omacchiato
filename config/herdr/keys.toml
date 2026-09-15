@@ -15,3 +15,11 @@ rename_tab = ["prefix+shift+t", "ctrl+alt+shift+t"]
 close_tab = ["prefix+shift+x", "ctrl+alt+w"]
 previous_workspace = "ctrl+alt+up"
 next_workspace = "ctrl+alt+down"
+
+[[keys.command]]
+key = "ctrl+alt+g"
+type = "popup"
+command = "$HOME/.local/bin/omacosy-herdr-worktree"
+description = "new worktree off a branch you pick"
+width = "80%"
+height = "80%"

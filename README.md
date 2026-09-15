@@ -571,6 +571,7 @@ keys still work.
 | `Ctrl+Alt+t` / `Ctrl+Alt+w` | new tab / close tab |
 | `Ctrl+Alt+shift+t` | rename tab |
 | `Ctrl+Alt+up` / `Ctrl+Alt+down` | previous / next space |
+| `Ctrl+Alt+g` | new worktree off a branch you pick (herdr's own dialog uses HEAD) |
 
 **On the modifier space.** omarchy layers `Super+Ctrl` and `Super+Alt`
 on top of `Super`. This setup cannot: Super IS `cmd+ctrl+alt`, so those

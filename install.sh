@@ -344,6 +344,7 @@ link "$REPO_DIR/bin/omacosy-update" "$HOME/.local/bin/omacosy-update"
 link "$REPO_DIR/bin/omacosy-spawn" "$HOME/.local/bin/omacosy-spawn"
 link "$REPO_DIR/bin/omacosy-karabiner-omniwm" "$HOME/.local/bin/omacosy-karabiner-omniwm"
 link "$REPO_DIR/bin/omacosy-omniwmctl" "$HOME/.local/bin/omacosy-omniwmctl"
+link "$REPO_DIR/bin/omacosy-herdr-worktree" "$HOME/.local/bin/omacosy-herdr-worktree"
 
 # --- 3. omarchy theme convention -------------------------------------------
 # Canonical theme state lives at ~/.config/omarchy/current/theme (what the
