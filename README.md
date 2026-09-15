@@ -430,9 +430,10 @@ application bundle identifier.
 4 = com.apple.Safari
 ```
 
-The bar first uses a configured icon. It then uses the icon of the sole app on
-that workspace, and finally shows the workspace's last digit. Exact workspace
-names win. In this example, workspace `14` uses `◆`, not the `4` shorthand.
+The bar first uses a configured icon. It then shows the icons of up to three
+apps on that workspace, fanned like a hand of cards, with the app in the
+leftmost window in front. Otherwise it shows the workspace's last digit.
+Exact workspace names win. In this example, workspace `14` uses `◆`, not the `4` shorthand.
 The shorthand applies only to multi-digit, all-numeric workspace names ending
 in `1` through `9` when they have no valid exact declaration.
 
@@ -444,7 +445,7 @@ launchctl kickstart -k "gui/$(id -u)/com.omacosy.bar"
 
 Malformed lines are logged and ignored. A well-formed bundle identifier that
 does not resolve to an installed app is unavailable. It blocks shorthand for
-that exact workspace, then the bar falls back to the sole app or the digit.
+that exact workspace, then the bar falls back to the app icons or the digit.
 Image paths are unsupported because the bar resolves configured app icons at
 startup and does no config-file or image-file I/O while it draws.
 

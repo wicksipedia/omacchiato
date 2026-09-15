@@ -358,7 +358,7 @@ func nerdFont(_ face: String, _ size: CGFloat) -> NSFont {
 // the workspace set, the visible one, the notch — belongs to the surface.
 final class Model {
     var focused = "" // globally focused workspace
-    var soleApp: [String: String] = [:] // ws -> app name, when it holds exactly one
+    var wsApps: [String: [String]] = [:] // ws -> up to three app names, leftmost window first
     var occupied: Set<String> = []
     var frontApp = ""
     var media = Media()
@@ -383,7 +383,7 @@ var palette = loadPalette()
 // frame has to travel.
 struct Snapshot {
     var perMonitor: [String: (workspaces: [String], visible: String)] = [:]
-    var soleApp: [String: String] = [:]
+    var wsApps: [String: [String]] = [:]
     var occupied: Set<String> = []
     var focused = ""
 }
@@ -396,7 +396,7 @@ func fetchSnapshot() -> Snapshot {
 }
 
 // The answers out of omniwmctl: workspaces arrive with their display in
-// one query, and the windows query brings the app names the sole-app
+// one query, and the windows query brings the app names the icon
 // chips need. The snapshot also carries focus: it rides the slow path
 // here, and the workspace-bar stream below covers the fast one.
 func omniwmSnapshot() -> Snapshot {
@@ -429,24 +429,24 @@ func omniwmSnapshot() -> Snapshot {
         s.perMonitor[id] = (sets[id] ?? [], visible[id] ?? "")
     }
 
-    var sole: [String: String] = [:]
-    var count: [String: Int] = [:]
-    if let list = omniQuery("windows", ["--fields", "workspace,app,mode"])?["windows"]
+    // Leftmost window first, to match the workspace-bar stream: it lists a
+    // niri workspace's apps in layout order.
+    var placed: [String: [(Double, Double, String)]] = [:]
+    if let list = omniQuery("windows", ["--fields", "workspace,app,mode,frame"])?["windows"]
         as? [[String: Any]] {
         for w in list {
             guard let ws = (w["workspace"] as? [String: Any])?["rawName"] as? String,
                   let app = (w["app"] as? [String: Any])?["name"] as? String else { continue }
             guard (w["mode"] as? String) != "floating" else { continue }
             s.occupied.insert(ws)
-            if let existing = sole[ws] {
-                if existing != app { count[ws] = 2 }
-            } else {
-                sole[ws] = app
-                count[ws] = 1
-            }
+            let frame = w["frame"] as? [String: Any]
+            placed[ws, default: []].append((frame?["x"] as? Double ?? .infinity,
+                                           frame?["y"] as? Double ?? .infinity, app))
         }
     }
-    s.soleApp = sole.filter { count[$0.key] == 1 }
+    for (ws, wins) in placed {
+        s.wsApps[ws] = handOf(wins.sorted { $0 < $1 }.map { $0.2 })
+    }
     return s
 }
 
@@ -469,7 +469,7 @@ func apply(_ s: Snapshot) -> Bool {
         }
     }
     if model.occupied != s.occupied { model.occupied = s.occupied; changed = true }
-    if model.soleApp != s.soleApp { model.soleApp = s.soleApp; changed = true }
+    if model.wsApps != s.wsApps { model.wsApps = s.wsApps; changed = true }
     if !s.focused.isEmpty, model.focused != s.focused { model.focused = s.focused; changed = true }
     return changed
 }
@@ -2956,6 +2956,37 @@ func appIcon(_ name: String) -> NSImage? {
     return icon
 }
 
+// The first three distinct apps: the cards a workspace chip fans out.
+func handOf(_ names: [String]) -> [String] {
+    var seen = Set<String>()
+    return Array(names.filter { seen.insert($0).inserted }.prefix(3))
+}
+
+// Up to three app icons fanned like a hand of cards: the first in front,
+// tilted left, and the others behind it to the right.
+func drawHand(_ icons: [NSImage], centeredIn box: NSRect) {
+    guard icons.count > 1 else {
+        icons.first?.draw(in: NSRect(x: box.midX - 9, y: barHeight / 2 - 9, width: 18, height: 18))
+        return
+    }
+    // Smaller cards keep the fan clear of the next chip's icon.
+    let card = NSRect(x: box.midX - 7.5, y: barHeight / 2 - 7.5, width: 15, height: 15)
+    let fan: [(shift: CGFloat, tilt: CGFloat)] = icons.count == 2
+        ? [(-3.5, 10), (3.5, -10)]
+        : [(-5, 12), (0, 0), (5, -12)]
+    for (icon, pose) in zip(icons, fan).reversed() {
+        NSGraphicsContext.saveGraphicsState()
+        // tilt about the card's own bottom centre, then slide it by the shift
+        let turn = NSAffineTransform()
+        turn.translateX(by: card.midX + pose.shift, yBy: card.minY)
+        turn.rotate(byDegrees: pose.tilt)
+        turn.translateX(by: -card.midX, yBy: -card.minY)
+        turn.concat()
+        icon.draw(in: card)
+        NSGraphicsContext.restoreGraphicsState()
+    }
+}
+
 let barHeight: CGFloat = 34
 let padLeft: CGFloat = 10
 let chipBox: CGFloat = 20
@@ -3167,10 +3198,11 @@ final class BarView: NSView {
             case .some(.image(let icon)):
                 icon.draw(in: NSRect(x: box.midX - 9, y: barHeight / 2 - 9, width: 18, height: 18))
             case .some(.unavailable), .none:
-                if let app = model.soleApp[ws], let icon = appIcon(app) {
-                    icon.draw(in: NSRect(x: box.midX - 9, y: barHeight / 2 - 9, width: 18, height: 18))
-                } else {
+                let icons = (model.wsApps[ws] ?? []).compactMap(appIcon)
+                if icons.isEmpty {
                     draw(String(ws.suffix(1)), chipFont, tint, centeredIn: box)
+                } else {
+                    drawHand(icons, centeredIn: box)
                 }
             }
             chipRects.append((ws, slot))
@@ -3684,7 +3716,7 @@ func omniWorkspaceBarEvent(_ line: Data) {
     // OmniWM's own Super+8/9 left the pill frozen. Their bar highlights
     // empties, so its scene channel fires on every switch, and carries
     // per-monitor active flags plus each workspace's windows (occupancy
-    // and the sole-app icon come free, no windows query).
+    // and the app icons come free, no windows query).
     guard let root = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
           root["channel"] as? String == "workspace-bar",
           let payload = (root["result"] as? [String: Any])?["payload"] as? [String: Any],
@@ -3694,7 +3726,7 @@ func omniWorkspaceBarEvent(_ line: Data) {
     let t0 = DispatchTime.now().uptimeNanoseconds
     var changed = false
     var occupied = Set<String>()
-    var sole: [String: String] = [:]
+    var hands: [String: [String]] = [:]
     var focusedNow = ""
     for m in monitors {
         guard let id = m["id"] as? String,
@@ -3707,8 +3739,7 @@ func omniWorkspaceBarEvent(_ line: Data) {
                 .filter { ($0["appName"] as? String)?.hasPrefix("omacosy") != true }
             if !wins.isEmpty {
                 occupied.insert(name)
-                let apps = Set(wins.compactMap { $0["appName"] as? String })
-                if apps.count == 1, let app = apps.first { sole[name] = app }
+                hands[name] = handOf(wins.compactMap { $0["appName"] as? String })
             }
         }
         guard !active.isEmpty else { continue }
@@ -3720,7 +3751,7 @@ func omniWorkspaceBarEvent(_ line: Data) {
     }
     if !focusedNow.isEmpty, model.focused != focusedNow { model.focused = focusedNow; changed = true }
     if model.occupied != occupied { model.occupied = occupied; changed = true }
-    if model.soleApp != sole { model.soleApp = sole; changed = true }
+    if model.wsApps != hands { model.wsApps = hands; changed = true }
     guard changed else { return }
     repaint()
     kickVisibility()
