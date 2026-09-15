@@ -304,7 +304,9 @@ pill's colour and give it a popup:
 `color` is one of `accent`, `label`, `muted`, `red`, `green` or `yellow`,
 resolved from the current theme, and tints both the icon and the label. A
 row takes the same `color` names, and a row with an `https` `url` opens it
-when clicked. A
+when clicked. A row with a `terminal` command opens your terminal on that
+command instead, the way the activity pill opens btop; it runs with the same
+trust as the plugin command that printed it. A
 colour emoji draws its own colours and ignores the icon tint, which is why
 the label carries it too. `icon` overrides the config. A `slider` between 0
 and 1 draws a progress track, and on a slider row `text` is a short

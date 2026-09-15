@@ -736,6 +736,16 @@ func pluginPopupRows(_ raw: [[String: Any]]) -> [PopupRow] {
         if let link = spec["url"] as? String, let url = URL(string: link),
            url.scheme == "https" {
             action = { NSWorkspace.shared.open(url) }
+        } else if let command = spec["terminal"] as? String, !command.isEmpty {
+            // The plugin's own command already runs with the bar's grants, so a
+            // row it prints may name a command too. Ghostty gets it as
+            // --command, like the activity pill's btop: -e asks to confirm.
+            action = {
+                DispatchQueue.global(qos: .userInitiated).async {
+                    _ = shell("/usr/bin/open", ["-na", terminalApp, "--args",
+                                                "--title=omacosy-plugin", "--command=\(command)"])
+                }
+            }
         }
         return PopupRow(text: spec["text"] as? String ?? "",
                         detail: spec["detail"] as? String ?? "",
