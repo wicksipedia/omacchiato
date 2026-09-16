@@ -626,7 +626,8 @@ Themes: `tokyo-night`, `catppuccin`, `catppuccin-latte`, `gruvbox`,
 `sketchybar.sh` / `borders.sh` (bar and focus-border colors; the file
 keeps its omarchy name and format, and the border uses the theme
 accent, omarchy's own convention), and `backgrounds/` (wallpapers from
-omarchy's MIT-licensed theme packs). Copy a directory to add one.
+omarchy's MIT-licensed theme packs; catppuccin-latte's is drawn for this
+repo). Copy a directory to add one.
 
 Every colour in `sketchybar.sh` is `0xAARRGGBB`, so the leading byte sets
 opacity. `ITEM_BG` fills the pills on the bar and `ROW_BG` fills a
