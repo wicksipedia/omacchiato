@@ -666,6 +666,14 @@ herdr's `terminal` theme. Prefer a real match where one exists. `terminal`
 takes the host palette, but reads its text colour from the ANSI white
 slot, so on a light theme the sidebar turns pale grey.
 
+Raycast keeps its own themes and a script cannot set one: its theme link
+opens an import prompt, and its theme storage is private. Raycast does
+follow the macOS appearance, so it can track a light/dark pair by
+itself. Import the Catppuccin Latte and Catppuccin Mocha themes once
+from [themes.ray.so](https://themes.ray.so), then choose them as the
+Light and Dark theme under Settings > General > Appearance. Themes need
+Raycast Pro.
+
 ### Light and dark
 
 `theme-set` also takes a light/dark pair, in the same syntax as Ghostty's
