@@ -442,7 +442,9 @@ application bundle identifier.
 The bar first uses a configured icon. It then shows the icons of up to three
 apps on that workspace, fanned like a hand of cards, with the app in the
 leftmost window in front. Otherwise it shows the workspace's last digit.
-Exact workspace names win. In this example, workspace `14` uses `◆`, not the `4` shorthand.
+On the workspace you are on, the app that has focus wears a ring in the
+theme accent. Exact workspace names win. In this example, workspace `14`
+uses `◆`, not the `4` shorthand.
 The shorthand applies only to multi-digit, all-numeric workspace names ending
 in `1` through `9` when they have no valid exact declaration.
 

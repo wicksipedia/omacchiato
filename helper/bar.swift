@@ -359,6 +359,7 @@ func nerdFont(_ face: String, _ size: CGFloat) -> NSFont {
 final class Model {
     var focused = "" // globally focused workspace
     var wsApps: [String: [String]] = [:] // ws -> up to three app names, leftmost window first
+    var focusedApp = "" // the app of the focused window, wherever it is
     var occupied: Set<String> = []
     var frontApp = ""
     var media = Media()
@@ -384,6 +385,7 @@ var palette = loadPalette()
 struct Snapshot {
     var perMonitor: [String: (workspaces: [String], visible: String)] = [:]
     var wsApps: [String: [String]] = [:]
+    var focusedApp = ""
     var occupied: Set<String> = []
     var focused = ""
 }
@@ -432,13 +434,14 @@ func omniwmSnapshot() -> Snapshot {
     // Leftmost window first, to match the workspace-bar stream: it lists a
     // niri workspace's apps in layout order.
     var placed: [String: [(Double, Double, String)]] = [:]
-    if let list = omniQuery("windows", ["--fields", "workspace,app,mode,frame"])?["windows"]
+    if let list = omniQuery("windows", ["--fields", "workspace,app,mode,frame,is-focused"])?["windows"]
         as? [[String: Any]] {
         for w in list {
             guard let ws = (w["workspace"] as? [String: Any])?["rawName"] as? String,
                   let app = (w["app"] as? [String: Any])?["name"] as? String else { continue }
             guard (w["mode"] as? String) != "floating" else { continue }
             s.occupied.insert(ws)
+            if (w["isFocused"] as? Bool) == true { s.focusedApp = app }
             let frame = w["frame"] as? [String: Any]
             placed[ws, default: []].append((frame?["x"] as? Double ?? .infinity,
                                            frame?["y"] as? Double ?? .infinity, app))
@@ -470,6 +473,7 @@ func apply(_ s: Snapshot) -> Bool {
     }
     if model.occupied != s.occupied { model.occupied = s.occupied; changed = true }
     if model.wsApps != s.wsApps { model.wsApps = s.wsApps; changed = true }
+    if model.focusedApp != s.focusedApp { model.focusedApp = s.focusedApp; changed = true }
     if !s.focused.isEmpty, model.focused != s.focused { model.focused = s.focused; changed = true }
     return changed
 }
@@ -2974,9 +2978,11 @@ func handOf(_ names: [String]) -> [String] {
 
 // Up to three app icons fanned like a hand of cards: the first in front,
 // tilted left, and the others behind it to the right.
-func drawHand(_ icons: [NSImage], centeredIn box: NSRect) {
+func drawHand(_ icons: [NSImage], ring: Int?, centeredIn box: NSRect) {
     guard icons.count > 1 else {
-        icons.first?.draw(in: NSRect(x: box.midX - 9, y: barHeight / 2 - 9, width: 18, height: 18))
+        let only = NSRect(x: box.midX - 9, y: barHeight / 2 - 9, width: 18, height: 18)
+        icons.first?.draw(in: only)
+        if ring == 0 { drawRing(only) }
         return
     }
     // Smaller cards keep the fan clear of the next chip's icon.
@@ -2984,7 +2990,8 @@ func drawHand(_ icons: [NSImage], centeredIn box: NSRect) {
     let fan: [(shift: CGFloat, tilt: CGFloat)] = icons.count == 2
         ? [(-3.5, 10), (3.5, -10)]
         : [(-5, 12), (0, 0), (5, -12)]
-    for (icon, pose) in zip(icons, fan).reversed() {
+
+    func posed(_ pose: (shift: CGFloat, tilt: CGFloat), _ paint: () -> Void) {
         NSGraphicsContext.saveGraphicsState()
         // tilt about the card's own bottom centre, then slide it by the shift
         let turn = NSAffineTransform()
@@ -2992,9 +2999,23 @@ func drawHand(_ icons: [NSImage], centeredIn box: NSRect) {
         turn.rotate(byDegrees: pose.tilt)
         turn.translateX(by: -card.midX, yBy: -card.minY)
         turn.concat()
-        icon.draw(in: card)
+        paint()
         NSGraphicsContext.restoreGraphicsState()
     }
+
+    for (icon, pose) in zip(icons, fan).reversed() { posed(pose) { icon.draw(in: card) } }
+    // the ring goes on last: the cards in front cover most of its own card
+    if let ring, ring < min(icons.count, fan.count) { posed(fan[ring]) { drawRing(card) } }
+}
+
+// The ring around the focused app's icon. It hugs the icon art, which sits
+// inside a transparent margin of about a tenth of the card.
+func drawRing(_ card: NSRect) {
+    let art = card.insetBy(dx: card.width * 0.06, dy: card.width * 0.06)
+    let path = NSBezierPath(roundedRect: art, xRadius: art.width * 0.26, yRadius: art.width * 0.26)
+    path.lineWidth = 1.2
+    palette.accent.withAlphaComponent(0.8).setStroke()
+    path.stroke()
 }
 
 let barHeight: CGFloat = 34
@@ -3205,11 +3226,13 @@ final class BarView: NSView {
             case .some(.image(let icon)):
                 icon.draw(in: NSRect(x: box.midX - 9, y: barHeight / 2 - 9, width: 18, height: 18))
             case .some(.unavailable), .none:
-                let icons = (model.wsApps[ws] ?? []).compactMap(appIcon)
-                if icons.isEmpty {
+                let cards = (model.wsApps[ws] ?? []).compactMap { name in appIcon(name).map { (name, $0) } }
+                if cards.isEmpty {
                     draw(String(ws.suffix(1)), chipFont, tint, centeredIn: box)
                 } else {
-                    drawHand(icons, centeredIn: box)
+                    let ring = ws == model.focused
+                        ? cards.firstIndex { $0.0 == model.focusedApp } : nil
+                    drawHand(cards.map { $0.1 }, ring: ring, centeredIn: box)
                 }
             }
             chipRects.append((ws, slot))
@@ -3735,6 +3758,7 @@ func omniWorkspaceBarEvent(_ line: Data) {
     var occupied = Set<String>()
     var hands: [String: [String]] = [:]
     var focusedNow = ""
+    var focusedAppNow = ""
     for m in monitors {
         guard let id = m["id"] as? String,
               let list = m["workspaces"] as? [[String: Any]] else { continue }
@@ -3742,11 +3766,16 @@ func omniWorkspaceBarEvent(_ line: Data) {
         for w in list {
             guard let name = w["rawName"] as? String else { continue }
             if (w["isFocused"] as? Bool) == true { active = name }
+            // no floating filter here: OmniWM leaves floating windows out of
+            // this payload unless its showFloatingWindows is on
             let wins = ((w["windows"] as? [[String: Any]]) ?? [])
                 .filter { ($0["appName"] as? String)?.hasPrefix("omacosy") != true }
             if !wins.isEmpty {
                 occupied.insert(name)
                 hands[name] = handOf(wins.compactMap { $0["appName"] as? String })
+                if let app = wins.first(where: { ($0["isFocused"] as? Bool) == true })?["appName"] {
+                    focusedAppNow = app as? String ?? ""
+                }
             }
         }
         guard !active.isEmpty else { continue }
@@ -3759,6 +3788,7 @@ func omniWorkspaceBarEvent(_ line: Data) {
     if !focusedNow.isEmpty, model.focused != focusedNow { model.focused = focusedNow; changed = true }
     if model.occupied != occupied { model.occupied = occupied; changed = true }
     if model.wsApps != hands { model.wsApps = hands; changed = true }
+    if model.focusedApp != focusedAppNow { model.focusedApp = focusedAppNow; changed = true }
     guard changed else { return }
     repaint()
     kickVisibility()
