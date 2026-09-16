@@ -367,8 +367,10 @@ payload.
 the GitHub CLI, signed in with `gh auth login`. The pill shows how many
 PRs are open and adds `!` when one of them has an update. The popup groups
 the PRs by repository. Each PR row starts with a mark for its state, and
-the line under it says what the PR waits for. Clicking either line opens the PR. To
-drop a PR from the list, unsubscribe from its notifications on GitHub.
+the line under it says what the PR waits for. A PR whose base branch is
+another PR in the list sits under that one, indented and marked `↳`.
+Clicking either line opens the PR. To drop a PR from the list,
+unsubscribe from its notifications on GitHub.
 
 ```
 [github]

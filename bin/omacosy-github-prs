@@ -32,6 +32,7 @@ query($open: String!, $closed: String!) {
 }
 fragment pr on PullRequest {
   number title url state isDraft mergeable reviewDecision viewerSubscription
+  baseRefName headRefName
   repository { nameWithOwner }
   reviews { totalCount }
   latestOpinionatedReviews(first: 20) { nodes { state } }
@@ -124,6 +125,35 @@ def status(pr, me):
     return " ".join(parts)
 
 
+def stack_order(prs):
+    """Each PR before the PRs based on its branch, so a stack reads base first.
+    Returns (pr, depth) pairs; depth is how many PRs it sits on."""
+    heads = {pr["headRefName"]: pr["number"] for pr in prs if pr.get("headRefName")}
+    children, roots = {}, []
+    for pr in prs:
+        base = heads.get(pr["baseRefName"]) if pr.get("baseRefName") else None
+        if base is not None and base != pr["number"]:
+            children.setdefault(base, []).append(pr)
+        else:
+            roots.append(pr)
+    ordered, seen = [], set()
+
+    def walk(pr, depth):
+        if pr["number"] in seen:
+            return
+        seen.add(pr["number"])
+        ordered.append((pr, depth))
+        for child in sorted(children.get(pr["number"], []), key=lambda c: -c["number"]):
+            walk(child, depth + 1)
+
+    for pr in sorted(roots, key=lambda p: -p["number"]):
+        walk(pr, 0)
+    # two PRs based on each other leave no root, and every PR must still show
+    for pr in sorted(prs, key=lambda p: -p["number"]):
+        walk(pr, 0)
+    return ordered
+
+
 def render(open_prs, closed_prs, unread, me=""):
     open_prs = [pr for pr in open_prs if pr.get("viewerSubscription") not in ("UNSUBSCRIBED", "IGNORED")]
     shown = open_prs + [pr for pr in closed_prs if key(pr) in unread]
@@ -135,15 +165,16 @@ def render(open_prs, closed_prs, unread, me=""):
         if rows:
             rows.append({"separator": True})
         rows.append({"text": repo, "detail": str(len(prs)), "hero": True})
-        for pr in sorted(prs, key=lambda p: -p["number"]):
+        for pr, depth in stack_order(prs):
             title = pr["title"]
             if len(title) > TITLE_MAX:
                 title = title[:TITLE_MAX - 1].rstrip() + "…"
-            row = {"text": "%s #%d %s" % (icon(pr, me), pr["number"], title), "url": pr["url"]}
+            lead = "  " * depth + ("↳ " if depth else "")
+            row = {"text": "%s%s #%d %s" % (lead, icon(pr, me), pr["number"], title), "url": pr["url"]}
             if key(pr) in unread:
                 row.update(detail="new", color="accent")
             rows.append(row)
-            rows.append({"text": "    " + status(pr, me), "dim": True, "url": pr["url"]})
+            rows.append({"text": "    " + "  " * depth + status(pr, me), "dim": True, "url": pr["url"]})
     if not rows:
         rows.append({"text": "No open pull requests", "dim": True})
     rows += [{"separator": True},
@@ -210,8 +241,9 @@ def fallback(reason):
 
 
 def self_test():
-    def pr(n, ci="SUCCESS", state="OPEN", reviews=0, decision=None, threads=()):
+    def pr(n, ci="SUCCESS", state="OPEN", reviews=0, decision=None, threads=(), base="main"):
         return {"number": n, "title": "t" * 80, "url": "https://github.com/a/b/pull/%d" % n,
+                "baseRefName": base, "headRefName": "branch-%d" % n,
                 "state": state, "isDraft": False, "mergeable": "MERGEABLE",
                 "reviewDecision": decision, "repository": {"nameWithOwner": "a/b"},
                 "reviews": {"totalCount": reviews}, "latestOpinionatedReviews": {"nodes": []},
@@ -240,6 +272,17 @@ def self_test():
     assert status(pr(8, reviews=1, threads=("them", "them")), "me") == "2 review threads to resolve. Waiting for review."
     assert icon(pr(9, threads=("me",)), "me") == "⏳", "your own thread is not feedback"
     assert icon(dict(pr(10), mergeable="CONFLICTING"), "me") == "💥"
+    stacked = render([pr(11), pr(12, base="branch-11"), pr(13, base="branch-12")], [], set())
+    texts = [r.get("text", "") for r in stacked["rows"]]
+    assert texts[1].startswith("⏳ #11 "), texts
+    assert texts[3].startswith("  ↳ ⏳ #12 ") and texts[5].startswith("    ↳ ⏳ #13 "), texts
+    assert texts[4].startswith("      Waiting"), texts
+    loop = [r.get("text", "") for r in
+            render([pr(14, base="branch-15"), pr(15, base="branch-14")], [], set())["rows"]]
+    assert [sum("#%d " % n in t for t in loop) for n in (14, 15)] == [1, 1], "a loop lists both once"
+    blank = [dict(pr(n), baseRefName=None, headRefName=None) for n in (16, 17)]
+    assert not any("↳" in r.get("text", "") for r in render(blank, [], set())["rows"]), \
+        "PRs with no branch names are not a stack"
     print("ok")
 
 
