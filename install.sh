@@ -363,6 +363,7 @@ link "$REPO_DIR/bin/omacosy-spawn" "$HOME/.local/bin/omacosy-spawn"
 link "$REPO_DIR/bin/omacosy-karabiner-omniwm" "$HOME/.local/bin/omacosy-karabiner-omniwm"
 link "$REPO_DIR/bin/omacosy-omniwmctl" "$HOME/.local/bin/omacosy-omniwmctl"
 link "$REPO_DIR/bin/omacosy-herdr-worktree" "$HOME/.local/bin/omacosy-herdr-worktree"
+link "$REPO_DIR/bin/omacosy-popup" "$HOME/.local/bin/omacosy-popup"
 
 # tokscale, for the Claude pill's last seven days. Homebrew has no formula, so
 # take the macOS binary from tokscale's npm package, pinned by version and

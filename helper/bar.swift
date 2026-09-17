@@ -3350,9 +3350,13 @@ final class BarView: NSView {
 
     var appPillRect = NSRect.zero
 
-    override func mouseDown(with event: NSEvent) {
-        let p = convert(event.locationInWindow, from: nil)
-        if appPillRect != .zero, appPillRect.contains(p), let surface {
+    // A click on an item and omacosy-popup both open its popup through here.
+    func showItemPopup(_ name: String) {
+        guard let surface else { return }
+        switch name {
+        case "apple", "appmenu":
+            let rect = name == "apple" ? appleRect : appPillRect
+            guard rect != .zero else { return }
             appMenuStack.removeAll()
             // clicking the bar deactivated the app, which makes its menu
             // items read disabled and presses land nowhere — hand focus
@@ -3360,19 +3364,23 @@ final class BarView: NSView {
             NSWorkspace.shared.runningApplications
                 .first { $0.localizedName == model.frontApp }?
                 .activate()
-            showPopup("appmenu", under: window?.convertToScreen(convert(appPillRect, to: nil)) ?? appPillRect,
+            // both sit at the left edge, so a right-aligned popup would hang off the screen
+            showPopup(name, under: window?.convertToScreen(convert(rect, to: nil)) ?? rect,
                       on: surface, alignLeft: true)
+        default:
+            guard let rect = itemRects.first(where: { $0.0 == name })?.1 else { return }
+            showPopup(name, under: window?.convertToScreen(convert(rect, to: nil)) ?? rect, on: surface)
+        }
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        let p = convert(event.locationInWindow, from: nil)
+        if appPillRect != .zero, appPillRect.contains(p), surface != nil {
+            showItemPopup("appmenu")
             return
         }
-        if appleRect.contains(p), let surface {
-            appMenuStack.removeAll()
-            NSWorkspace.shared.runningApplications
-                .first { $0.localizedName == model.frontApp }?
-                .activate()
-            // aligned to its LEFT edge: it is the leftmost thing on the bar,
-            // so a right-aligned popup would hang off the screen
-            showPopup("apple", under: window?.convertToScreen(convert(appleRect, to: nil)) ?? appleRect,
-                      on: surface, alignLeft: true)
+        if appleRect.contains(p), surface != nil {
+            showItemPopup("apple")
             return
         }
         if let ws = chipRects.first(where: { $0.1.contains(p) })?.0 {
@@ -3386,14 +3394,13 @@ final class BarView: NSView {
             }
             return
         }
-        guard let name = hit(event), let rect = itemRects.first(where: { $0.0 == name })?.1 else {
+        guard let name = hit(event) else {
             closePopup()
             return
         }
         // an item with a popup toggles it; the rest still act directly
-        if !popupRows(for: name).isEmpty, let surface {
-            let anchor = window?.convertToScreen(convert(rect, to: nil)) ?? rect
-            showPopup(name, under: anchor, on: surface)
+        if !popupRows(for: name).isEmpty, surface != nil {
+            showItemPopup(name)
             return
         }
         closePopup()
@@ -3747,6 +3754,29 @@ func watch(_ path: String, create: Bool, handler: @escaping () -> Void) {
 // Super+K writes this; the bar has no key tap and should not grow one
 let cheatPath = "/tmp/omacosy-bar-cheatsheet"
 watch(cheatPath, create: true) { toggleCheatsheet() }
+
+// omacosy-popup writes "<item> [display name]" here; an empty line closes the popup
+let popupPath = "/tmp/omacosy-bar-popup"
+var popupPoke: DispatchWorkItem?
+watch(popupPath, create: true) {
+    // a shell redirect empties the file before it writes, and each step can
+    // wake the watcher; read once, after the write has landed
+    popupPoke?.cancel()
+    let poke = DispatchWorkItem {
+        let line = ((try? String(contentsOfFile: popupPath, encoding: .utf8)) ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let words = line.split(separator: " ", maxSplits: 1).map(String.init)
+        guard let item = words.first else { closePopup(); return }
+        let pointer = NSEvent.mouseLocation
+        let surface = words.count > 1
+            ? surfaces.first { $0.screen.localizedName == words[1] }
+            : surfaces.first { NSMouseInRect(pointer, $0.screen.frame, false) }
+        tlog("popup command \(line): \(surface == nil ? "no such display" : "opening")")
+        surface?.view.showItemPopup(item)
+    }
+    popupPoke = poke
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: poke)
+}
 
 let movedPath = "/tmp/omacosy-bar-moved"
 watch(movedPath, create: true) {

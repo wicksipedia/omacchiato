@@ -89,10 +89,10 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
 - Plugin pills come from `~/.config/omacosy/bar-plugins.conf`. A command
   prints a label, or JSON with `label`, `color`, `icon` and `rows`. Row
   keys: `text`, `detail`, `hero`, `dim`, `separator`, `slider`,
-  `marker`, `color` and `url` (https only). Labels are cut at 32
-  characters. The bar puts `~/.local/bin` and Homebrew first on `PATH`
-  and sets `OMACOSY_PILL_ICON`. Plugin commands run with the bar's TCC
-  grants.
+  `marker`, `bar`, `color`, `url` (https only) and `terminal`. Labels
+  are cut at 32 characters. The bar puts `~/.local/bin` and Homebrew
+  first on `PATH` and sets `OMACOSY_PILL_ICON`. Plugin commands run with
+  the bar's TCC grants.
 - AppKit hit-tests a non-opaque window by alpha, so a pill background
   with zero alpha takes no clicks. `NSColor.clickable` raises zero alpha
   to 0.01.
@@ -107,6 +107,10 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   pair and `OMACOSY_APPEARANCE`.
 - The native menu bar auto-hides (`_HIHideMenuBar`,
   `AutoHideMenuBarOption`), and the bar sits in its place.
+- `omacosy-popup <item> [display]` writes `/tmp/omacosy-bar-popup`, and
+  the bar opens that item's popup as a click would. It reads the file
+  50 ms after a change, because a shell redirect empties the file first.
+  Use it for screenshots instead of posted clicks.
 - `Super+K` opens a cheatsheet built from the `[[hotkeys]]` in
   `~/.config/omniwm/settings.toml` and the Karabiner rules whose
   descriptions start with `omacosy-omniwm:`.

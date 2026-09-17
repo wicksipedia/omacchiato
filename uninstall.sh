@@ -56,7 +56,7 @@ rm -f /tmp/omacosy-*.log /tmp/omacosy-*.err "/tmp/omacosy-overview-$(id -u).pid"
   "/tmp/omacosy-guard-bounce-$(id -u)" \
   "/tmp/omacosy-guard-cooldown-$(id -u)" \
   "/tmp/omacosy-split-state-$(id -u)" \
-  /tmp/omacosy-bar-ws /tmp/omacosy-bar-moved /tmp/omacosy-bar-cheatsheet \
+  /tmp/omacosy-bar-ws /tmp/omacosy-bar-moved /tmp/omacosy-bar-cheatsheet /tmp/omacosy-bar-popup \
   "${TMPDIR:-/tmp}/omacosy-monitor-count"
 rm -rf "/tmp/omacosy-spawn-$(id -u).lock.d"
 rm -f "$HOME/.config/omacosy/ffm-ignore" \
@@ -161,7 +161,7 @@ fi
 # theme-set / theme-next out of ~/.local/bin — only when they are OUR
 # symlinks (a user's own script of the same name survives). Retired
 # scripts stay in the list, because an older install linked them.
-for t in theme-set theme-next theme-bg-next omacosy-ws omacosy-toggle omacosy-focus-guard omacosy-ws-collapse omacosy-float omacosy-cycle omacosy-update omacosy-spawn omacosy-layout omacosy-wm-switch omacosy-karabiner-omniwm omacosy-omniwmctl omacosy-herdr-worktree; do
+for t in theme-set theme-next theme-bg-next omacosy-ws omacosy-toggle omacosy-focus-guard omacosy-ws-collapse omacosy-float omacosy-cycle omacosy-update omacosy-spawn omacosy-layout omacosy-wm-switch omacosy-karabiner-omniwm omacosy-omniwmctl omacosy-herdr-worktree omacosy-popup; do
   target="$(readlink "$HOME/.local/bin/$t" 2>/dev/null || true)"
   case "$target" in *omacosy*) rm -f "$HOME/.local/bin/$t" ;; esac
 done
