@@ -18,7 +18,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 HOME = os.path.expanduser("~")
-CACHE = os.path.join(HOME, ".config/omacosy/github-prs-cache.json")
+CACHE = os.path.join(HOME, ".config/omacchiato/github-prs-cache.json")
 CLOSED_DAYS = 7
 TITLE_MAX = 60
 TIMEOUT_S = 30

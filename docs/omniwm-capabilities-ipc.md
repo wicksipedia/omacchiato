@@ -456,7 +456,7 @@ What a script can and cannot do over IPC:
   subscriptions with initial state, a per-monitor bar projection, and window
   rules CRUD over IPC.
 
-**Net for omacosy**: bar and gesture integrations can build on this today; an
+**Net for Omacchiato**: bar and gesture integrations can build on this today; an
 external overview needs its own capture pipeline plus a focus-then-move dance;
 anything needing exec, config mutation, per-window placement, or window-created
 granularity needs upstream work (candidate asks: move-window-by-id-to-workspace,

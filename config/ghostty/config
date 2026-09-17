@@ -1,4 +1,4 @@
-# Ghostty settings for the omacosy look. Loaded from ~/.config/ghostty
+# Ghostty settings for the omacchiato look. Loaded from ~/.config/ghostty
 # (symlinked by install.sh); your personal settings can live in
 # ~/Library/Application Support/com.mitchellh.ghostty/config — Ghostty
 # reads both.
@@ -10,7 +10,7 @@ macos-titlebar-style = hidden
 # Colours come from the desktop theme: theme-set writes this file on every
 # switch and signals Ghostty to reload. The "?" keeps a fresh install, where
 # theme-set has not run yet, from erroring.
-config-file = ?~/.config/omacosy/ghostty-theme
+config-file = ?~/.config/omacchiato/ghostty-theme
 
 # Pin the initial size of NEW windows (in cells). Ghostty otherwise
 # inherits the previous window's size, and under a tiling WM that is

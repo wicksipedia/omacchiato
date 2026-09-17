@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# omacosy-herdr-worktree — open a herdr worktree off a base branch you pick.
+# omacchiato-herdr-worktree — open a herdr worktree off a base branch you pick.
 # herdr's own New worktree dialog always branches off HEAD.
 set -euo pipefail
 

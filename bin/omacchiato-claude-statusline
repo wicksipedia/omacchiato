@@ -4,15 +4,15 @@
 # Claude Code hands its statusline command a JSON payload on stdin, and that
 # payload is the only place the rate limit windows appear. Claude Code does not
 # write them to disk. Put this script in front of the statusline you already
-# use, and omacosy-claude-usage gets the numbers without a plugin in between.
+# use, and omacchiato-claude-usage gets the numbers without a plugin in between.
 #
 # Configure it in ~/.claude/settings.json as the statusline command, followed by
 # the command it must run, for example:
-#   "command": "$HOME/.local/share/omacosy/bin/omacosy-claude-statusline node $HOME/.claude/hud/omc-hud.mjs"
+#   "command": "$HOME/.local/share/omacchiato/bin/omacchiato-claude-statusline node $HOME/.claude/hud/omc-hud.mjs"
 # With no command after it, this script only saves the payload.
 set -uo pipefail
 
-OUT="${OMACOSY_CLAUDE_STATUS:-$HOME/.config/omacosy/claude-status.json}"
+OUT="${OMACCHIATO_CLAUDE_STATUS:-$HOME/.config/omacchiato/claude-status.json}"
 
 payload=$(cat)
 

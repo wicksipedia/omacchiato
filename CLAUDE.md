@@ -1,6 +1,6 @@
-# omacosy: notes for Claude
+# Omacchiato: notes for Claude
 
-omacosy is an omarchy-style tiling desktop for macOS 26: a status bar,
+Omacchiato is an omarchy-style tiling desktop for macOS 26: a status bar,
 a gesture daemon, a workspace overview, themes and install scripts
 around the OmniWM window manager. README.md describes the features and
 CONTRIBUTING.md holds the design rules. This file holds what the code does not show.
@@ -8,16 +8,23 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
 
 ## Repository
 
-- This repo is a fork. `main` tracks `fork/main`
-  (github.com/wicksipedia/omacosy). `origin` is the upstream project,
-  paulsp94/omacosy. To take upstream work, run
-  `git fetch origin && git merge origin/main`.
-- `omacosy-update` pulls the branch that the local branch tracks, then
+- Omacchiato is a fork of omacosy. `origin` is this fork,
+  github.com/wicksipedia/omacchiato. `upstream` is paulsp94/omacosy. To
+  take upstream work, run `git fetch upstream && git merge upstream/main`.
+- Upstream still uses the omacosy names. Git follows the renamed files,
+  but a new upstream file or line that says omacosy needs the rename by
+  hand.
+- `migrate-omacosy.sh` moves an omacosy install to the omacchiato names:
+  agents, binaries, `~/.config` and `~/.local/state`, and the command
+  names in `bar-plugins.conf` and the herdr config. `install.sh` and
+  `uninstall.sh` run it first, so they know the new names only. The new
+  signing identifiers need new TCC grants.
+- `omacchiato-update` pulls the branch that the local branch tracks, then
   runs `install.sh` again.
 - `config/requirements.conf` holds the minimum app versions that
-  `bin/omacosy-requirements` checks. Raise one when omacosy starts to
+  `bin/omacchiato-requirements` checks. Raise one when Omacchiato starts to
   write a setting that only a newer version of the app reads.
-- The clone lives at `~/.local/share/omacosy`, and configs are symlinked
+- The clone lives at `~/.local/share/omacchiato`, and configs are symlinked
   into it, so an edit to a symlinked config is live. A clone in
   `~/Documents`, `~/Desktop` or `~/Downloads` gets copies instead,
   because TCC blocks launchd agents from those folders.
@@ -47,26 +54,26 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   ```sh
   swiftc -O -F /System/Library/PrivateFrameworks -framework SkyLight -framework DisplayServices \
     -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker helper/bar-info.plist \
-    -o "$TMPDIR/omacosy-bar" helper/bar.swift
-  cp "$TMPDIR/omacosy-bar" omacosy-bar.app/Contents/MacOS/omacosy-bar
-  codesign -f -s "Apple Development" --identifier com.omacosy.bar omacosy-bar.app
-  launchctl kickstart -k "gui/$(id -u)/com.omacosy.bar"
+    -o "$TMPDIR/omacchiato-bar" helper/bar.swift
+  cp "$TMPDIR/omacchiato-bar" omacchiato-bar.app/Contents/MacOS/omacchiato-bar
+  codesign -f -s "Apple Development" --identifier com.omacchiato.bar omacchiato-bar.app
+  launchctl kickstart -k "gui/$(id -u)/com.omacchiato.bar"
   ```
 
 - TCC keys a grant on the code signature. Sign with the same Apple
   Development identity and identifier every time, and the bar, overview
   and helper keep their grants across rebuilds.
-- `omacosy-gesture` is the exception. TCC pins its grant to the exact
+- `omacchiato-gesture` is the exception. TCC pins its grant to the exact
   build, so every rebuild needs a new Accessibility grant. `install.sh`
   rebuilds it only when a file in `helper/gesture/` changed.
 - There is no test framework. Check shell scripts with `bash -n`.
-  `bin/omacosy-github-prs --self-test` runs that script's asserts. For
+  `bin/omacchiato-github-prs --self-test` runs that script's asserts. For
   the bar, rebuild, restart and look at it, for example with
   `screencapture -x -R0,0,3000,40 bar.png`.
-- Logs: `/tmp/omacosy-bar.log` (timings and `tlog` lines),
-  `/tmp/omacosy-bar.err`, `/tmp/omacosy-gesture.log`,
-  `/tmp/omacosy-overview.log`, `/tmp/omacosy-ws.log`.
-- Launch agents: `com.omacosy.bar` and `com.omacosy.gesture`. Restart
+- Logs: `/tmp/omacchiato-bar.log` (timings and `tlog` lines),
+  `/tmp/omacchiato-bar.err`, `/tmp/omacchiato-gesture.log`,
+  `/tmp/omacchiato-overview.log`, `/tmp/omacchiato-ws.log`.
+- Launch agents: `com.omacchiato.bar` and `com.omacchiato.gesture`. Restart
   one with `launchctl kickstart -k "gui/$(id -u)/<label>"`.
 
 ## Tests on the user's screen
@@ -83,15 +90,15 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
 - The bar, its popups and its OSDs are one process. `rightOrder` sets
   the pill order: `menubar`, then the plugin pills in file order, then
   the built-in pills.
-- `~/.config/omacosy/bar-pills.conf` holds `<pill> = <mode>` lines:
+- `~/.config/omacchiato/bar-pills.conf` holds `<pill> = <mode>` lines:
   `hide`, `icon`, `volume = muted`, `battery = time` and
   `media = <characters>`. The bar reads it once at startup.
-- Plugin pills come from `~/.config/omacosy/bar-plugins.conf`. A command
+- Plugin pills come from `~/.config/omacchiato/bar-plugins.conf`. A command
   prints a label, or JSON with `label`, `color`, `icon` and `rows`. Row
   keys: `text`, `detail`, `hero`, `dim`, `separator`, `slider`,
   `marker`, `bar`, `color`, `url` (https only) and `terminal`. Labels
   are cut at 32 characters. The bar puts `~/.local/bin` and Homebrew
-  first on `PATH` and sets `OMACOSY_PILL_ICON`. Plugin commands run with
+  first on `PATH` and sets `OMACCHIATO_PILL_ICON`. Plugin commands run with
   the bar's TCC grants.
 - AppKit hit-tests a non-opaque window by alpha, so a pill background
   with zero alpha takes no clicks. `NSColor.clickable` raises zero alpha
@@ -102,23 +109,23 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
 - The media pill reads Apple Music only (`com.apple.Music`, notification
   `com.apple.iTunes.playerInfo`). The artwork comes from osascript as
   `«data ...»` hex.
-- If `~/.config/omacosy/theme.conf` holds a `light:X,dark:Y` pair, the
+- If `~/.config/omacchiato/theme.conf` holds a `light:X,dark:Y` pair, the
   bar watches `NSApp.effectiveAppearance` and runs `theme-set` with the
-  pair and `OMACOSY_APPEARANCE`.
+  pair and `OMACCHIATO_APPEARANCE`.
 - The native menu bar auto-hides (`_HIHideMenuBar`,
   `AutoHideMenuBarOption`), and the bar sits in its place.
-- `omacosy-popup <item> [display]` writes `/tmp/omacosy-bar-popup`, and
+- `omacchiato-popup <item> [display]` writes `/tmp/omacchiato-bar-popup`, and
   the bar opens that item's popup as a click would. It reads the file
   50 ms after a change, because a shell redirect empties the file first.
   Use it for screenshots instead of posted clicks.
 - `Super+K` opens a cheatsheet built from the `[[hotkeys]]` in
   `~/.config/omniwm/settings.toml` and the Karabiner rules whose
-  descriptions start with `omacosy-omniwm:`.
+  descriptions start with `omacchiato-omniwm:`.
 - If OmniWM does not answer, the bar counts that as no window manager.
   It still draws on every screen with no workspace chips, and looks for
   OmniWM again every 5 s. If the bar is missing, read
-  `/tmp/omacosy-bar.err` and
-  `launchctl print "gui/$(id -u)/com.omacosy.bar"` (runs, last exit code).
+  `/tmp/omacchiato-bar.err` and
+  `launchctl print "gui/$(id -u)/com.omacchiato.bar"` (runs, last exit code).
 
 ## Menu bar apps pill
 
@@ -147,13 +154,13 @@ The design and the test results are in
 ## Themes (`bin/theme-set`)
 
 - `theme-set <name>` or `theme-set light:<name>,dark:<name>`. A pair
-  follows the macOS appearance, and `OMACOSY_APPEARANCE` overrides
+  follows the macOS appearance, and `OMACCHIATO_APPEARANCE` overrides
   `AppleInterfaceStyle`. A theme name is a directory in `themes/`, and
   names with `/` or `..` are refused.
-- It writes `~/.config/omacosy/theme.conf` and links
+- It writes `~/.config/omacchiato/theme.conf` and links
   `~/.config/omarchy/current/theme`. The wallpaper changes only when the
   theme changes.
-- Ghostty reloads through `omacosy-helper ghostty-reload`: an Apple Event
+- Ghostty reloads through `omacchiato-helper ghostty-reload`: an Apple Event
   to `terminal 1` of the application. It skips `errAENoSuchObject`
   (no window open). A handler error comes back inside the reply, not as
   a thrown error.
@@ -183,18 +190,18 @@ The design and the test results are in
   the secondary display.
 - Gestures: `fingerCount = 3` is the Niri column scroll, which focuses
   the column where it stops. `workspaceSwipeFingerCount = 4` switches
-  workspaces. `omacosy-gesture` keeps only the 4-finger vertical swipe
+  workspaces. `omacchiato-gesture` keeps only the 4-finger vertical swipe
   for the overview. `macos-defaults.sh` turns off the system's 3- and
   4-finger horizontal swipes.
 - `followsMouse = false`, so focus follows clicks and keys only.
 - OmniWM hotkeys cannot run shell commands.
-  `bin/omacosy-karabiner-omniwm install` adds Karabiner rules for those
+  `bin/omacchiato-karabiner-omniwm install` adds Karabiner rules for those
   chords and replaces its own rules on each run. `install.sh` copies
   `config/karabiner/karabiner.json` over the live file, so it must add
   the OmniWM rules after that copy and after it writes `apps.conf`.
 - The Karabiner rules, the bar and the overview run `omniwmctl` through
-  `bin/omacosy-omniwmctl`, which finds it in the Homebrew link, the
-  release app or a dev build. `omacosy-omni`
+  `bin/omacchiato-omniwmctl`, which finds it in the Homebrew link, the
+  release app or a dev build. `omacchiato-omni`
   (`helper/gesture/omnicli.c`) is a fast IPC client for the scripts.
   OmniWM rejects all IPC while its overview is open.
 - OmniWM does not start while another window manager runs. It shows a
@@ -222,34 +229,35 @@ The design and the test results are in
 ## install.sh
 
 - It copies `config/gesture/config.json` to
-  `~/.config/omacosy/gesture.json` on every run. The gesture daemon
+  `~/.config/omacchiato/gesture.json` on every run. The gesture daemon
   keeps only the vertical swipes, because OmniWM owns the horizontal
   ones.
-- It retires what older installs left behind: the `com.omacosy.dwindle`,
-  `com.omacosy.borders` and `com.omacosy.ffm` agents and binaries, and
-  links in `~/.local/bin` to scripts that no longer exist. The
-  retirement blocks sit after the bar build.
+- It retires what older installs left behind. `migrate-omacosy.sh`
+  stops the dwindle, borders and ffm agents and removes their binaries
+  and links. The blocks after the bar build remove their config files
+  and the AeroSpace config.
 - While the previous window manager still runs, it warns and does not
   start OmniWM. Quitting a window manager strands the windows it parked
   off screen, so the user quits it.
 - `uninstall.sh` removes only what the manifest
-  (`~/.local/state/omacosy/manifest`) lists. It also removes the retired
-  agents, for an install that never ran a newer `install.sh`.
+  (`~/.local/state/omacchiato/manifest`) lists. It runs
+  `migrate-omacosy.sh` first, so it also removes the retired agents of an
+  install that never ran a newer `install.sh`.
 
 ## Pill scripts in `bin/`
 
-- `omacosy-github-prs [search qualifiers]` lists open PRs by
+- `omacchiato-github-prs [search qualifiers]` lists open PRs by
   `author:@me` through `gh`. An update is an unread GitHub notification.
   PRs that the user unsubscribed from are hidden. Marks, first match
   wins: 📝 draft, 💥 CI failed or merge conflicts, 🏗️ CI running,
   💬 changes requested or an unresolved thread from someone else,
   ✅ approved, ⏳ waiting for a review.
-- `omacosy-claude-usage` reads the Claude Code OAuth token from the
+- `omacchiato-claude-usage` reads the Claude Code OAuth token from the
   keychain and never refreshes it, because a refresh races Claude Code
   and signs the user out. A request that carries the token follows no
   redirect. The status row reads the "Claude Code" component of
   status.claude.com. The bars are coloured by pace against elapsed time.
-  Without the token it uses the payload that `omacosy-claude-statusline`
+  Without the token it uses the payload that `omacchiato-claude-statusline`
   saves.
 
 ## Security notes
@@ -258,4 +266,4 @@ The design and the test results are in
 audit from 2026-08-17. Upstream fixed or removed its real findings.
 Low items that remain: fixed `/tmp` log paths (a risk only on a Mac with
 more than one account), `popen` of the `gesture.json` command strings,
-and `omacosy-karabiner-omniwm`, which sources `apps.conf` as shell.
+and `omacchiato-karabiner-omniwm`, which sources `apps.conf` as shell.

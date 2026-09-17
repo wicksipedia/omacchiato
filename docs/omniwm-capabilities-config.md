@@ -86,7 +86,7 @@ impossible. What the source says happened:
    applied — a full canonical file with `[workspaceBar] yOffset` edited in
    decodes fine, so live reload accepted it.
 3. If you then replaced the file with a sparse one again (e.g. re-provisioning
-   from omacosy), live reload silently ignored it — in-memory state still held
+   from Omacchiato), live reload silently ignored it — in-memory state still held
    your values, so it *appeared* accepted.
 4. On restart, `load()` hit the sparse file, failed, and fell back to defaults
    (rewriting the file again). Hence "live-reload accepted it but restart reset
@@ -96,7 +96,7 @@ impossible. What the source says happened:
 fingerprint of this exact failure mode.** The Settings GUI Diagnostics tab also
 reports it (`settingsFileCorrupt` issue).
 
-Practical rule for omacosy provisioning: **never write a sparse settings.toml.**
+Practical rule for Omacchiato provisioning: **never write a sparse settings.toml.**
 Either let OmniWM generate the full file once and patch keys in place, or ship a
 complete canonical file (every table, every key, every default hotkey id).
 
@@ -541,7 +541,7 @@ override is silently treated as "no override" rather than rejecting the file
    `monitorAssignment.type`, `orientation`) → whole-file rejection; enum strings
    inside monitor bar/niri/dwindle overrides → silently no-override.
 6. **Rewrites lose comments and ordering** but keep unknown keys/tables — you
-   can stash `[omacosy]` metadata in the file and it survives; comments don't.
+   can stash `[omacchiato]` metadata in the file and it survives; comments don't.
 7. **Gap overrides with no set fields are garbage-collected** on load and save.
 8. **Hidden-bar can never hide** Control Center / MenuBarAgent / SystemUIServer;
    those ids are stripped on apply (and re-saved stripped).

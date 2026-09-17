@@ -1,13 +1,13 @@
-# omacosy zsh — the CLI-stack wiring. Personal config belongs in
+# omacchiato zsh — the CLI-stack wiring. Personal config belongs in
 # ~/.zshrc.local (sourced below), so this file stays generic.
 
 [ -x /opt/homebrew/bin/brew ] && eval "$(/opt/homebrew/bin/brew shellenv)"
 
 export PATH="$HOME/.local/bin:$PATH"
 
-# omacosy repo location, derived from the installed theme-set symlink
+# omacchiato repo location, derived from the installed theme-set symlink
 if [ -L "$HOME/.local/bin/theme-set" ]; then
-  export OMACOSY="$(dirname "$(dirname "$(readlink -f "$HOME/.local/bin/theme-set")")")"
+  export OMACCHIATO="$(dirname "$(dirname "$(readlink -f "$HOME/.local/bin/theme-set")")")"
 fi
 
 autoload -Uz compinit

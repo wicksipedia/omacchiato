@@ -1,8 +1,8 @@
 # OmniWM notes
 
-Findings from running omacosy on OmniWM: trial notes, the capability
+Findings from running Omacchiato on OmniWM: trial notes, the capability
 audit, upgrade notes and a ledger of upstream quirks. Read the ledger
-before you assume that a strange layout is omacosy's fault.
+before you assume that a strange layout is Omacchiato's fault.
 
 ## Trial findings (2026-08-26, first live day)
 
@@ -23,30 +23,30 @@ before you assume that a strange layout is omacosy's fault.
   needs an OmniWM restart to take. Cost us an hour of GUI archaeology;
   the settings file had been right all along.
 - **Swipe feel**: one-switch-per-swipe by design, less smooth than
-  omacosy-gesture's swipes. Trial con.
+  omacchiato-gesture's swipes. Trial con.
 - **Vertical swipes RESTORED (2026-08-26)**: the gesture daemon runs
   with its horizontal swipes off, swipe-up fires `omniwmctl command
-  toggle-overview`, and swipe-down closes via `omacosy-helper
+  toggle-overview`, and swipe-down closes via `omacchiato-helper
   omniwm-overview-close` — activation-based, since OmniWM blackholes
   IPC while its overview is open and ignored synthetic Escape. Both
-  live-verified. Swipe-up has since moved to omacosy-overview.
+  live-verified. Swipe-up has since moved to omacchiato-overview.
 - **Phantom-bar workaround FAILED** — their workspace bar's
   reserveLayoutSpace does reserve under dwindle (measured, windows
   y=32->78), but the bar cannot be made invisible (app icons and
   workspace chips render regardless of backgroundOpacity/showLabels)
   and the reservation did not survive an OmniWM restart. Removed;
-  omacosy-bar stays hover-reveal until upstream honors [gaps.outer]
+  omacchiato-bar stays hover-reveal until upstream honors [gaps.outer]
   for dwindle. That upstream issue is now the ONLY path to a
   permanently visible bar.
 - **Overview verdict (user)**: OmniWM's is search-and-scroll — the
-  search is liked, but the old omacosy overview LAYOUT (wallpaper-zoom
+  search is liked, but the old Omacchiato overview LAYOUT (wallpaper-zoom
   workspace cards) is preferred over their concept. Open decision:
   port our overview to an omniwmctl data source, or upstream-feature
   request a card layout, or live with theirs.
-- **Menu-bar apps are awkward under omacosy**: OmniWM is menu-bar-only
+- **Menu-bar apps are awkward under Omacchiato**: OmniWM is menu-bar-only
   and our bar covers/hides the native bar; even _HIHideMenuBar=false +
   Dock restart did not bring it back while our bar ran. Reaching their
-  GUI means parking omacosy-bar. Their GUI toggle for swipes did not
+  GUI means parking omacchiato-bar. Their GUI toggle for swipes did not
   actually persist to settings.toml in our attempt — TOML remained the
   authority.
 
@@ -76,7 +76,7 @@ this directory. Version-critical reconciliation:
   be themed toward our wallpaper-card concept. Options: fork (GPL,
   cleanly layered) or external overview on IPC (feasible: queries +
   focus/switch commands exist; missing thumbnails-by-IPC means own
-  ScreenCaptureKit, which omacosy-overview already does).
+  ScreenCaptureKit, which omacchiato-overview already does).
 - IPC: bar + gesture daemon fully served; no exec, no config access,
   no close-window (Karabiner Cmd+W stays). Docs' alias section is
   unimplemented — worth reporting upstream.
@@ -95,7 +95,7 @@ omniwmctl request but `version` answered `protocol_mismatch`: bar
 click-to-jump, overview card taps and the Super+Space palette chord
 were all dead, and the bar's `watch workspace-bar` survived only
 because its child predated the upgrade. Everything on the held client
-(omacosy-omni: swipes, Super+N, bar snapshots) negotiates per
+(omacchiato-omni: swipes, Super+N, bar snapshots) negotiates per
 connection and never noticed. Rule: a cask upgrade is not done until
 the WM has been restarted. Casks cannot be pinned, so expect this on
 every `brew upgrade` that carries OmniWM.
@@ -110,12 +110,12 @@ closeFocusedWindow); every key of ours survived (188 hotkeys, 18
 workspaces, 13 appRules; gaps, ffm, ipc, swipe and bar keys intact).
 Every real window stayed on its workspace across the restart (0.6.5's
 dwindle persistence). The managed-window count fell 19 -> 10 because
-Notification Centre widgets, QuickShade and omacosy-bar's own windows
+Notification Centre widgets, QuickShade and omacchiato-bar's own windows
 are no longer admitted (0.6.5's structural eligibility). The bar did
 NOT re-establish its workspace-bar watch: no launch/quit observer line
 in its log and no watch child afterwards; `launchctl kickstart -k
-gui/$UID/com.omacosy.bar` brought it back in 1 s. WATCH ITEM. A
-round-trip next/prev through omacosy-omni was verified live and the
+gui/$UID/com.omacchiato.bar` brought it back in 1 s. WATCH ITEM. A
+round-trip next/prev through omacchiato-omni was verified live and the
 bar followed each switch within 15 ms.
 
 Protocol 13 -> 15 (14 in 0.6.5, 15 in 0.6.6): a no-op switch now
@@ -177,7 +177,7 @@ requires restoring settings.toml.pre-v1 first.
    workspace is silent, not just in bursts. handleSessionStateChanged's
    workspaceChanged is derived from window state. The `workspace-bar`
    channel does fire on every switch (their bar highlights empties), so
-   omacosy-bar consumes that instead. Feature ask: emit
+   omacchiato-bar consumes that instead. Feature ask: emit
    active-workspace on the workspace change itself.
 6. **Dwindle has no mouse move/swap** — MouseEventHandler's dwindle
    path guards button == .right (resize only); Option+drag move is
@@ -234,7 +234,7 @@ requires restoring settings.toml.pre-v1 first.
 
 ## Root cause of the pill/overshoot saga (2026-08-26)
 
-Four stacked bugs, each masking the next: `omacosy-ws next` parsed
+Four stacked bugs, each masking the next: `omacchiato-ws next` parsed
 "next" as a slot so the cycle logic was dead code; isFocused goes dark
 on empty workspaces; omniwmctl pretty-prints multi-line JSON that a
 per-line parser silently rejects; and — the last one standing —
@@ -282,5 +282,5 @@ is acceptable-by-design; silent WM restarts are not.
 
 ## Open questions
 
-- Retire omacosy-overview for OmniWM's, or keep ours for the themed
+- Retire omacchiato-overview for OmniWM's, or keep ours for the themed
   look? (Theirs has search and drag; ours matches the wallpaper zoom.)

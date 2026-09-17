@@ -8,7 +8,7 @@ the extra usage credits appear, so it is preferred. It needs the Claude CLI's
 token and the network.
 
 The statusline payload is the fallback. Claude Code hands it to whatever
-statusline is configured and writes it nowhere, so omacosy-claude-statusline
+statusline is configured and writes it nowhere, so omacchiato-claude-statusline
 saves it. It needs no credential and no network, which is what makes it the
 right thing to fall back to.
 
@@ -28,9 +28,9 @@ import urllib.request
 from datetime import datetime, timedelta
 
 HOME = os.path.expanduser("~")
-CACHE = os.environ.get("OMACOSY_CLAUDE_USAGE_CACHE",
-                       os.path.join(HOME, ".config/omacosy/claude-usage-cache.json"))
-CAPTURES = [os.path.join(HOME, ".config/omacosy/claude-status.json"),
+CACHE = os.environ.get("OMACCHIATO_CLAUDE_USAGE_CACHE",
+                       os.path.join(HOME, ".config/omacchiato/claude-usage-cache.json"))
+CAPTURES = [os.path.join(HOME, ".config/omacchiato/claude-status.json"),
             os.path.join(HOME, ".claude/hud/.omc/state/hud-stdin-cache.json")]
 KEYCHAIN_SERVICE = "Claude Code-credentials"
 CREDENTIALS_FILE = os.path.join(HOME, ".claude/.credentials.json")
@@ -337,7 +337,7 @@ def stats_rows(stats):
 
 def health_icon(status):
     """Decorate the configured icon when the service is not healthy."""
-    base = os.environ.get("OMACOSY_PILL_ICON", "")
+    base = os.environ.get("OMACCHIATO_PILL_ICON", "")
     if not status:
         return None
     mark = {"none": "", "minor": "\U0001F3E5"}.get(status.get("indicator"), "\U0001FAA6")

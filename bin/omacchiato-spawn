@@ -1,5 +1,5 @@
 #!/bin/bash
-# omacosy-spawn <App> — open a new window of App on the omarchy side of
+# omacchiato-spawn <App> — open a new window of App on the omarchy side of
 # the focused tile, one spawn at a time.
 #
 # OmniWM's dwindle insertion side is not omarchy's: with smartSplit off a
@@ -18,7 +18,7 @@ APP="$1"
 
 # macOS ships no flock; mkdir is the portable atomic lock. A holder that
 # died is stolen after ~5s so the terminal key can never go dead.
-LOCK="/tmp/omacosy-spawn-$(id -u).lock.d"
+LOCK="/tmp/omacchiato-spawn-$(id -u).lock.d"
 for i in $(seq 120); do
   mkdir "$LOCK" 2>/dev/null && break
   [ "$i" -ge 100 ] && { rm -rf "$LOCK"; }
@@ -26,7 +26,7 @@ for i in $(seq 120); do
 done
 trap 'rmdir "$LOCK" 2>/dev/null' EXIT
 
-OMNI="$HOME/.local/bin/omacosy-omni"
+OMNI="$HOME/.local/bin/omacchiato-omni"
 mult="$(sed -n 's/^splitWidthMultiplier = //p' "$HOME/.config/omniwm/settings.toml" 2>/dev/null | head -1)"
 "$OMNI" preselect-for-focused "${mult:-1.4}" >/dev/null 2>&1 || true
 before="$("$OMNI" window-count 2>/dev/null || echo 0)"

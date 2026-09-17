@@ -3,7 +3,7 @@
 // Every `omniwmctl` invocation is a ~36 ms process launch; a request on
 // a held connection is ~1 ms (measured 2026-08-29). The gesture daemon
 // links this directly so a swipe is one round-trip, and the same code
-// builds the `omacosy-omni` CLI (~3 ms launch) for the shell scripts.
+// builds the `omacchiato-omni` CLI (~3 ms launch) for the shell scripts.
 #pragma once
 #include <stdbool.h>
 #include <stddef.h>

@@ -1,6 +1,6 @@
-# omacosy
+# Omacchiato
 
-omakase + macOS + cosy. An [omarchy](https://omarchy.org)-style tiling
+omakase + macOS + macchiato. An [omarchy](https://omarchy.org)-style tiling
 desktop for macOS 26 and 27, built around the
 [OmniWM](https://github.com/BarutSRB/OmniWM) window manager. One
 `install.sh` gives you a Super key on Caps Lock, niri columns and
@@ -10,7 +10,12 @@ workspace overview with live window previews, and a theme switch that
 recolours the bar, the focus border, the terminal and the wallpaper in
 one command.
 
-![The omacosy desktop under the catppuccin-latte theme: the bar in place of the menu bar, over the theme's wallpaper](docs/screenshots/desktop.jpg)
+Omacchiato is a fork of [omacosy](https://github.com/paulsp94/omacosy)
+by Paul Spende, under the same MIT licence. On a Mac with omacosy
+installed, `install.sh` moves that install to the new names. macOS then
+asks again for the permissions of the bar and the gesture daemon.
+
+![The Omacchiato desktop under the catppuccin-latte theme: the bar in place of the menu bar, over the theme's wallpaper](docs/screenshots/desktop.jpg)
 
 Numbers from this repo, measured on the author's desk:
 
@@ -23,7 +28,7 @@ Numbers from this repo, measured on the author's desk:
 - The bar makes **one network call** by default, the weather fetch.
   Delete that pill and nothing leaves the machine. There is no
   telemetry and no background update check.
-- omacosy's own binaries never run as root. Karabiner-Elements does,
+- Omacchiato's own binaries never run as root. Karabiner-Elements does,
   and [What it does not do](#what-it-does-not-do) says what that means.
 - Five small binaries, Swift and C, built by the installer: the bar,
   the overview, the gesture daemon, a system helper and an IPC client
@@ -38,8 +43,8 @@ Numbers from this repo, measured on the author's desk:
 ## Install
 
 ```sh
-git clone https://github.com/wicksipedia/omacosy.git ~/.local/share/omacosy &&
-cd ~/.local/share/omacosy && ./install.sh
+git clone https://github.com/wicksipedia/omacchiato.git ~/.local/share/omacchiato &&
+cd ~/.local/share/omacchiato && ./install.sh
 ```
 
 The clone location matters. Configs are symlinked into the repo, and
@@ -63,11 +68,11 @@ asks you to approve its driver extension.
 To update:
 
 ```sh
-omacosy-update          # pull, then re-run the installer
-omacosy-update --check  # only say whether there is anything new
+omacchiato-update          # pull, then re-run the installer
+omacchiato-update --check  # only say whether there is anything new
 ```
 
-`omacosy-update` refuses a clone with local edits and a branch that
+`omacchiato-update` refuses a clone with local edits and a branch that
 has diverged, and pulls the branch that yours tracks, so a clone of a
 fork updates from the fork. Nothing contacts the network unless you
 run it.
@@ -81,7 +86,7 @@ of columns that scrolls sideways, and `Option+Shift+L` switches a
 workspace to dwindle, where each new window splits the focused one
 along its longer edge. That is the omarchy feel, and on a 3440-wide
 display it is the difference between a usable third window and three
-narrow strips. `omacosy-spawn`, which the terminal chord runs,
+narrow strips. `omacchiato-spawn`, which the terminal chord runs,
 preselects omarchy's insertion side (right of a wide window, below a
 tall one) and serialises spawns, so a burst of `Super+Enter` becomes a
 clean staircase instead of splitting the same cell again and again.
@@ -126,7 +131,7 @@ Left to right:
 - **Apple menu**: the real one, read over Accessibility. About This
   Mac, System Settings, Recent Items (with app and file-type icons
   resolved locally, because AX exposes none), Force Quit and the power
-  verbs, plus omacosy's Next Theme at the bottom.
+  verbs, plus Omacchiato's Next Theme at the bottom.
 - **Workspaces**: one capsule per display, showing only that display's
   workspaces. A chip shows the icons of up to three apps on the
   workspace, fanned like a hand of cards, or the workspace's digit when
@@ -143,7 +148,7 @@ Left to right:
   left cluster on a notched one, and hides when Music is not running.
   Click the title to open Music.
 
-![The Apple menu popup: About This Mac, System Information, System Settings, App Store, Recent Items, Force Quit, Sleep, Restart, Shut Down, Lock Screen, Log Out and omacosy's Next Theme at the bottom](docs/screenshots/popup-apple.png)
+![The Apple menu popup: About This Mac, System Information, System Settings, App Store, Recent Items, Force Quit, Sleep, Restart, Shut Down, Lock Screen, Log Out and Omacchiato's Next Theme at the bottom](docs/screenshots/popup-apple.png)
 
 ![Right end of the bar: the menu bar apps grid, the Claude and GitHub plugin pills, wi-fi, battery, the clock and the activity pill](docs/screenshots/bar-right.png)
 
@@ -205,26 +210,26 @@ very top edge, so brightness and volume stay reachable mid-film.
 
 ### Plugin pills
 
-`~/.config/omacosy/bar-plugins.conf` adds pills without a rebuild. A
+`~/.config/omacchiato/bar-plugins.conf` adds pills without a rebuild. A
 command prints a label, or a JSON object with a colour, an icon and
 popup rows, and the bar draws the result. The format is under
 [Adding pills](#adding-pills). Three plugins ship in `bin/`:
 
-- **Claude usage** (`omacosy-claude-usage`): the pill shows how far
+- **Claude usage** (`omacchiato-claude-usage`): the pill shows how far
   into the five-hour window you are and the time until it resets,
   coloured by pace. The popup adds the weekly window, each per-model
   weekly window, extra usage credits, the status of the Claude Code
   component on status.claude.com with any open incident, and the last
   seven days from tokscale: tokens per day and per model at API prices,
   sessions, active days and active hours.
-- **GitHub pull requests** (`omacosy-github-prs`): the pill counts your
+- **GitHub pull requests** (`omacchiato-github-prs`): the pill counts your
   open PRs and adds `!` when one has an unread notification. The popup
   groups them by repository, marks each with what it needs next
   (📝 draft, 💥 CI failed or conflicts, 🏗️ CI running, 💬 feedback to
   resolve, ✅ ready to merge, ⏳ waiting for a review) and says what it
   waits for. A PR based on another PR in the list sits under it,
   indented and marked `↳`.
-- **Keep awake** (`omacosy-keep-awake`): a cup while something holds
+- **Keep awake** (`omacchiato-keep-awake`): a cup while something holds
   the Mac awake, nothing otherwise. It reads the power assertions
   rather than any app's saved setting, ignores the ones the system
   holds as a matter of course, and lists the holders and how long each
@@ -259,7 +264,7 @@ workspace there.
 OmniWM's own swipes do the horizontal work: a 4-finger swipe left or
 right switches workspaces, and in a niri workspace a 3-finger swipe
 scrolls the columns and focuses the column it stops on. A fast flick
-can pass more than one column. `omacosy-gesture` keeps the 4-finger
+can pass more than one column. `omacchiato-gesture` keeps the 4-finger
 swipe up for the overview and swipe down to close it, reading raw
 trackpad contacts because macOS 26 stopped carrying touch data in
 normal events. `macos-defaults.sh` turns off the system's 4-finger
@@ -289,16 +294,16 @@ one.
 
 ### Parking the setup
 
-`omacosy-toggle off` returns to a vanilla Mac in one command (OmniWM
+`omacchiato-toggle off` returns to a vanilla Mac in one command (OmniWM
 quits, and the gesture daemon and the bar stop) without uninstalling.
-`omacosy-toggle on` brings everything back, and no argument flips.
+`omacchiato-toggle on` brings everything back, and no argument flips.
 `./uninstall.sh` removes what the install manifest lists and restores
 what it displaced; see [Back to a normal Mac](#back-to-a-normal-mac).
 
 ## Bundled tools and plugins
 
 Everything the Brewfile installs, everything `install.sh` fetches, and
-the code this repo absorbed, with what omacosy uses each for.
+the code this repo absorbed, with what Omacchiato uses each for.
 
 ### Installed by the Brewfile
 
@@ -309,7 +314,7 @@ the code this repo absorbed, with what omacosy uses each for.
 | Ghostty | The default terminal, with a hidden titlebar and colours from the theme. The activity pill opens btop in your terminal | [ghostty-org/ghostty](https://github.com/ghostty-org/ghostty) |
 | Raycast | The launcher on `Cmd+Space`, a hotkey you set in Raycast itself | [raycast.com](https://www.raycast.com) |
 | starship | The shell prompt, from `config/starship.toml` | [starship/starship](https://github.com/starship/starship) |
-| fzf | Fuzzy finding in the shell, and the branch picker in `omacosy-herdr-worktree` | [junegunn/fzf](https://github.com/junegunn/fzf) |
+| fzf | Fuzzy finding in the shell, and the branch picker in `omacchiato-herdr-worktree` | [junegunn/fzf](https://github.com/junegunn/fzf) |
 | eza | `ls`, `ll`, `la` and `lt` in `zsh/zshrc` | [eza-community/eza](https://github.com/eza-community/eza) |
 | zoxide | Directory jumping in the shell | [ajeetdsouza/zoxide](https://github.com/ajeetdsouza/zoxide) |
 | ripgrep | Search in the shell | [BurntSushi/ripgrep](https://github.com/BurntSushi/ripgrep) |
@@ -332,22 +337,22 @@ the code this repo absorbed, with what omacosy uses each for.
 
 | Script | What it does | Talks to |
 |---|---|---|
-| [`omacosy-claude-usage`](bin/omacosy-claude-usage) | The Claude usage pill | `api.anthropic.com`, `status.claude.com`, tokscale |
-| [`omacosy-claude-statusline`](bin/omacosy-claude-statusline) | Saves the Claude Code statusline payload, the pill's offline fallback | nothing |
-| [`omacosy-github-prs`](bin/omacosy-github-prs) | The GitHub pull requests pill | `api.github.com` through `gh` |
-| [`omacosy-keep-awake`](bin/omacosy-keep-awake) | The keep-awake pill | `pmset` |
-| [`omacosy-herdr-worktree`](bin/omacosy-herdr-worktree) | herdr's `Ctrl+Alt+G` worktree picker | `git`, `herdr` |
+| [`omacchiato-claude-usage`](bin/omacchiato-claude-usage) | The Claude usage pill | `api.anthropic.com`, `status.claude.com`, tokscale |
+| [`omacchiato-claude-statusline`](bin/omacchiato-claude-statusline) | Saves the Claude Code statusline payload, the pill's offline fallback | nothing |
+| [`omacchiato-github-prs`](bin/omacchiato-github-prs) | The GitHub pull requests pill | `api.github.com` through `gh` |
+| [`omacchiato-keep-awake`](bin/omacchiato-keep-awake) | The keep-awake pill | `pmset` |
+| [`omacchiato-herdr-worktree`](bin/omacchiato-herdr-worktree) | herdr's `Ctrl+Alt+G` worktree picker | `git`, `herdr` |
 | [`theme-set`](bin/theme-set), [`theme-next`](bin/theme-next), [`theme-bg-next`](bin/theme-bg-next) | Themes and wallpapers | Ghostty, OmniWM, herdr |
-| [`omacosy-ws`](bin/omacosy-ws), [`omacosy-ws-collapse`](bin/omacosy-ws-collapse), [`omacosy-spawn`](bin/omacosy-spawn) | Workspace cycling, undocking, and spawning on the omarchy side | OmniWM over IPC |
-| [`omacosy-toggle`](bin/omacosy-toggle), [`omacosy-update`](bin/omacosy-update), [`omacosy-requirements`](bin/omacosy-requirements) | Parking, updating and the version check | launchd, git, Homebrew |
+| [`omacchiato-ws`](bin/omacchiato-ws), [`omacchiato-ws-collapse`](bin/omacchiato-ws-collapse), [`omacchiato-spawn`](bin/omacchiato-spawn) | Workspace cycling, undocking, and spawning on the omarchy side | OmniWM over IPC |
+| [`omacchiato-toggle`](bin/omacchiato-toggle), [`omacchiato-update`](bin/omacchiato-update), [`omacchiato-requirements`](bin/omacchiato-requirements) | Parking, updating and the version check | launchd, git, Homebrew |
 
 ### Absorbed and borrowed
 
-| Project | What omacosy took | Source |
+| Project | What Omacchiato took | Source |
 |---|---|---|
 | omarchy | The idea, the 22-colour theme format, the palettes and the MIT-licensed wallpapers | [omacom/omarchy](https://github.com/omacom/omarchy) |
-| aerospace-swipe | The gesture engine, which lives on as `omacosy-gesture` (MIT, notice kept in `helper/gesture/`) | [acsandmann/aerospace-swipe](https://github.com/acsandmann/aerospace-swipe) |
-| yyjson | The JSON parser inside `omacosy-gesture` and `omacosy-omni` (MIT) | [ibireme/yyjson](https://github.com/ibireme/yyjson) |
+| aerospace-swipe | The gesture engine, which lives on as `omacchiato-gesture` (MIT, notice kept in `helper/gesture/`) | [acsandmann/aerospace-swipe](https://github.com/acsandmann/aerospace-swipe) |
+| yyjson | The JSON parser inside `omacchiato-gesture` and `omacchiato-omni` (MIT) | [ibireme/yyjson](https://github.com/ibireme/yyjson) |
 | wttr.in | The weather pill's one request | [chubin/wttr.in](https://github.com/chubin/wttr.in) |
 | Catppuccin, Gruvbox, Tokyo Night | The palettes behind three of the themes, by way of omarchy's packs | [catppuccin/catppuccin](https://github.com/catppuccin/catppuccin), [morhetz/gruvbox](https://github.com/morhetz/gruvbox), [tokyo-night/tokyo-night-vscode-theme](https://github.com/tokyo-night/tokyo-night-vscode-theme) |
 
@@ -355,7 +360,7 @@ the code this repo absorbed, with what omacosy uses each for.
 
 Super is Caps Lock held. Karabiner sends it as `cmd+ctrl+alt`, and a
 tap alone is Escape. Chords marked *Karabiner* come from
-`bin/omacosy-karabiner-omniwm`; the rest are OmniWM hotkeys from
+`bin/omacchiato-karabiner-omniwm`; the rest are OmniWM hotkeys from
 `config/omniwm/settings.toml`. `Super+K` draws the same map on screen
 from the live config, and you can type to filter it.
 
@@ -439,7 +444,7 @@ windows, which macOS's own switcher does not.
 |---|---|
 | 4-finger swipe left / right | switch workspace (OmniWM) |
 | 3-finger swipe left / right | scroll the niri columns; focus lands on the column it stops on (OmniWM) |
-| 4-finger swipe up / down | open / close the overview (`omacosy-gesture`) |
+| 4-finger swipe up / down | open / close the overview (`omacchiato-gesture`) |
 | Click a workspace chip | jump to it |
 | Click a pill | open its popup; click a plugin pill without rows to re-run it |
 | Scroll on the volume or brightness pill | adjust in 5% steps; brightness keeps going past zero into the shade |
@@ -481,14 +486,14 @@ grant hide themselves rather than half-work.
 
 | Grant | Who asks | What it does | Without it |
 |---|---|---|---|
-| **Accessibility** | OmniWM, `omacosy-gesture`, `omacosy-bar` (reads the focused app's menus for the app-pill popup, and reads and clicks other apps' menu bar icons for the menu bar apps pill) | Move, resize and focus other apps' windows. This is the tiling itself, and it is the broadest permission here. | Nothing tiles. Not optional in practice. |
-| **Input Monitoring** | Karabiner-Elements, `omacosy-gesture`, and OmniWM | Karabiner reads keys to remap Caps Lock; `omacosy-gesture` reads raw trackpad contacts, because macOS 26 stopped carrying touch data in normal events. | No Super key, no swipe gestures. |
-| **Screen Recording** | `omacosy-overview`; OmniWM (optional) | Captures a thumbnail per window for the overview cards, including windows the window manager has stashed offscreen. OmniWM uses it for its own overview thumbnails, the image of a window you drag, and Hidden Bar icons. | Cards fall back to app icons and titles. OmniWM starts without it. |
-| **Bluetooth** | `omacosy-bar` | Reads adapter power and the paired-device list for the bluetooth pill and its menu. | The pill hides itself. |
-| **Location** | `omacosy-bar` | Reads **only** the wi-fi network's name, which macOS classes as location data. No coordinate is requested; the authorisation itself is what unlocks `CWInterface.ssid()`. | The wi-fi popup's title row reads "wi-fi" instead of your network's name. |
-| **Automation** | `omacosy-bar`, `theme-set`, and the terminal that runs `install.sh` | Apple Events to **Music** (the current track and its artwork), to **Ghostty** (reloading its colours after a theme change) and to **System Events** (sleep, lock and restart from the Apple menu; setting the wallpaper; adding OmniWM as a login item). | The media pill has no artwork; those menu rows do nothing; OmniWM does not start at login until you add it under System Settings > General > Login Items. |
-| **Files and Folders** | `omacosy-bar` | Only if your clone lives in `~/Documents`, `~/Desktop` or `~/Downloads`. The bar reads its palette from the theme directory inside the repo, and macOS walls launchd agents off from those folders. | The bar **hangs at startup** waiting on the prompt. Clone to `~/.local/share/omacosy` and this never comes up. |
-| **Keychain** | `omacosy-claude-usage`, only if you add the Claude pill | Reads the Claude Code sign-in token from your login keychain with `security`, to ask Anthropic for your usage. It never writes to the keychain and never refreshes the token. | The pill falls back to the statusline payload, which has only the five-hour and weekly windows. |
+| **Accessibility** | OmniWM, `omacchiato-gesture`, `omacchiato-bar` (reads the focused app's menus for the app-pill popup, and reads and clicks other apps' menu bar icons for the menu bar apps pill) | Move, resize and focus other apps' windows. This is the tiling itself, and it is the broadest permission here. | Nothing tiles. Not optional in practice. |
+| **Input Monitoring** | Karabiner-Elements, `omacchiato-gesture`, and OmniWM | Karabiner reads keys to remap Caps Lock; `omacchiato-gesture` reads raw trackpad contacts, because macOS 26 stopped carrying touch data in normal events. | No Super key, no swipe gestures. |
+| **Screen Recording** | `omacchiato-overview`; OmniWM (optional) | Captures a thumbnail per window for the overview cards, including windows the window manager has stashed offscreen. OmniWM uses it for its own overview thumbnails, the image of a window you drag, and Hidden Bar icons. | Cards fall back to app icons and titles. OmniWM starts without it. |
+| **Bluetooth** | `omacchiato-bar` | Reads adapter power and the paired-device list for the bluetooth pill and its menu. | The pill hides itself. |
+| **Location** | `omacchiato-bar` | Reads **only** the wi-fi network's name, which macOS classes as location data. No coordinate is requested; the authorisation itself is what unlocks `CWInterface.ssid()`. | The wi-fi popup's title row reads "wi-fi" instead of your network's name. |
+| **Automation** | `omacchiato-bar`, `theme-set`, and the terminal that runs `install.sh` | Apple Events to **Music** (the current track and its artwork), to **Ghostty** (reloading its colours after a theme change) and to **System Events** (sleep, lock and restart from the Apple menu; setting the wallpaper; adding OmniWM as a login item). | The media pill has no artwork; those menu rows do nothing; OmniWM does not start at login until you add it under System Settings > General > Login Items. |
+| **Files and Folders** | `omacchiato-bar` | Only if your clone lives in `~/Documents`, `~/Desktop` or `~/Downloads`. The bar reads its palette from the theme directory inside the repo, and macOS walls launchd agents off from those folders. | The bar **hangs at startup** waiting on the prompt. Clone to `~/.local/share/omacchiato` and this never comes up. |
+| **Keychain** | `omacchiato-claude-usage`, only if you add the Claude pill | Reads the Claude Code sign-in token from your login keychain with `security`, to ask Anthropic for your usage. It never writes to the keychain and never refreshes the token. | The pill falls back to the statusline payload, which has only the five-hour and weekly windows. |
 | **Allow in the Background** | `install.sh` (launch agents for the bar and the gesture daemon) | macOS lists the agents under System Settings > General > Login Items & Extensions. They start at login and restart if they quit. | The parts whose switch is off do not run. |
 
 On **Location**: it buys one string. The bar requests authorisation and
@@ -513,7 +518,7 @@ treats each rebuild as a new app and you re-grant after every install.
   machine. The plugin pills contact more hosts: the Claude pill calls
   `api.anthropic.com` and `status.claude.com`, and the GitHub pill
   calls `api.github.com` through `gh`.
-- **omacosy's own binaries never run as root.** `install.sh` uses no
+- **Omacchiato's own binaries never run as root.** `install.sh` uses no
   sudo, installs no LaunchDaemon, and every helper it builds runs as
   you, in your login session.
 - **Karabiner-Elements does run as root, and you should know that
@@ -524,12 +529,12 @@ treats each rebuild as a new app and you re-grant after every install.
   during install is. It is the most privileged thing this repo puts on
   your Mac, and it is third-party. Skip it if that trade is wrong for
   you; you lose the Super key and keep everything else.
-- **Nothing here reads your keystrokes.** No omacosy binary opens a
+- **Nothing here reads your keystrokes.** No Omacchiato binary opens a
   keyboard event tap. Only Karabiner sees keys, which is inherent to
-  remapping one. `omacosy-gesture`'s event tap is gesture-only and
+  remapping one. `omacchiato-gesture`'s event tap is gesture-only and
   listen-only (`1 << NSEventTypeGesture`,
   `kCGEventTapOptionListenOnly`), so it cannot see or alter a
-  keystroke. Debug logs (`/tmp/omacosy-*.log`) carry window titles,
+  keystroke. Debug logs (`/tmp/omacchiato-*.log`) carry window titles,
   app names and workspace numbers, never input. The menu bar apps pill
   posts mouse clicks and one key chord (Ctrl+F8), and reads no keys.
 
@@ -558,7 +563,7 @@ sources last.
 
 ### Choosing pills
 
-`~/.config/omacosy/bar-pills.conf` sets what each right-cluster pill
+`~/.config/omacchiato/bar-pills.conf` sets what each right-cluster pill
 does, one `<name> = <mode>` per line. The names are `menubar`,
 `weather`, `wifi`, `bluetooth`, `brightness`, `volume`, `mic`,
 `battery`, `clock` and `activity`. The modes are `hide` and `icon`.
@@ -587,10 +592,10 @@ The bar reads the file once at startup, so restart it to apply an
 edit:
 
 ```sh
-launchctl kickstart -k "gui/$(id -u)/com.omacosy.bar"
+launchctl kickstart -k "gui/$(id -u)/com.omacchiato.bar"
 ```
 
-`omacosy-popup <item> [display]` opens a pill's popup from a script or
+`omacchiato-popup <item> [display]` opens a pill's popup from a script or
 a Karabiner chord, as a click on the pill does. The item is a pill
 name, a plugin pill's name, `apple` or `appmenu`, and the display is
 its name as macOS shows it, such as `"DELL U2722D (1)"`. Without a
@@ -599,7 +604,7 @@ closes the open popup.
 
 ### Adding pills
 
-`~/.config/omacosy/bar-plugins.conf` adds pills without a rebuild.
+`~/.config/omacchiato/bar-plugins.conf` adds pills without a rebuild.
 Each `[name]` section takes a `command`, run by `/bin/sh -c`, whose
 first line of stdout becomes the label. `interval` is the gap between
 runs in seconds (minimum 1, default 30) and `icon` is an optional
@@ -668,7 +673,7 @@ glyph the config names.
 
 ### The Claude pill
 
-`omacosy-claude-usage` colours the pill by how far into the five-hour
+`omacchiato-claude-usage` colours the pill by how far into the five-hour
 window you are, and opens a popup with that window, the weekly one,
 each per-model weekly window, and any extra usage credits. Each bar
 has a tick at the share of its window that has passed, and its colour
@@ -698,12 +703,12 @@ party rewriting the CLI's own credentials can race Claude Code and log
 you out.
 
 If the token is expired or the network is gone, it falls back to the
-statusline payload saved by `omacosy-claude-statusline`, which needs
+statusline payload saved by `omacchiato-claude-statusline`, which needs
 neither. That payload has only the five-hour and weekly windows, and
 after a window rolls over with no session running it reports `--`
 rather than a percentage for a window that no longer exists.
 
-To save that payload, make `omacosy-claude-statusline` the statusline
+To save that payload, make `omacchiato-claude-statusline` the statusline
 command in `~/.claude/settings.json`, followed by the statusline
 command you already use. With nothing after it, the script only saves
 the payload.
@@ -711,18 +716,18 @@ the payload.
 ```json
 "statusLine": {
   "type": "command",
-  "command": "$HOME/.local/share/omacosy/bin/omacosy-claude-statusline ~/.claude/statusline.sh"
+  "command": "$HOME/.local/share/omacchiato/bin/omacchiato-claude-statusline ~/.claude/statusline.sh"
 }
 ```
 
 ### The GitHub pull requests pill
 
-`omacosy-github-prs` lists the open pull requests you authored. It
+`omacchiato-github-prs` lists the open pull requests you authored. It
 needs the GitHub CLI, signed in with `gh auth login`.
 
 ```
 [github]
-command = omacosy-github-prs -repo:owner/bots
+command = omacchiato-github-prs -repo:owner/bots
 interval = 120
 ```
 
@@ -756,7 +761,7 @@ reach, the popup keeps the last list and says when it was fetched.
 
 ### The keep-awake pill
 
-`omacosy-keep-awake` shows a cup while something is keeping the Mac
+`omacchiato-keep-awake` shows a cup while something is keeping the Mac
 awake, and hides otherwise. It names no particular app: it reads the
 power assertions, and ignores the ones held from the system's own
 directories, because powerd, coreaudiod and sharingd hold one as a
@@ -772,7 +777,7 @@ already holds it open for the volume pill.
 
 ### Workspace icons
 
-The optional `~/.config/omacosy/workspace-icons.conf` file sets an
+The optional `~/.config/omacchiato/workspace-icons.conf` file sets an
 icon per workspace. Each non-comment line has one workspace name, an
 equals sign, and either one Unicode scalar or a reverse-DNS bundle
 identifier.
@@ -844,14 +849,14 @@ faint for a track inside a solid popup. A theme that names only
 `settings.toml` from the luminance of the theme's `background` colour,
 so a light theme gets light chrome without extra configuration.
 
-`theme-set` writes `~/.config/omacosy/ghostty-theme` from the palette
+`theme-set` writes `~/.config/omacchiato/ghostty-theme` from the palette
 and asks Ghostty to reload. The Ghostty config includes that file, so
 the terminal follows the desktop theme. Do not set `theme` in
 `~/Library/Application Support/com.mitchellh.ghostty/config`: macOS
 config files load after the XDG one, so it would win. The reload goes
-through `omacosy-helper ghostty-reload`, not `SIGUSR2`, which Ghostty
+through `omacchiato-helper ghostty-reload`, not `SIGUSR2`, which Ghostty
 accepts and ignores on macOS. The helper aims one Apple Event at each
-Ghostty process, because omacosy opens an instance per window and
+Ghostty process, because Omacchiato opens an instance per window and
 AppleScript addresses an app by bundle. OmniWM's quake terminal reads
 the same Ghostty config files but is not a Ghostty process; it
 re-reads them when OmniWM reloads `settings.toml`, which `theme-set`
@@ -880,7 +885,7 @@ need Raycast Pro.
 theme-set light:catppuccin-latte,dark:catppuccin
 ```
 
-`theme-set` stores the pair in `~/.config/omacosy/theme.conf` and
+`theme-set` stores the pair in `~/.config/omacchiato/theme.conf` and
 applies the half that matches the current appearance. The bar watches
 the system appearance and runs `theme-set` with the pair again when it
 changes, and once when it starts. A pair sets OmniWM's
@@ -890,7 +895,7 @@ system directly.
 `theme-set` with one name stores that name instead, and so does
 `Super+Shift+T`, which runs `theme-next`. Either one stops the
 following until you set a pair again. On the first switch, macOS asks
-whether omacosy-bar can control Ghostty; refuse and the terminal keeps
+whether omacchiato-bar can control Ghostty; refuse and the terminal keeps
 its old colours.
 
 ## Tiling details
@@ -898,7 +903,7 @@ its old colours.
 OmniWM's dwindle puts the new window on a different side from
 omarchy's. With `smartSplit` off, a new window goes right in a
 horizontal split and above in a vertical one, while Hyprland's
-`force_split=2` puts it right or below. So `omacosy-spawn` applies
+`force_split=2` puts it right or below. So `omacchiato-spawn` applies
 OmniWM's own orientation rule (height times `splitWidthMultiplier`
 greater than width means a vertical split) to the focused tile and
 preselects down or right for each new window.
@@ -931,7 +936,7 @@ other one first.
 The bar and the overview read OmniWM's workspaces over IPC, and
 `theme-set` colours its focus border and sets its light or dark
 chrome. `Super+N` and `Super+Shift+N` route through Karabiner into
-`omacosy-omni`, a held-socket IPC client written in C, so slots
+`omacchiato-omni`, a held-socket IPC client written in C, so slots
 resolve on the display under your pointer; OmniWM's native hotkeys are
 name-global and would always hit the main set. The cost is a shell
 command per chord, and the IPC round trip itself takes about 4 ms.
@@ -945,14 +950,14 @@ the repo. To pin workspaces to one display, set
 `name` in the local copy. If a pinned display is missing, OmniWM
 moves its workspaces to the nearest display.
 
-With one display left, the bar also runs `omacosy-ws-collapse`,
+With one display left, the bar also runs `omacchiato-ws-collapse`,
 which moves the windows on any two-digit workspace into the lowest
 free 1 to 9 slot and records where each came from. Plug the display
 back in and each window goes home.
 
 OmniWM is daily-driven on a docked multi-monitor desk, and
 `docs/omniwm-port.md` carries a ledger of upstream quirks found while
-porting. Read it before assuming a strange layout is omacosy's fault.
+porting. Read it before assuming a strange layout is Omacchiato's fault.
 
 ## Memory use
 
@@ -960,8 +965,8 @@ About **293MB** of physical footprint (what Activity Monitor calls
 Memory) across OmniWM, the bar, the overview daemon, the gesture
 daemon and Karabiner's two user processes. The measurement, on
 2026-09-14 under OmniWM and docked to two external displays, came to
-306MB; that figure included 13MB for `omacosy-borders`, which omacosy
-no longer runs. Footprint is the number to compare: resident set size
+306MB; that figure included 13MB for the borders daemon, which
+Omacchiato no longer runs. Footprint is the number to compare: resident set size
 counts each process's share of the shared system frameworks more than
 once. Karabiner's three root processes need root to measure, so they
 are not in the total; their resident size is about 39MB. Largest
@@ -971,11 +976,11 @@ first:
 |---|---|
 | OmniWM | 169MB |
 | Karabiner (2 user processes) | 47MB |
-| `omacosy-bar` | 42MB |
-| `omacosy-overview` | 24MB |
-| `omacosy-gesture` | 11MB |
+| `omacchiato-bar` | 42MB |
+| `omacchiato-overview` | 24MB |
+| `omacchiato-gesture` | 11MB |
 
-The figures move with uptime. `omacosy-overview` caches a
+The figures move with uptime. `omacchiato-overview` caches a
 half-resolution capture per window shown, so it starts near 9MB and
 settles between about 25MB and 37MB. It plateaus there because it
 filters the cache to the visible set on each open. Packaging the bar
@@ -992,7 +997,7 @@ Manifest-driven: `install.sh` records what this machine gained
 (Homebrew packages that were not already present, every `defaults`
 key's prior value, displaced symlinks and the wallpaper), and
 `uninstall.sh` removes and restores exactly that. Tools and settings
-you had before omacosy are never touched. Pre-manifest installs fall
+you had before Omacchiato are never touched. Pre-manifest installs fall
 back to a conservative teardown that leaves all Homebrew packages in
 place.
 
@@ -1003,6 +1008,6 @@ whole idea, plus MIT-licensed theme palettes and wallpapers),
 [OmniWM](https://github.com/BarutSRB/OmniWM),
 [Karabiner-Elements](https://karabiner-elements.pqrs.org) and
 [aerospace-swipe](https://github.com/acsandmann/aerospace-swipe)
-(MIT; its gesture engine lives on here as `omacosy-gesture`, notice
+(MIT; its gesture engine lives on here as `omacchiato-gesture`, notice
 kept in `helper/gesture/`). The full list, with what each is used for,
 is under [Bundled tools and plugins](#bundled-tools-and-plugins).

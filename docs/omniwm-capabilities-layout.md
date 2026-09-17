@@ -528,7 +528,7 @@ So a same-slot conflict doesn't error; it disables the custom grid wholesale.
 - afterwards: niri engine monitor sync, workspace GC of empty unconfigured
   workspaces, quake-terminal re-anchor.
 
-### Mapping to omacosy's convention (1–9 main, 11–19 secondary)
+### Mapping to Omacchiato's convention (1–9 main, 11–19 secondary)
 
 - Workspace **names must be positive integers** (`WorkspaceIDPolicy`,
   `Sources/OmniWMIPC/WorkspaceAddressing.swift` — `normalizeRawID` requires
@@ -546,7 +546,7 @@ So a same-slot conflict doesn't error; it disables the custom grid wholesale.
   the secondary again; the restore-assignment pass re-picks the visible
   workspace per monitor. Runtime overrides survive the unplug and re-attach on
   replug via `runtimeOverrideReconnectAssignments`.
-- Net: omacosy's *intent* (guests go home on redock) is native behavior; the
+- Net: Omacchiato's *intent* (guests go home on redock) is native behavior; the
   *mechanism* (temporary renumber into 1–9) is impossible and unnecessary —
   the workspaces simply coexist on main under their own numbers. Anything that
   depends on "workspace 4 now holds what was on 14" has no equivalent.

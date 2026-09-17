@@ -4,7 +4,7 @@ Date: 2026-09-14. Status: approved.
 
 ## Problem
 
-omacosy hides the native macOS menu bar. Third-party menu bar apps, such as
+Omacchiato hides the native macOS menu bar. Third-party menu bar apps, such as
 Vorssaint, Karabiner and CleanShot X, put their icons there, so you cannot see
 or open them while the menu bar is hidden. The app-name pill already gives you
 the running app's menus. This design does the same for menu bar apps.
@@ -12,7 +12,7 @@ the running app's menus. This design does the same for menu bar apps.
 ## Scope
 
 In scope: third-party menu bar apps. Out of scope: Control Center modules, and
-the items that omacosy already shows as pills (Wi-Fi, Bluetooth, sound,
+the items that Omacchiato already shows as pills (Wi-Fi, Bluetooth, sound,
 battery and clock).
 
 ## What you see

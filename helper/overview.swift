@@ -1,4 +1,4 @@
-// omacosy-overview — the workspace overview Mission Control can't be.
+// omacchiato-overview — the workspace overview Mission Control can't be.
 // OmniWM workspaces aren't Spaces, so MC shows one undifferentiated
 // window pile; this overlay asks OmniWM itself over IPC and draws a
 // card per non-empty workspace with LIVE window previews
@@ -69,11 +69,11 @@ func rememberFront() {
 // purged pidfile made the daemon unfindable — the next swipe spawned a
 // second daemon and the first became an orphan running its capture
 // pipeline forever (found at load average 190 after six days).
-let stateDir = NSString(string: "~/.local/state/omacosy").expandingTildeInPath
+let stateDir = NSString(string: "~/.local/state/omacchiato").expandingTildeInPath
 let pidPath = "\(stateDir)/overview.pid"
-// raised while the overlay is on screen: omacosy-gesture then ignores
+// raised while the overlay is on screen: omacchiato-gesture then ignores
 // horizontal swipes, whose lift-off would switch workspaces under it
-let activeFlag = "/tmp/omacosy-overlay-active-\(getuid())"
+let activeFlag = "/tmp/omacchiato-overlay-active-\(getuid())"
 let isDaemon = CommandLine.arguments.contains("--daemon")
 let showOnLaunch = CommandLine.arguments.contains("--show")
 
@@ -104,7 +104,7 @@ if !isDaemon {
 if let out = try? { () -> String in
     let p = Process()
     p.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
-    p.arguments = ["-f", "omacosy-overview --daemon"]
+    p.arguments = ["-f", "omacchiato-overview --daemon"]
     let pipe = Pipe()
     p.standardOutput = pipe
     try p.run()
@@ -136,7 +136,7 @@ signal(SIGTERM) { _ in
 signal(SIGUSR1, SIG_IGN) // delivered via DispatchSource below
 signal(SIGUSR2, SIG_IGN)
 
-let logURL = URL(fileURLWithPath: "/tmp/omacosy-overview.log")
+let logURL = URL(fileURLWithPath: "/tmp/omacchiato-overview.log")
 func tlog(_ m: String) {
     let line = "\(Date()) \(m)\n"
     if let h = try? FileHandle(forWritingTo: logURL) {
@@ -161,7 +161,7 @@ func omniwmActive() -> Bool {
 }
 
 // the wrapper finds omniwmctl in the Homebrew link, the release app or a dev build
-let omniwmctlBin = NSHomeDirectory() + "/.local/bin/omacosy-omniwmctl"
+let omniwmctlBin = NSHomeDirectory() + "/.local/bin/omacchiato-omniwmctl"
 
 @discardableResult
 func omniwmctl(_ args: [String]) -> String {
@@ -196,11 +196,11 @@ func shellOut(_ bin: String, _ args: [String]) -> String {
 // down at result.payload (bar.swift's helper, duplicated by the repo's
 // helper-binary convention).
 func omniQuery(_ name: String, _ args: [String] = []) -> [String: Any]? {
-    // fast path: omacosy-omni holds a persistent socket and launches in
+    // fast path: omacchiato-omni holds a persistent socket and launches in
     // ~3 ms where omniwmctl (Swift) needs ~10; it speaks `query <name>
     // [fields-csv]` and prints the same envelope. Anything fancier
     // (selector flags like --focused) stays on omniwmctl.
-    let omni = "\(NSHomeDirectory())/.local/bin/omacosy-omni"
+    let omni = "\(NSHomeDirectory())/.local/bin/omacchiato-omni"
     var out = ""
     if FileManager.default.isExecutableFile(atPath: omni),
        args.isEmpty || (args.count == 2 && args[0] == "--fields") {
@@ -329,8 +329,8 @@ func omniwmSnapshot(screenName: String)
             // overview and helper binaries are unbundled, so the app
             // NAME prefix is the reliable net (it caught the overview
             // capturing its own overlay).
-            if (app?["bundleId"] as? String)?.hasPrefix("com.omacosy.") == true { continue }
-            if (app?["name"] as? String)?.hasPrefix("omacosy") == true { continue }
+            if (app?["bundleId"] as? String)?.hasPrefix("com.omacchiato.") == true { continue }
+            if (app?["name"] as? String)?.hasPrefix("omacchiato") == true { continue }
             // icons want a bundle PATH; the payload carries a bundle id
             let bundle = ((app?["bundleId"] as? String).flatMap {
                 NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0)?.path }) ?? ""
@@ -644,7 +644,7 @@ func reorderWorkspaces(from slots: [String], to order: [String]) {
         }
         // a rotation between hidden workspaces moves nothing on screen,
         // so the bar's workspace icons have no event to learn from
-        FileManager.default.createFile(atPath: "/tmp/omacosy-bar-moved", contents: nil)
+        FileManager.default.createFile(atPath: "/tmp/omacchiato-bar-moved", contents: nil)
         DispatchQueue.main.async {
             if overlayVisible { // take key back the way showOverlay takes it
                 win.makeKeyAndOrderFront(nil)
@@ -857,7 +857,7 @@ final class ContentView: NSView {
     }
     override func keyDown(with event: NSEvent) {
         // the KEYCODE is what debugging needs; the character it produced
-        // is input, and /tmp/omacosy-*.log is world-readable
+        // is input, and /tmp/omacchiato-*.log is world-readable
         tlog("keyDown code=\(event.keyCode) shown=\(shownIds)")
         switch event.keyCode {
         case 53: // esc — clear an active search first, close on the second

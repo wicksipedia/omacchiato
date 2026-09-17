@@ -1,6 +1,6 @@
-// omacosy-omni — the scripts' door to OmniWM's socket. A plain C binary
-// launches in ~3 ms where omniwmctl (Swift) needs ~36 ms; omacosy-ws and
-// omacosy-spawn call this so a Super+Tab or Super+Enter costs one
+// omacchiato-omni — the scripts' door to OmniWM's socket. A plain C binary
+// launches in ~3 ms where omniwmctl (Swift) needs ~36 ms; omacchiato-ws and
+// omacchiato-spawn call this so a Super+Tab or Super+Enter costs one
 // round-trip, not three process launches and three python parses.
 #include "omniwm.h"
 #include "yyjson.h"
@@ -12,13 +12,13 @@
 static int usage(void)
 {
 	fprintf(stderr,
-		"usage: omacosy-omni active | numbers | focus <raw-name> | next | prev\n"
-		"       omacosy-omni command <name> [args-json]\n"
-		"       omacosy-omni query <name> [fields-csv]      (raw response line)\n"
-		"       omacosy-omni preselect-for-focused [mult]   (down/right by aspect)\n"
-		"       omacosy-omni slot <1-9> [move]               (cursor display's set)\n"
-		"       omacosy-omni focus-window <window-id>\n"
-		"       omacosy-omni window-count | wait-window <baseline> [timeout-ms]\n");
+		"usage: omacchiato-omni active | numbers | focus <raw-name> | next | prev\n"
+		"       omacchiato-omni command <name> [args-json]\n"
+		"       omacchiato-omni query <name> [fields-csv]      (raw response line)\n"
+		"       omacchiato-omni preselect-for-focused [mult]   (down/right by aspect)\n"
+		"       omacchiato-omni slot <1-9> [move]               (cursor display's set)\n"
+		"       omacchiato-omni focus-window <window-id>\n"
+		"       omacchiato-omni window-count | wait-window <baseline> [timeout-ms]\n");
 	return 3;
 }
 
@@ -63,7 +63,7 @@ int main(int argc, char** argv)
 		return 0;
 	}
 	omniwm* c = omniwm_new();
-	if (!c) { fprintf(stderr, "omacosy-omni: OmniWM socket unavailable\n"); return 2; }
+	if (!c) { fprintf(stderr, "omacchiato-omni: OmniWM socket unavailable\n"); return 2; }
 	int rc = 0;
 	if (!strcmp(op, "active")) {
 		char* a = omniwm_active_workspace(c);

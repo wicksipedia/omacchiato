@@ -4,7 +4,7 @@ Design: `docs/plans/2026-09-14-menu-bar-apps-design.md` (approved).
 
 ## Overview
 
-Add a `menubar` pill to the omacosy bar. Its popup lists the running
+Add a `menubar` pill to the Omacchiato bar. Its popup lists the running
 third-party menu bar apps, and a click on a row opens that app's own menu.
 All the work is in `helper/bar.swift`, plus the README.
 
@@ -45,7 +45,7 @@ Task 1: scan + press, behind a test trigger (proves AXPress)
 
 **Description:** Add the scan (`menuBarItems()`) and the press
 (`pressMenuBarItem(_:)`) to the bar with no interface. A temporary trigger
-file, `/tmp/omacosy-bar-menubar-test`, makes the bar log every item it found
+file, `/tmp/omacchiato-bar-menubar-test`, makes the bar log every item it found
 and press the item whose index the file contains. Use it on at least three
 apps, including one Electron app if one is running.
 
@@ -55,7 +55,7 @@ apps, including one Electron app if one is running.
 - [ ] A decision is recorded: `AXPress`, or show the menu bar and click the icon's position.
 
 **Verification:**
-- [ ] Build succeeds (the `swiftc` command in `install.sh`), and the bar restarts with `launchctl kickstart -k gui/$(id -u)/com.omacosy.bar`.
+- [ ] Build succeeds (the `swiftc` command in `install.sh`), and the bar restarts with `launchctl kickstart -k gui/$(id -u)/com.omacchiato.bar`.
 - [ ] Manual check: screenshots of each opened menu.
 
 **Dependencies:** none.
@@ -84,7 +84,7 @@ Findings:
   prove that a menu opened.
 - macOS shows its menu bar while a menu is open. After the bar cancelled the
   menus with `AXCancel`, the native menu bar stayed on screen and covered the
-  omacosy bar.
+  Omacchiato bar.
 - Labels: most are empty or symbol names ("Pawprint"). OneDrive's label
   repeats the app name and has a second line, so a row uses the first line
   without the app name, and only when an app has several icons.

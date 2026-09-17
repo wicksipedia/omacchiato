@@ -25,7 +25,7 @@ NAME="$SPEC"
 # appearance: the bar runs theme-set with the pair again when it changes.
 # One name pins that theme.
 if [[ "$SPEC" == *:* ]]; then
-  MODE="${OMACOSY_APPEARANCE:-$(defaults read -g AppleInterfaceStyle 2>/dev/null || true)}"
+  MODE="${OMACCHIATO_APPEARANCE:-$(defaults read -g AppleInterfaceStyle 2>/dev/null || true)}"
   case "$MODE" in [Dd]ark) MODE=dark ;; *) MODE=light ;; esac
   NAME="$(tr ',' '\n' <<<"$SPEC" | sed -n "s/^ *$MODE: *//p" | head -1)"
 fi
@@ -36,8 +36,8 @@ if [ -z "$NAME" ] || [[ "$NAME" == */* || "$NAME" == *..* ]] || [ ! -d "$THEMES_
   exit 1
 fi
 
-mkdir -p "$CURRENT_DIR" "$HOME/.config/omacosy"
-printf 'theme = %s\n' "$SPEC" > "$HOME/.config/omacosy/theme.conf"
+mkdir -p "$CURRENT_DIR" "$HOME/.config/omacchiato"
+printf 'theme = %s\n' "$SPEC" > "$HOME/.config/omacchiato/theme.conf"
 PREV="$(readlink "$CURRENT_DIR/theme" 2>/dev/null || true)"
 ln -sfn "$THEMES_DIR/$NAME" "$CURRENT_DIR/theme"
 
@@ -54,7 +54,7 @@ if [ -f "$KORREN_CFG" ]; then
 fi
 
 # Wallpaper: first image in the theme's backgrounds/ dir, on every screen.
-# omacosy-helper wraps NSWorkspace (System Events wallpaper scripting
+# omacchiato-helper wraps NSWorkspace (System Events wallpaper scripting
 # half-broke on macOS 14+: some desktops return "missing value" and
 # silently keep the old picture); osascript remains as fallback.
 WALL="$(ls "$THEMES_DIR/$NAME"/backgrounds/* 2>/dev/null | head -1)"
@@ -62,10 +62,10 @@ if [ -n "$WALL" ] && [ "${PREV##*/}" != "$NAME" ]; then
   # theme-bg-next cycles through the rest; a theme switch restarts the
   # cycle at the first image, so the remembered position moves with it.
   # The same theme again, as the bar applies it at startup, keeps it.
-  mkdir -p "$HOME/.local/state/omacosy"
-  ln -nsf "$WALL" "$HOME/.local/state/omacosy/background"
-  if [ -x "$HOME/.local/bin/omacosy-helper" ]; then
-    "$HOME/.local/bin/omacosy-helper" wallpaper "$WALL" >/dev/null 2>&1 || true
+  mkdir -p "$HOME/.local/state/omacchiato"
+  ln -nsf "$WALL" "$HOME/.local/state/omacchiato/background"
+  if [ -x "$HOME/.local/bin/omacchiato-helper" ]; then
+    "$HOME/.local/bin/omacchiato-helper" wallpaper "$WALL" >/dev/null 2>&1 || true
   else
     # the path is an ARGUMENT, not spliced into the script text: it is a
     # filename out of a theme pack, and a theme is third-party content.
@@ -80,7 +80,7 @@ APPLESCRIPT
 fi
 
 
-# omacosy-bar re-reads the theme on its own (kqueue on
+# omacchiato-bar re-reads the theme on its own (kqueue on
 # ~/.config/omarchy/current), so the symlink swap above IS the
 # notification
 
@@ -90,9 +90,9 @@ fi
 # Ghostty has no theme-watching of its own, so write one from the palette
 # and poke it. SIGUSR2 reloads only on Linux; on macOS it is delivered and
 # ignored, which looks like success. The helper aims one Apple Event per
-# Ghostty process, because omacosy opens an instance per window and
+# Ghostty process, because omacchiato opens an instance per window and
 # AppleScript addresses an app by bundle, so it would reach only one.
-GHOSTTY_THEME="$HOME/.config/omacosy/ghostty-theme"
+GHOSTTY_THEME="$HOME/.config/omacchiato/ghostty-theme"
 if [ -f "$THEMES_DIR/$NAME/colors.toml" ]; then
   mkdir -p "$(dirname "$GHOSTTY_THEME")"
   python3 - "$THEMES_DIR/$NAME/colors.toml" "$GHOSTTY_THEME" <<'PY'
@@ -116,7 +116,7 @@ for key, ghostty in (("background", "background"), ("foreground", "foreground"),
         lines.append("%s = %s" % (ghostty, v))
 open(out, "w").write("\n".join(lines) + "\n")
 PY
-  "$HOME/.local/bin/omacosy-helper" ghostty-reload >/dev/null || true
+  "$HOME/.local/bin/omacchiato-helper" ghostty-reload >/dev/null || true
 fi
 
 # OmniWM draws the focus border and tints its own chrome from settings.toml.

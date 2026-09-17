@@ -1,4 +1,4 @@
-# omacosy — everything the setup needs, installable via `brew bundle`
+# omacchiato — everything the setup needs, installable via `brew bundle`
 
 # Window management
 cask "omniwm"

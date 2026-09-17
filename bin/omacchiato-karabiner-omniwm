@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# omacosy-karabiner-omniwm <install|remove> — the exec chords.
+# omacchiato-karabiner-omniwm <install|remove> — the exec chords.
 #
 # OmniWM's hotkey system has no exec/shell command (verified against
 # HotkeyCommand.swift: window-management cases only), so every chord
@@ -17,8 +17,8 @@
 set -euo pipefail
 
 KARABINER="$HOME/.config/karabiner/karabiner.json"
-APPS="$HOME/.config/omacosy/apps.conf"   # resolved by install.sh
-MARK="omacosy-omniwm"                     # rule-description prefix, removal key
+APPS="$HOME/.config/omacchiato/apps.conf"   # resolved by install.sh
+MARK="omacchiato-omniwm"                     # rule-description prefix, removal key
 
 [ -f "$KARABINER" ] || { echo "no karabiner.json" >&2; exit 1; }
 
@@ -51,15 +51,15 @@ apps = {k: os.environ[k] for k in ("TERMINAL", "BROWSER", "MUSIC", "MESSENGER")}
 
 # workspace slots: OmniWM's native switchWorkspace.N is name-global
 # (always the main set), blind to which screen you are on — these route
-# through omacosy-omni's cursor-display slot resolution instead. The
+# through omacchiato-omni's cursor-display slot resolution instead. The
 # native ids are Unassigned in settings.toml so nothing double-fires.
 slot_rules = []
 for n in range(1, 10):
     key = str(n)
-    slot_rules.append(rule(f"workspace slot {n}", key, SUPER, cmd=f"{home}/.local/bin/omacosy-omni slot {n} >/dev/null 2>&1"))
-    slot_rules.append(rule(f"move to slot {n}", key, SHIFT, cmd=f"{home}/.local/bin/omacosy-omni slot {n} move >/dev/null 2>&1"))
+    slot_rules.append(rule(f"workspace slot {n}", key, SUPER, cmd=f"{home}/.local/bin/omacchiato-omni slot {n} >/dev/null 2>&1"))
+    slot_rules.append(rule(f"move to slot {n}", key, SHIFT, cmd=f"{home}/.local/bin/omacchiato-omni slot {n} move >/dev/null 2>&1"))
 
-ctl = f"{home}/.local/bin/omacosy-omniwmctl"
+ctl = f"{home}/.local/bin/omacchiato-omniwmctl"
 
 # One set of resize chords for both layouts: niri changes the column
 # width or the window's height in its column, dwindle resizes the split.
@@ -68,22 +68,22 @@ def resize_rule(desc, key, mods, niri, dwindle):
     return rule(desc, key, mods, cmd=f"{ctl} command {niri} >/dev/null 2>&1 || {ctl} command {dwindle} >/dev/null 2>&1")
 
 rules = slot_rules + [
-    # omacosy-spawn preselects the omarchy insertion side and serializes
+    # omacchiato-spawn preselects the omarchy insertion side and serializes
     # bursts — a bare `open -na` gives OmniWM's above-not-below spiral
-    rule("terminal", "return_or_enter", SUPER, cmd=f"{home}/.local/bin/omacosy-spawn '{apps['TERMINAL']}'"),
+    rule("terminal", "return_or_enter", SUPER, cmd=f"{home}/.local/bin/omacchiato-spawn '{apps['TERMINAL']}'"),
     rule("browser", "return_or_enter", SHIFT, cmd=f"open -a '{apps['BROWSER']}'"),
     # OmniWM's command palette on the launcher chord; Raycast keeps its
     # own Cmd+Space hotkey
     rule("launcher", "spacebar", SUPER, cmd=f"{ctl} command open-command-palette >/dev/null 2>&1"),
-    rule("overview", "o", SUPER, cmd=f"{home}/.local/bin/omacosy-overview"),
+    rule("overview", "o", SUPER, cmd=f"{home}/.local/bin/omacchiato-overview"),
     # throws go to the OTHER display, not a direction — resolved
-    # per-press by omacosy-omni from the display arrangement
-    rule("throw window to other monitor", "o", SHIFT, cmd=f"{home}/.local/bin/omacosy-omni throw-window >/dev/null 2>&1"),
-    rule("throw workspace to other monitor", "spacebar", SHIFT, cmd=f"{home}/.local/bin/omacosy-omni throw-workspace >/dev/null 2>&1"),
+    # per-press by omacchiato-omni from the display arrangement
+    rule("throw window to other monitor", "o", SHIFT, cmd=f"{home}/.local/bin/omacchiato-omni throw-window >/dev/null 2>&1"),
+    rule("throw workspace to other monitor", "spacebar", SHIFT, cmd=f"{home}/.local/bin/omacchiato-omni throw-workspace >/dev/null 2>&1"),
     # slot-scoped cycling (1-9 stays 1-9): OmniWM's own next/prev walks
     # the guest workspaces too on a single display
-    rule("next workspace", "tab", SUPER, cmd=f"{home}/.local/bin/omacosy-ws next"),
-    rule("previous workspace", "tab", SHIFT, cmd=f"{home}/.local/bin/omacosy-ws prev"),
+    rule("next workspace", "tab", SUPER, cmd=f"{home}/.local/bin/omacchiato-ws next"),
+    rule("previous workspace", "tab", SHIFT, cmd=f"{home}/.local/bin/omacchiato-ws prev"),
     rule("files", "f", SHIFT, cmd="open -a Finder"),
     rule("music", "m", SHIFT, cmd=f"open -a '{apps['MUSIC']}'"),
     rule("messenger", "g", SHIFT, cmd=f"open -a '{apps['MESSENGER']}'"),
@@ -94,8 +94,8 @@ rules = slot_rules + [
     rule("video", "y", SHIFT, cmd=f"open -a '{home}/Applications/YouTube.app'"),
     rule("next theme", "t", SHIFT, cmd=f"{home}/.local/bin/theme-next"),
     rule("next wallpaper", "b", SHIFT, cmd=f"{home}/.local/bin/theme-bg-next"),
-    rule("lock", "l", SHIFT, cmd=f"{home}/.local/bin/omacosy-helper lock"),
-    rule("cheatsheet", "k", SUPER, cmd="/usr/bin/touch /tmp/omacosy-bar-cheatsheet"),
+    rule("lock", "l", SHIFT, cmd=f"{home}/.local/bin/omacchiato-helper lock"),
+    rule("cheatsheet", "k", SUPER, cmd="/usr/bin/touch /tmp/omacchiato-bar-cheatsheet"),
     # OmniWM has no close-window command (HotkeyCommand.swift) — send
     # the app-level Cmd+W instead, which closes the focused window
     rule("close window", "w", SUPER, to_key="w", to_mods=["command"]),
@@ -103,7 +103,7 @@ rules = slot_rules + [
     # displays than workspace sets, one direction can land on such a
     # display, so try the other direction when the first does nothing.
     # ponytail: one step back only — a full cycle over several empty
-    # displays needs a display picker in omacosy-omni
+    # displays needs a display picker in omacchiato-omni
     rule("focus next display", "tab", ["control", "option"],
          cmd=f"{ctl} command focus-monitor next >/dev/null 2>&1 || {ctl} command focus-monitor prev >/dev/null 2>&1"),
     rule("focus previous display", "tab", ["control", "option", "shift"],

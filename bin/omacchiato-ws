@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# omacosy-ws <N|next|prev> [switch|move] — switch to workspace N or move
+# omacchiato-ws <N|next|prev> [switch|move] — switch to workspace N or move
 # the focused window there, or step to the next or previous workspace of
 # the display under the cursor (Super+Tab).
 #
-# Everything goes through omacosy-omni, a held-socket C client that
+# Everything goes through omacchiato-omni, a held-socket C client that
 # launches in ~3 ms where omniwmctl needs ~10 ms. The slot-scoped cycle
 # (1-9 stays in 1-9, guests in guests, wrapping) lives in helper/gesture/
 # omniwm.c, shared with the gesture daemon, so a swipe and Super+Tab
@@ -13,7 +13,7 @@
 set -euo pipefail
 slot="${1:-}"
 op="${2:-switch}"
-OMNI="$HOME/.local/bin/omacosy-omni"
+OMNI="$HOME/.local/bin/omacchiato-omni"
 
 case "$slot" in next | prev) op="$slot" ;; esac
 case "$op" in
@@ -21,5 +21,5 @@ case "$op" in
   move) "$OMNI" command move-to-workspace "{\"workspaceNumber\":$slot}" >/dev/null 2>&1 || true ;;
   next | prev)
     r="$("$OMNI" "$op" 2>&1)" || true
-    echo "$(date +%T) op=$op resp='$(echo "$r" | head -c 120)'" >> /tmp/omacosy-ws.log ;;
+    echo "$(date +%T) op=$op resp='$(echo "$r" | head -c 120)'" >> /tmp/omacchiato-ws.log ;;
 esac

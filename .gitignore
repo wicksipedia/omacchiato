@@ -1,7 +1,7 @@
 .DS_Store
 *.bak.*
-/omacosy-bar.app/
-/omacosy-gesture.app/
+/omacchiato-bar.app/
+/omacchiato-gesture.app/
 config/apps.local.conf
 __pycache__/
 # an older install generated this; install.sh deletes it

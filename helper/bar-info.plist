@@ -2,21 +2,21 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleIdentifier</key><string>com.omacosy.bar</string>
-  <key>CFBundleName</key><string>omacosy-bar</string>
+  <key>CFBundleIdentifier</key><string>com.omacchiato.bar</string>
+  <key>CFBundleName</key><string>omacchiato-bar</string>
   <!-- This file is BOTH the section embedded in the binary and the
        bundle's Contents/Info.plist, so the usage strings have one home.
        The bundle is not cosmetic: measured on macOS 26.3, a bundled app
        with Location authorised reads the SSID and an unbundled binary
        reads nil no matter what it is granted. -->
-  <key>CFBundleExecutable</key><string>omacosy-bar</string>
+  <key>CFBundleExecutable</key><string>omacchiato-bar</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>LSUIElement</key><true/>
   <key>NSAppleEventsUsageDescription</key>
-  <string>omacosy-bar sends commands to Music for the media pill, and asks Ghostty to reload its colours after a theme change.</string>
+  <string>omacchiato-bar sends commands to Music for the media pill, and asks Ghostty to reload its colours after a theme change.</string>
   <key>NSBluetoothAlwaysUsageDescription</key>
-  <string>omacosy-bar shows how many bluetooth devices are connected in the status bar.</string>
+  <string>omacchiato-bar shows how many bluetooth devices are connected in the status bar.</string>
   <key>NSLocationWhenInUseUsageDescription</key>
-  <string>macOS treats the name of the wi-fi network you are on as location data. omacosy-bar shows that name in the status bar; it never reads your position.</string>
+  <string>macOS treats the name of the wi-fi network you are on as location data. omacchiato-bar shows that name in the status bar; it never reads your position.</string>
 </dict>
 </plist>

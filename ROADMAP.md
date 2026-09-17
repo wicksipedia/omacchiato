@@ -24,7 +24,7 @@ Direction, not promises. Ordered roughly by pull.
 sixteen shell plugins, the popup guard that polled the cursor, and the
 watcher daemon whose only job was triggering it. It started as a slice
 built alongside sketchybar to answer one question with numbers. Run a
-second copy stacked under the real one with `OMACOSY_BAR_STACK=1` if you
+second copy stacked under the real one with `OMACCHIATO_BAR_STACK=1` if you
 ever want that comparison again:
 
 ```
@@ -32,9 +32,9 @@ swiftc -O -F /System/Library/PrivateFrameworks -framework SkyLight \
   -framework DisplayServices \
   -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist \
   -Xlinker helper/bar-info.plist \
-  -o /tmp/omacosy-bar helper/bar.swift &&
-codesign -f -s "Apple Development" --identifier com.omacosy.bar /tmp/omacosy-bar &&
-/tmp/omacosy-bar &
+  -o /tmp/omacchiato-bar helper/bar.swift &&
+codesign -f -s "Apple Development" --identifier com.omacchiato.bar /tmp/omacchiato-bar &&
+/tmp/omacchiato-bar &
 ```
 
 It exists to price one question: how much of the bar's latency is the
@@ -184,6 +184,6 @@ Center replacement.
   MIT-licensed palettes drop in. The easiest PR in the repo.
 - **Upstreaming.** The gesture engine's macOS 26 fixes are offered
   upstream (pull requests #29 and #30, linked in the README). The
-  engine lives in-tree as `omacosy-gesture`, so a merge is a courtesy,
+  engine lives in-tree as `omacchiato-gesture`, so a merge is a courtesy,
   not a dependency. A window-created event in OmniWM's IPC would
   delete the bar's SkyLight dependency for window events.

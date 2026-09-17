@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# omacosy-requirements [file] — check installed apps against the minimum
+# omacchiato-requirements [file] — check installed apps against the minimum
 # versions in config/requirements.conf. Exits 1 when one is too old or missing.
 set -euo pipefail
 

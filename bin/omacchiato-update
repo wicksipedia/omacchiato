@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# omacosy-update [--check] — pull this repo and re-run install.sh.
+# omacchiato-update [--check] — pull this repo and re-run install.sh.
 #
 # install.sh is idempotent and rebuilds only the binaries whose sources
 # changed, so updating is a pull plus a re-run. This finds the clone
@@ -27,13 +27,13 @@ while [ -L "$SELF" ]; do
   esac
 done
 REPO="$(cd "$(dirname "$SELF")/.." && pwd)"
-[ -f "$REPO/install.sh" ] || die "could not find the omacosy clone (looked in $REPO)"
+[ -f "$REPO/install.sh" ] || die "could not find the omacchiato clone (looked in $REPO)"
 git -C "$REPO" rev-parse --git-dir >/dev/null 2>&1 || die "$REPO is not a git clone; update by hand"
 
 # install.sh checks app versions itself; this covers the exits that skip it
 requirements() {
   say "app versions"
-  "$REPO/bin/omacosy-requirements" || say "WARNING: an app above is older than omacosy needs"
+  "$REPO/bin/omacchiato-requirements" || say "WARNING: an app above is older than omacchiato needs"
 }
 
 BRANCH="$(git -C "$REPO" rev-parse --abbrev-ref HEAD)"

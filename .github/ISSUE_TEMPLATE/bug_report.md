@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Something broken in the omacosy stack
+about: Something broken in the Omacchiato stack
 ---
 
 **What happened / what you expected**
@@ -17,7 +17,7 @@ about: Something broken in the omacosy stack
 exists of:
 
 ```sh
-ls -la /tmp/omacosy-*.log
+ls -la /tmp/omacchiato-*.log
 ```
 
 For bar issues also paste the failing item's state:
@@ -27,4 +27,4 @@ sketchybar --query <item>   # e.g. bluetooth, weather, space.1
 ```
 
 **Reproduction** — steps, and whether it survives
-`omacosy-toggle off && omacosy-toggle on`.
+`omacchiato-toggle off && omacchiato-toggle on`.

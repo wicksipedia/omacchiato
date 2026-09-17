@@ -1,4 +1,4 @@
-// omacosy-helper — tiny compiled utility replacing four brew dependencies
+// omacchiato-helper — tiny compiled utility replacing four brew dependencies
 // (cliclick, desktoppr, switchaudio-osx, blueutil):
 //   cursor                  print the cursor position as "x,y" (CG top-left)
 //   cursor set <x> <y>      warp it there (no synthetic movement, so
@@ -120,7 +120,7 @@ case "cursor":
 
 case "ghostty-reload":
     // AppleScript addresses an app by bundle, so it reaches ONE instance.
-    // omacosy opens a Ghostty instance per window, so a theme switch left
+    // omacchiato opens a Ghostty instance per window, so a theme switch left
     // every other window on the old colours. An Apple Event can be aimed at
     // a process instead, so aim one at each.
     let code = { (s: String) -> OSType in
@@ -177,7 +177,7 @@ case "wallpaper":
     guard args.count > 2 else { fail("usage: wallpaper <path> | wallpaper get") }
     // `get` prints each screen's current wallpaper path in arrangement
     // order — install.sh records these so uninstall.sh can put the
-    // pre-omacosy picture back instead of leaving the theme wallpaper
+    // pre-omacchiato picture back instead of leaving the theme wallpaper
     // as a souvenir.
     if args[2] == "get" {
         for screen in NSScreen.screens.sorted(by: { $0.frame.origin.x < $1.frame.origin.x }) {
@@ -285,7 +285,7 @@ case "omniwm-overview-close":
     // fire Escape into whatever app is focused.
     //
     // CGEventPost needs Accessibility, judged by the RESPONSIBLE
-    // process: run from omacosy-gesture's handler (which holds
+    // process: run from omacchiato-gesture's handler (which holds
     // the grant) this works; run from a bare shell it may not.
     guard let wins = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else { exit(1) }
     let overviewUp = wins.contains { w in
@@ -383,5 +383,5 @@ case "bt":
     }
 
 default:
-    fail("usage: omacosy-helper cursor | displays | wallpaper <path> | audio ... | bt ... | brightness [set <0-100>]")
+    fail("usage: omacchiato-helper cursor | displays | wallpaper <path> | audio ... | bt ... | brightness [set <0-100>]")
 }

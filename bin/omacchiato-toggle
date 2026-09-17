@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# omacosy-toggle [on|off|toggle] — park the whole tiling setup without
+# omacchiato-toggle [on|off|toggle] — park the whole tiling setup without
 # uninstalling. `off`: OmniWM quits (it has no enable toggle), and the
 # trackpad-gesture daemon and the bar stop. `on` restores all of it.
 # No args = flip.
@@ -9,9 +9,9 @@
 # (the native menu bar is there once the bar is down).
 set -euo pipefail
 
-STATE="$HOME/.config/omacosy/disabled"
+STATE="$HOME/.config/omacchiato/disabled"
 UID_N="$(id -u)"
-AGENTS=(com.omacosy.dwindle com.omacosy.bar com.omacosy.gesture)
+AGENTS=(com.omacchiato.bar com.omacchiato.gesture)
 
 mode="${1:-toggle}"
 if [ "$mode" = toggle ]; then
@@ -26,7 +26,7 @@ case "$mode" in
       launchctl bootout "gui/$UID_N/$a" 2>/dev/null || true
     done
     mkdir -p "$(dirname "$STATE")" && : >"$STATE"
-    echo "omacosy: OFF — vanilla macOS. Restore with: omacosy-toggle on"
+    echo "omacchiato: OFF — vanilla macOS. Restore with: omacchiato-toggle on"
     ;;
   on)
     for a in "${AGENTS[@]}"; do
@@ -34,10 +34,10 @@ case "$mode" in
     done
     open -a OmniWM 2>/dev/null || true
     rm -f "$STATE"
-    echo "omacosy: ON — tiling restored"
+    echo "omacchiato: ON — tiling restored"
     ;;
   *)
-    echo "usage: omacosy-toggle [on|off|toggle]" >&2
+    echo "usage: omacchiato-toggle [on|off|toggle]" >&2
     exit 2
     ;;
 esac

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# omacosy bootstrap — clone this repo anywhere, run this once.
+# omacchiato bootstrap — clone this repo anywhere, run this once.
 # Idempotent: safe to re-run after pulling changes.
 
 set -euo pipefail
@@ -7,11 +7,13 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 
+"$REPO_DIR/migrate-omacosy.sh"
+
 # --- 0. Manifest: record what THIS machine gains ----------------------------
 # uninstall.sh removes only what is recorded here, so tools and settings
-# the user had before omacosy are never touched. First run wins for
+# the user had before omacchiato are never touched. First run wins for
 # recorded prior values; re-runs never duplicate entries.
-STATE_DIR="$HOME/.local/state/omacosy"
+STATE_DIR="$HOME/.local/state/omacchiato"
 MANIFEST="$STATE_DIR/manifest"
 mkdir -p "$STATE_DIR"
 touch "$MANIFEST"
@@ -26,13 +28,13 @@ export MANIFEST
 # Access, so such clones get COPIES instead (re-run install.sh after
 # editing; manifest-recorded so uninstall removes them). Existing
 # repo-symlinks are grandfathered — they prove this machine's grants
-# already read through. OMACOSY_SYMLINK=1 forces symlinks.
+# already read through. OMACCHIATO_SYMLINK=1 forces symlinks.
 case "$REPO_DIR" in
   "$HOME/Documents"* | "$HOME/Desktop"* | "$HOME/Downloads"*)
-    if [ -n "${OMACOSY_SYMLINK:-}" ]; then LINK_MODE=symlink; else
+    if [ -n "${OMACCHIATO_SYMLINK:-}" ]; then LINK_MODE=symlink; else
       LINK_MODE=copy
       log "Clone sits under a TCC-protected folder — copying configs instead of symlinking."
-      log "(clone to ~/.local/share/omacosy for live-editable symlinks)"
+      log "(clone to ~/.local/share/omacchiato for live-editable symlinks)"
     fi
     ;;
   *) LINK_MODE=symlink ;;
@@ -80,8 +82,8 @@ comm -13 <(printf '%s\n' "$PRE_CASKS") <(brew list --cask 2>/dev/null | sort) \
   | while read -r c; do [ -n "$c" ] && mark "brew-cask $c"; done
 
 log "Checking app versions"
-"$REPO_DIR/bin/omacosy-requirements" ||
-  log "WARNING: an app above is older than omacosy needs; its settings may be rejected."
+"$REPO_DIR/bin/omacchiato-requirements" ||
+  log "WARNING: an app above is older than omacchiato needs; its settings may be rejected."
 
 # --- 2. Symlinks ------------------------------------------------------------
 # Existing non-symlink targets are backed up, never deleted. A
@@ -99,10 +101,11 @@ link() {
     local cur
     cur="$(readlink "$dst")"
     case "$cur" in
-      "$src" | *omacosy*)
+      "$src" | *omacchiato* | *omacosy*)
         # ours. Grandfather it in copy mode: a live repo-symlink
-        # proves this machine's grants read through it.
-        [ "$mode" = copy ] && return
+        # proves this machine's grants read through it. A link into a
+        # clone that moved, or was renamed, points nowhere.
+        [ "$mode" = copy ] && [ -e "$dst" ] && return
         ;;
       *) mark "$(printf 'prior-symlink\t%s\t%s' "$dst" "$cur")" ;;
     esac
@@ -124,8 +127,8 @@ link() {
 #
 # These are READ, not sourced. apps.local.conf is a file the README
 # invites you to paste values into, and `source` would execute whatever
-# is in it. The values then land in ~/.config/omacosy/apps.conf, which
-# omacosy-karabiner-omniwm sources, and inside single-quoted shell
+# is in it. The values then land in ~/.config/omacchiato/apps.conf, which
+# omacchiato-karabiner-omniwm sources, and inside single-quoted shell
 # commands in the Karabiner rules. A name carrying a quote or a newline
 # could close the string and run its own command, so anything outside a
 # plain app name is refused rather than substituted.
@@ -169,7 +172,7 @@ fi
 mkdir -p "$HOME/.config/omniwm"
 [ -e "$HOME/.config/omniwm/settings.toml" ] || cp "$REPO_DIR/config/omniwm/settings.toml" "$HOME/.config/omniwm/settings.toml"
 
-# Add the omacosy keys only to a herdr config with no keys table, so keys
+# Add the omacchiato keys only to a herdr config with no keys table, so keys
 # that the user set stay.
 if command -v herdr >/dev/null 2>&1; then
   HERDR_CFG="$HOME/.config/herdr/config.toml"
@@ -186,11 +189,11 @@ fi
 # configs living under ~/Documents (TCC folder protection) without Full
 # Disk Access. The repo copy is the source of truth on install.
 mkdir -p "$HOME/.config/karabiner"
-# preserve a pre-omacosy karabiner config once, for uninstall to restore
+# preserve a pre-omacchiato karabiner config once, for uninstall to restore
 if [ -f "$HOME/.config/karabiner/karabiner.json" ] \
-  && [ ! -f "$HOME/.config/karabiner/karabiner.json.bak.omacosy" ] \
+  && [ ! -f "$HOME/.config/karabiner/karabiner.json.bak.omacchiato" ] \
   && ! cmp -s "$REPO_DIR/config/karabiner/karabiner.json" "$HOME/.config/karabiner/karabiner.json"; then
-  cp "$HOME/.config/karabiner/karabiner.json" "$HOME/.config/karabiner/karabiner.json.bak.omacosy"
+  cp "$HOME/.config/karabiner/karabiner.json" "$HOME/.config/karabiner/karabiner.json.bak.omacchiato"
   mark "had-karabiner-config"
 fi
 cp "$REPO_DIR/config/karabiner/karabiner.json" "$HOME/.config/karabiner/karabiner.json"
@@ -212,15 +215,15 @@ mkdir -p "$HOME/.local/bin"
 # tiny compiled helper (cursor position, wallpaper) — replaces the
 # cliclick and desktoppr dependencies; swiftc ships with the CLT that
 # Homebrew already requires
-if [ ! -x "$HOME/.local/bin/omacosy-helper" ] || [ "$REPO_DIR/helper/main.swift" -nt "$HOME/.local/bin/omacosy-helper" ]; then
-  log "Building omacosy-helper"
-  swiftc -O -F /System/Library/PrivateFrameworks -framework DisplayServices -o "$HOME/.local/bin/omacosy-helper" "$REPO_DIR/helper/main.swift"
+if [ ! -x "$HOME/.local/bin/omacchiato-helper" ] || [ "$REPO_DIR/helper/main.swift" -nt "$HOME/.local/bin/omacchiato-helper" ]; then
+  log "Building omacchiato-helper"
+  swiftc -O -F /System/Library/PrivateFrameworks -framework DisplayServices -o "$HOME/.local/bin/omacchiato-helper" "$REPO_DIR/helper/main.swift"
 fi
 
 # workspace overview overlay (4-finger swipe up)
-if [ ! -x "$HOME/.local/bin/omacosy-overview" ] || [ "$REPO_DIR/helper/overview.swift" -nt "$HOME/.local/bin/omacosy-overview" ]; then
-  log "Building omacosy-overview"
-  swiftc -O -F /System/Library/PrivateFrameworks -framework SkyLight -o "$HOME/.local/bin/omacosy-overview" "$REPO_DIR/helper/overview.swift"
+if [ ! -x "$HOME/.local/bin/omacchiato-overview" ] || [ "$REPO_DIR/helper/overview.swift" -nt "$HOME/.local/bin/omacchiato-overview" ]; then
+  log "Building omacchiato-overview"
+  swiftc -O -F /System/Library/PrivateFrameworks -framework SkyLight -o "$HOME/.local/bin/omacchiato-overview" "$REPO_DIR/helper/overview.swift"
 fi
 
 
@@ -228,7 +231,7 @@ fi
 # publishers (SkyLight, CoreAudio, IOPS, DisplayServices, SCDynamicStore,
 # IOBluetooth) instead of forking scripts. The embedded Info.plist carries
 # the Bluetooth usage description an unbundled binary otherwise cannot
-# declare, and the agent below sets OMACOSY_MANAGED so it knows it may ask.
+# declare, and the agent below sets OMACCHIATO_MANAGED so it knows it may ask.
 #
 # It ships inside a minimal .app because macOS will not give the wi-fi
 # network name to an unbundled binary: measured on 26.3, a bundled app
@@ -239,12 +242,12 @@ fi
 # the plist is compiled INTO the binary AND copied in as the bundle's
 # Info.plist, so a change to it alone still needs a rebuild — the usage
 # strings live there and a stale binary asks for nothing
-BAR_APP="$HOME/.local/share/omacosy/omacosy-bar.app"
-BAR_BIN="$BAR_APP/Contents/MacOS/omacosy-bar"
+BAR_APP="$HOME/.local/share/omacchiato/omacchiato-bar.app"
+BAR_BIN="$BAR_APP/Contents/MacOS/omacchiato-bar"
 if [ ! -x "$BAR_BIN" ] \
   || [ "$REPO_DIR/helper/bar.swift" -nt "$BAR_BIN" ] \
   || [ "$REPO_DIR/helper/bar-info.plist" -nt "$BAR_BIN" ]; then
-  log "Building omacosy-bar"
+  log "Building omacchiato-bar"
   mkdir -p "$BAR_APP/Contents/MacOS"
   swiftc -O -F /System/Library/PrivateFrameworks -framework SkyLight -framework DisplayServices \
     -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker "$REPO_DIR/helper/bar-info.plist" \
@@ -252,40 +255,12 @@ if [ ! -x "$BAR_BIN" ] \
 fi
 cp "$REPO_DIR/helper/bar-info.plist" "$BAR_APP/Contents/Info.plist"
 mark "built-bar-app"
-rm -f "$HOME/.local/bin/omacosy-bar"   # the pre-bundle binary, if any
+# The dwindle, borders and ffm daemons are gone. migrate-omacosy.sh stops
+# them, and these are the files they left.
+rm -f "$HOME/.config/omacchiato/borders.conf" "$HOME/.config/omacchiato/ffm-ignore"
 
-# omacosy-dwindle is gone. A machine upgrading from an older install
-# still has the daemon and its agent, and leaving it running would join
-# every new window a second time.
-launchctl bootout "gui/$(id -u)/com.omacosy.dwindle" 2>/dev/null || true
-launchctl unload "$HOME/Library/LaunchAgents/com.omacosy.dwindle.plist" 2>/dev/null || true
-rm -f "$HOME/Library/LaunchAgents/com.omacosy.dwindle.plist" "$HOME/.local/bin/omacosy-dwindle"
-
-# omacosy-borders is gone: OmniWM draws the focus border, and theme-set
-# colours it. An older install still runs the daemon, which would draw a
-# second ring.
-launchctl bootout "gui/$(id -u)/com.omacosy.borders" 2>/dev/null || true
-launchctl unload "$HOME/Library/LaunchAgents/com.omacosy.borders.plist" 2>/dev/null || true
-rm -f "$HOME/Library/LaunchAgents/com.omacosy.borders.plist" "$HOME/.local/bin/omacosy-borders" \
-  "$HOME/.config/omacosy/borders.conf"
-
-# omacosy-ffm is gone: OmniWM has its own focus-follows-mouse setting
-# (followsMouse). An older install still has the daemon and its agent.
-launchctl bootout "gui/$(id -u)/com.omacosy.ffm" 2>/dev/null || true
-launchctl unload "$HOME/Library/LaunchAgents/com.omacosy.ffm.plist" 2>/dev/null || true
-rm -f "$HOME/Library/LaunchAgents/com.omacosy.ffm.plist" "$HOME/.local/bin/omacosy-ffm" \
-  "$HOME/.config/omacosy/ffm-ignore"
-
-# The scripts that served only AeroSpace are gone, so an older install's
-# links to them in ~/.local/bin point nowhere. Only links into this repo
-# are removed.
-for t in omacosy-wm-switch omacosy-focus-guard omacosy-layout omacosy-float omacosy-cycle; do
-  case "$(readlink "$HOME/.local/bin/$t" 2>/dev/null)" in
-    "$REPO_DIR"/*) rm -f "$HOME/.local/bin/$t" ;;
-  esac
-done
-# So is its config: the link, the copy in a TCC-protected clone, and
-# the aerospace.toml that an older install.sh generated in the repo.
+# The config of AeroSpace is gone: the link, the copy in a TCC-protected
+# clone, and the aerospace.toml that an older install.sh generated in the repo.
 if [ -L "$HOME/.config/aerospace" ] && [ "$(readlink "$HOME/.config/aerospace")" = "$REPO_DIR/config/aerospace" ]; then
   rm "$HOME/.config/aerospace"
 fi
@@ -301,10 +276,10 @@ rmdir "$REPO_DIR/config/aerospace" 2>/dev/null || true
 # stable code identity so TCC grants survive rebuilds (skipped when no
 # signing identity is present — then re-grant after each rebuild)
 if security find-identity -p codesigning -v 2>/dev/null | grep -q "Apple Development"; then
-  codesign -f -s "Apple Development" --identifier com.omacosy.helper "$HOME/.local/bin/omacosy-helper" 2>/dev/null || true
+  codesign -f -s "Apple Development" --identifier com.omacchiato.helper "$HOME/.local/bin/omacchiato-helper" 2>/dev/null || true
   # the BUNDLE is signed now; the identifier is what grants key on
-  codesign -f -s "Apple Development" --identifier com.omacosy.bar "$BAR_APP" 2>/dev/null || true
-  codesign -f -s "Apple Development" --identifier com.omacosy.overview "$HOME/.local/bin/omacosy-overview" 2>/dev/null || true
+  codesign -f -s "Apple Development" --identifier com.omacchiato.bar "$BAR_APP" 2>/dev/null || true
+  codesign -f -s "Apple Development" --identifier com.omacchiato.overview "$HOME/.local/bin/omacchiato-overview" 2>/dev/null || true
 else
   log "NOTE: no Apple Development signing identity found."
   log "  macOS ties permission grants to the binary's signature — without a"
@@ -313,28 +288,28 @@ else
   log "  System Settings > Privacy & Security. Free fix: Xcode > Settings >"
   log "  Accounts > Manage Certificates > + > Apple Development, then re-run."
 fi
-# (omacosy-gesture is signed in section 5, right after its build —
+# (omacchiato-gesture is signed in section 5, right after its build —
 # the makefile re-signs ad-hoc as part of the build, so signing here
 # would be overwritten and every rebuild would invalidate the
 # Accessibility grant again)
 
-mkdir -p "$HOME/.config/omacosy"
+mkdir -p "$HOME/.config/omacchiato"
 # app choices, RESOLVED (apps.local.conf already applied) and copied: the
 # bar's activity pill launches $TERMINAL and cannot read the repo from a
 # launchd agent when the clone is TCC-protected
 printf 'TERMINAL=%s\nBROWSER=%s\nMUSIC=%s\nMESSENGER=%s\n' \
-  "$TERMINAL" "$BROWSER" "$MUSIC" "$MESSENGER" > "$HOME/.config/omacosy/apps.conf"
+  "$TERMINAL" "$BROWSER" "$MUSIC" "$MESSENGER" > "$HOME/.config/omacchiato/apps.conf"
 
 # after apps.conf, so the injected rules launch the user's chosen apps
-"$REPO_DIR/bin/omacosy-karabiner-omniwm" install \
+"$REPO_DIR/bin/omacchiato-karabiner-omniwm" install \
   || log "WARNING: the OmniWM Karabiner rules did not install. Re-run install.sh."
 
-cat > "$HOME/Library/LaunchAgents/com.omacosy.bar.plist" <<PLIST
+cat > "$HOME/Library/LaunchAgents/com.omacchiato.bar.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key><string>com.omacosy.bar</string>
+  <key>Label</key><string>com.omacchiato.bar</string>
   <key>ProgramArguments</key><array><string>$BAR_BIN</string></array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
@@ -342,28 +317,28 @@ cat > "$HOME/Library/LaunchAgents/com.omacosy.bar.plist" <<PLIST
        shell the bar would be killed outright for asking. Under launchd it
        is responsible for itself and may prompt, and this marker is how it
        knows the difference. -->
-  <key>EnvironmentVariables</key><dict><key>OMACOSY_MANAGED</key><string>1</string></dict>
-  <key>StandardErrorPath</key><string>/tmp/omacosy-bar.err</string>
+  <key>EnvironmentVariables</key><dict><key>OMACCHIATO_MANAGED</key><string>1</string></dict>
+  <key>StandardErrorPath</key><string>/tmp/omacchiato-bar.err</string>
 </dict>
 </plist>
 PLIST
-launchctl unload "$HOME/Library/LaunchAgents/com.omacosy.bar.plist" 2>/dev/null || true
-launchctl load "$HOME/Library/LaunchAgents/com.omacosy.bar.plist"
+launchctl unload "$HOME/Library/LaunchAgents/com.omacchiato.bar.plist" 2>/dev/null || true
+launchctl load "$HOME/Library/LaunchAgents/com.omacchiato.bar.plist"
 link "$REPO_DIR/bin/theme-set"  "$HOME/.local/bin/theme-set"
 link "$REPO_DIR/bin/theme-next" "$HOME/.local/bin/theme-next"
 link "$REPO_DIR/bin/theme-bg-next" "$HOME/.local/bin/theme-bg-next"
-link "$REPO_DIR/bin/omacosy-toggle" "$HOME/.local/bin/omacosy-toggle"
-link "$REPO_DIR/bin/omacosy-claude-usage" "$HOME/.local/bin/omacosy-claude-usage"
-link "$REPO_DIR/bin/omacosy-github-prs" "$HOME/.local/bin/omacosy-github-prs"
-link "$REPO_DIR/bin/omacosy-keep-awake" "$HOME/.local/bin/omacosy-keep-awake"
-link "$REPO_DIR/bin/omacosy-ws" "$HOME/.local/bin/omacosy-ws"
-link "$REPO_DIR/bin/omacosy-ws-collapse" "$HOME/.local/bin/omacosy-ws-collapse"
-link "$REPO_DIR/bin/omacosy-update" "$HOME/.local/bin/omacosy-update"
-link "$REPO_DIR/bin/omacosy-spawn" "$HOME/.local/bin/omacosy-spawn"
-link "$REPO_DIR/bin/omacosy-karabiner-omniwm" "$HOME/.local/bin/omacosy-karabiner-omniwm"
-link "$REPO_DIR/bin/omacosy-omniwmctl" "$HOME/.local/bin/omacosy-omniwmctl"
-link "$REPO_DIR/bin/omacosy-herdr-worktree" "$HOME/.local/bin/omacosy-herdr-worktree"
-link "$REPO_DIR/bin/omacosy-popup" "$HOME/.local/bin/omacosy-popup"
+link "$REPO_DIR/bin/omacchiato-toggle" "$HOME/.local/bin/omacchiato-toggle"
+link "$REPO_DIR/bin/omacchiato-claude-usage" "$HOME/.local/bin/omacchiato-claude-usage"
+link "$REPO_DIR/bin/omacchiato-github-prs" "$HOME/.local/bin/omacchiato-github-prs"
+link "$REPO_DIR/bin/omacchiato-keep-awake" "$HOME/.local/bin/omacchiato-keep-awake"
+link "$REPO_DIR/bin/omacchiato-ws" "$HOME/.local/bin/omacchiato-ws"
+link "$REPO_DIR/bin/omacchiato-ws-collapse" "$HOME/.local/bin/omacchiato-ws-collapse"
+link "$REPO_DIR/bin/omacchiato-update" "$HOME/.local/bin/omacchiato-update"
+link "$REPO_DIR/bin/omacchiato-spawn" "$HOME/.local/bin/omacchiato-spawn"
+link "$REPO_DIR/bin/omacchiato-karabiner-omniwm" "$HOME/.local/bin/omacchiato-karabiner-omniwm"
+link "$REPO_DIR/bin/omacchiato-omniwmctl" "$HOME/.local/bin/omacchiato-omniwmctl"
+link "$REPO_DIR/bin/omacchiato-herdr-worktree" "$HOME/.local/bin/omacchiato-herdr-worktree"
+link "$REPO_DIR/bin/omacchiato-popup" "$HOME/.local/bin/omacchiato-popup"
 
 # tokscale, for the Claude pill's last seven days. Homebrew has no formula, so
 # take the macOS binary from tokscale's npm package, pinned by version and
@@ -406,11 +381,11 @@ mkdir -p "$HOME/.config/omarchy/current"
 link "$HOME/.config/omarchy" "$HOME/Library/Application Support/omarchy"
 
 if [ ! -e "$HOME/.config/omarchy/current/theme" ]; then
-  # record the pre-omacosy wallpaper per screen (once) so uninstall can
+  # record the pre-omacchiato wallpaper per screen (once) so uninstall can
   # put it back — theme-set is about to overwrite every display
   if ! grep -q '^wallpaper	' "$MANIFEST" 2>/dev/null; then
     i=0
-    "$HOME/.local/bin/omacosy-helper" wallpaper get 2>/dev/null | while IFS= read -r wp; do
+    "$HOME/.local/bin/omacchiato-helper" wallpaper get 2>/dev/null | while IFS= read -r wp; do
       [ -n "$wp" ] && printf 'wallpaper\t%s\t%s\n' "$i" "$wp" >> "$MANIFEST"
       i=$((i + 1))
     done
@@ -438,16 +413,16 @@ elif [ -d "/Applications/Korren.app" ]; then
   log "Created Korren config (theme follows omarchy)"
 fi
 
-# --- 5. Trackpad gestures (omacosy-gesture) ---------------------------------
+# --- 5. Trackpad gestures (omacchiato-gesture) ---------------------------------
 # The gesture engine — absorbed from aerospace-swipe (MIT, notice kept in
-# helper/gesture/LICENSE.aerospace-swipe) with every omacosy fix folded
+# helper/gesture/LICENSE.aerospace-swipe) with every omacchiato fix folded
 # in — runs as a user launch agent. OmniWM owns the horizontal swipes,
 # so this daemon keeps the vertical ones for the overview. Config is
 # COPIED (launch agents can't read ~/Documents — TCC).
-GESTURE_APP="$HOME/.local/share/omacosy/omacosy-gesture.app"
-GESTURE_BIN="$GESTURE_APP/Contents/MacOS/omacosy-gesture"
-mkdir -p "$HOME/.config/omacosy"
-cp "$REPO_DIR/config/gesture/config.json" "$HOME/.config/omacosy/gesture.json"
+GESTURE_APP="$HOME/.local/share/omacchiato/omacchiato-gesture.app"
+GESTURE_BIN="$GESTURE_APP/Contents/MacOS/omacchiato-gesture"
+mkdir -p "$HOME/.config/omacchiato"
+cp "$REPO_DIR/config/gesture/config.json" "$HOME/.config/omacchiato/gesture.json"
 # the aerospace-swipe era: retire its agent, and its clone if it was ours
 if [ -f "$HOME/Library/LaunchAgents/com.acsandmann.swipe.plist" ]; then
   launchctl unload "$HOME/Library/LaunchAgents/com.acsandmann.swipe.plist" 2>/dev/null || true
@@ -462,21 +437,21 @@ fi
 # so every rebuild means dead swipes until the user re-grants. The only
 # safe rebuild is the one that does not happen: skip the whole block
 # unless the binary is missing or a source file actually changed.
-# omacosy-omni: the scripts' held-socket client for OmniWM (plain C,
+# omacchiato-omni: the scripts' held-socket client for OmniWM (plain C,
 # ~3 ms launch; no grants involved, so it is simply rebuilt when stale)
 G="$REPO_DIR/helper/gesture"
-if [ ! -x "$HOME/.local/bin/omacosy-omni" ] || find "$G/omniwm.c" "$G/omniwm.h" "$G/omnicli.c" "$G/yyjson.c" "$G/yyjson.h" -newer "$HOME/.local/bin/omacosy-omni" 2>/dev/null | grep -q .; then
+if [ ! -x "$HOME/.local/bin/omacchiato-omni" ] || find "$G/omniwm.c" "$G/omniwm.h" "$G/omnicli.c" "$G/yyjson.c" "$G/yyjson.h" -newer "$HOME/.local/bin/omacchiato-omni" 2>/dev/null | grep -q .; then
   # C11 lets yyjson.h and omniwm.h both declare the yyjson typedefs
-  clang -std=c11 -O2 -arch arm64 -o "$HOME/.local/bin/omacosy-omni" "$G/omniwm.c" "$G/yyjson.c" "$G/omnicli.c" -framework ApplicationServices -framework CoreFoundation \
-    || echo "omacosy-omni build failed"
+  clang -std=c11 -O2 -arch arm64 -o "$HOME/.local/bin/omacchiato-omni" "$G/omniwm.c" "$G/yyjson.c" "$G/omnicli.c" -framework ApplicationServices -framework CoreFoundation \
+    || echo "omacchiato-omni build failed"
 fi
 GESTURE_STALE=""
 if [ ! -x "$GESTURE_BIN" ]; then GESTURE_STALE=1
 elif find "$REPO_DIR/helper/gesture" -newer "$GESTURE_BIN" 2>/dev/null | grep -q .; then GESTURE_STALE=1
 fi
 if [ -n "$GESTURE_STALE" ]; then
-  log "Building omacosy-gesture (grant Accessibility + Input Monitoring when prompted)"
-  launchctl unload "$HOME/Library/LaunchAgents/com.omacosy.gesture.plist" 2>/dev/null || true
+  log "Building omacchiato-gesture (grant Accessibility + Input Monitoring when prompted)"
+  launchctl unload "$HOME/Library/LaunchAgents/com.omacchiato.gesture.plist" 2>/dev/null || true
   G="$REPO_DIR/helper/gesture"
   mkdir -p "$GESTURE_APP/Contents/MacOS"
   clang -std=c11 -O3 -fobjc-arc -arch arm64 \
@@ -484,41 +459,41 @@ if [ -n "$GESTURE_STALE" ]; then
     -o "$GESTURE_BIN" "$G/omniwm.c" "$G/yyjson.c" "$G/haptic.c" "$G/event_tap.m" "$G/main.m" \
     -framework CoreFoundation -framework IOKit -F/System/Library/PrivateFrameworks -framework MultitouchSupport \
     -framework ApplicationServices -framework Cocoa -ldl \
-    || echo "omacosy-gesture build failed"
+    || echo "omacchiato-gesture build failed"
   cp "$G/gesture-info.plist" "$GESTURE_APP/Contents/Info.plist"
   echo "APPL????" > "$GESTURE_APP/Contents/PkgInfo"
   # sign BEFORE anything launches: the only binary launchd ever starts
   # is the one the user grants
   if security find-identity -p codesigning -v 2>/dev/null | grep -q "Apple Development"; then
-    codesign -f -s "Apple Development" --identifier com.omacosy.gesture \
+    codesign -f -s "Apple Development" --identifier com.omacchiato.gesture \
       --entitlements "$G/accessibility.entitlements" "$GESTURE_APP" 2>/dev/null || true
   else
     codesign -f --entitlements "$G/accessibility.entitlements" --sign - "$GESTURE_APP" 2>/dev/null || true
   fi
 fi
-cat > "$HOME/Library/LaunchAgents/com.omacosy.gesture.plist" <<PLIST
+cat > "$HOME/Library/LaunchAgents/com.omacchiato.gesture.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-  <key>Label</key><string>com.omacosy.gesture</string>
+  <key>Label</key><string>com.omacchiato.gesture</string>
   <key>ProgramArguments</key><array><string>$GESTURE_BIN</string></array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
   <key>LimitLoadToSessionType</key><string>Aqua</string>
   <key>ProcessType</key><string>Interactive</string>
-  <key>StandardOutPath</key><string>/tmp/omacosy-gesture.log</string>
-  <key>StandardErrorPath</key><string>/tmp/omacosy-gesture.log</string>
+  <key>StandardOutPath</key><string>/tmp/omacchiato-gesture.log</string>
+  <key>StandardErrorPath</key><string>/tmp/omacchiato-gesture.log</string>
 </dict></plist>
 PLIST
-launchctl unload "$HOME/Library/LaunchAgents/com.omacosy.gesture.plist" 2>/dev/null || true
-launchctl load "$HOME/Library/LaunchAgents/com.omacosy.gesture.plist" 2>/dev/null || true
+launchctl unload "$HOME/Library/LaunchAgents/com.omacchiato.gesture.plist" 2>/dev/null || true
+launchctl load "$HOME/Library/LaunchAgents/com.omacchiato.gesture.plist" 2>/dev/null || true
 # a rebuild strands the daemon in its permission-wait loop with no
 # visible symptom but dead swipes — check and say so out loud
 sleep 2
-if tail -5 /tmp/omacosy-gesture.log 2>/dev/null | grep -q "Waiting for accessibility"; then
-  log "WARNING: omacosy-gesture is waiting for its Accessibility grant"
+if tail -5 /tmp/omacchiato-gesture.log 2>/dev/null | grep -q "Waiting for accessibility"; then
+  log "WARNING: omacchiato-gesture is waiting for its Accessibility grant"
   log "  (a rebuild makes macOS treat it as a new app — this is a macOS rule, not a bug)."
-  log "  Fix: System Settings -> Privacy & Security -> Accessibility -> toggle omacosy-gesture"
+  log "  Fix: System Settings -> Privacy & Security -> Accessibility -> toggle omacchiato-gesture"
 fi
 
 # --- 6. macOS look ----------------------------------------------------------

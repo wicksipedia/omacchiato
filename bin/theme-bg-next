@@ -3,21 +3,21 @@
 # omarchy-theme-bg-next for macOS. With a path argument, set exactly
 # that image instead of cycling.
 #
-# The chosen background is remembered as a symlink in the omacosy state
+# The chosen background is remembered as a symlink in the omacchiato state
 # dir (NOT /tmp — macOS purges idle /tmp files after ~3 days), so the
 # cycle continues where it left off. theme-set repoints the link when
 # the theme changes.
 set -euo pipefail
 
 CURRENT_THEME="$HOME/.config/omarchy/current/theme"
-STATE_DIR="$HOME/.local/state/omacosy"
+STATE_DIR="$HOME/.local/state/omacchiato"
 LINK="$STATE_DIR/background"
 mkdir -p "$STATE_DIR"
 
 set_bg() {
   ln -nsf "$1" "$LINK"
-  if [ -x "$HOME/.local/bin/omacosy-helper" ]; then
-    "$HOME/.local/bin/omacosy-helper" wallpaper "$1" >/dev/null 2>&1 || true
+  if [ -x "$HOME/.local/bin/omacchiato-helper" ]; then
+    "$HOME/.local/bin/omacchiato-helper" wallpaper "$1" >/dev/null 2>&1 || true
   else
     # argument, not spliced text — a theme is third-party content and a
     # crafted filename could otherwise close the AppleScript string

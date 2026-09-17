@@ -1,7 +1,7 @@
-// omacosy-gesture — the trackpad gesture engine.
+// omacchiato-gesture — the trackpad gesture engine.
 //
 // Absorbed from acsandmann/aerospace-swipe (MIT, notice kept in
-// LICENSE.aerospace-swipe) on 2026-08-28, with omacosy's accumulated
+// LICENSE.aerospace-swipe) on 2026-08-28, with omacchiato's accumulated
 // fixes folded in: raw MultitouchSupport frames (macOS 26.3 stopped
 // carrying multi-touch data in CGEvent taps), wake re-registration,
 // per-direction command overrides, and shell execution for any
@@ -161,7 +161,7 @@ static void switch_workspace(const char* ws)
 			haptic_actuate(g_haptic, 3);
 		return;
 	}
-	// omacosy: a direction that looks like a COMMAND is run like the
+	// omacchiato: a direction that looks like a COMMAND is run like the
 	// vertical gestures are, so horizontal swipes can route through
 	// omniwmctl and keep this engine's tuned mid-gesture thresholds
 	// (OmniWM's own swipe commits late and cannot be tuned). Called
@@ -187,7 +187,7 @@ static void reset_gesture_state(gesture_ctx* ctx)
 static bool overlay_active(void)
 {
 	char path[128];
-	snprintf(path, sizeof path, "/tmp/omacosy-overlay-active-%d", getuid());
+	snprintf(path, sizeof path, "/tmp/omacchiato-overlay-active-%d", getuid());
 	FILE* f = fopen(path, "r");
 	if (!f)
 		return false;
@@ -225,7 +225,7 @@ static void fire_gesture(gesture_ctx* ctx, int direction)
 	static dispatch_queue_t switch_q;
 	static dispatch_once_t once;
 	dispatch_once(&once, ^{
-		switch_q = dispatch_queue_create("com.omacosy.gesture.switch", DISPATCH_QUEUE_SERIAL);
+		switch_q = dispatch_queue_create("com.omacchiato.gesture.switch", DISPATCH_QUEUE_SERIAL);
 	});
 	dispatch_async(switch_q, ^{
 		switch_workspace(direction > 0 ? g_config.swipe_right : g_config.swipe_left);
@@ -586,7 +586,7 @@ static void acquire_lockfile(void)
 		printf("Error: User variable not set.\n"), exit(1);
 
 	char buffer[256];
-	snprintf(buffer, 256, "/tmp/omacosy-gesture-%s.lock", user);
+	snprintf(buffer, 256, "/tmp/omacchiato-gesture-%s.lock", user);
 
 	int handle = open(buffer, O_CREAT | O_WRONLY, 0600);
 	if (handle == -1) {
@@ -603,7 +603,7 @@ static void acquire_lockfile(void)
 	};
 
 	if (fcntl(handle, F_SETLK, &lockfd) == -1) {
-		printf("Error: Could not acquire lock-file.\nomacosy-gesture already running?\n");
+		printf("Error: Could not acquire lock-file.\nomacchiato-gesture already running?\n");
 		exit(1);
 	}
 }

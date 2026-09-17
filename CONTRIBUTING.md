@@ -1,4 +1,4 @@
-# Contributing to omacosy
+# Contributing to Omacchiato
 
 Small repo, strong opinions. PRs are welcome when they keep these.
 
@@ -45,7 +45,7 @@ Small repo, strong opinions. PRs are welcome when they keep these.
   work (CLI spawns, AX calls) stays off the event/main thread, and AX
   calls carry a messaging timeout.
 - **install.sh is idempotent and manifest-honest.** Anything it adds
-  to the machine is recorded in `~/.local/state/omacosy/manifest`;
+  to the machine is recorded in `~/.local/state/omacchiato/manifest`;
   uninstall.sh removes exactly that and nothing the user had before.
   Backups are never deleted, displaced symlinks are recorded and
   restored.
@@ -58,7 +58,7 @@ Small repo, strong opinions. PRs are welcome when they keep these.
 
 - Test on stock bash: `bash -n` is the floor, `/bin/bash script.sh`
   is the truth.
-- The debug story is `/tmp/omacosy-*.log` — daemons `tlog` there.
+- The debug story is `/tmp/omacchiato-*.log` — daemons `tlog` there.
   Keep it that way; it is what bug reports run on.
 - Theme packs are the easiest contribution: copy a directory under
   `themes/`, provide `colors.toml`, `sketchybar.sh` (the bar reads its

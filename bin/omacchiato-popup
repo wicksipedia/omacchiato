@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# omacosy-popup [item [display]] — open a bar item's popup, as a click on the
+# omacchiato-popup [item [display]] — open a bar item's popup, as a click on the
 # item does, and close it when the same item comes again. item is a pill name
 # (weather, wifi, bluetooth, brightness, mic, volume, battery, clock, activity,
 # menubar, a plugin pill's name), apple or appmenu. display is its name as
 # macOS shows it, such as "DELL U2722D (1)"; without one, the display under the
 # pointer. With no item, it closes the open popup.
-printf '%s\n' "$*" > /tmp/omacosy-bar-popup
+printf '%s\n' "$*" > /tmp/omacchiato-bar-popup

@@ -1,4 +1,4 @@
-// omacosy-bar — a native bar surface, in ONE process.
+// omacchiato-bar — a native bar surface, in ONE process.
 //
 // SLICE: workspace chips + front-app pill, on the built-in display only,
 // drawn over sketchybar's own bar so the two can be watched side by side
@@ -15,7 +15,7 @@
 // draw one frame. The slow path (which windows exist, where) runs only
 // on window create/destroy, off the critical path.
 //
-// Timings land in /tmp/omacosy-bar.log as `switch <ws> <ms>`.
+// Timings land in /tmp/omacchiato-bar.log as `switch <ws> <ms>`.
 //
 // The right cluster is the same eight pills the bar already carries, but
 // reading their sources directly instead of forking a script that forks
@@ -36,7 +36,7 @@ import SystemConfiguration
 import UniformTypeIdentifiers
 
 // DisplayServices (private) — the same calls Control Center makes, and
-// the same ones helper/main.swift uses for `omacosy-helper brightness`.
+// the same ones helper/main.swift uses for `omacchiato-helper brightness`.
 @_silgen_name("DisplayServicesGetBrightness")
 func DSGetBrightness(_ display: CGDirectDisplayID, _ value: UnsafeMutablePointer<Float>) -> Int32
 @_silgen_name("DisplayServicesSetBrightness")
@@ -97,7 +97,7 @@ func omniwmActive() -> Bool {
 }
 
 // the wrapper finds omniwmctl in the Homebrew link, the release app or a dev build
-let omniwmctlBin = NSHomeDirectory() + "/.local/bin/omacosy-omniwmctl"
+let omniwmctlBin = NSHomeDirectory() + "/.local/bin/omacchiato-omniwmctl"
 
 @discardableResult
 func omniwmctl(_ args: [String]) -> String { shell(omniwmctlBin, args) }
@@ -120,11 +120,11 @@ func shellOut(_ bin: String, _ args: [String]) -> String {
 // IPCResponse envelope; everything the bar wants lives two levels down
 // at result.payload (OmniWM docs/IPC-CLI.md, "Response Format").
 func omniQuery(_ name: String, _ args: [String] = []) -> [String: Any]? {
-    // fast path: omacosy-omni holds a persistent socket and launches in
+    // fast path: omacchiato-omni holds a persistent socket and launches in
     // ~3 ms where omniwmctl (Swift) needs ~10; it speaks `query <name>
     // [fields-csv]` and prints the same envelope. Anything fancier
     // (selector flags like --focused) stays on omniwmctl.
-    let omni = "\(NSHomeDirectory())/.local/bin/omacosy-omni"
+    let omni = "\(NSHomeDirectory())/.local/bin/omacchiato-omni"
     var out = ""
     if FileManager.default.isExecutableFile(atPath: omni),
        args.isEmpty || (args.count == 2 && args[0] == "--fields") {
@@ -148,7 +148,7 @@ func focusWorkspace(_ ws: String) {
     omniwmctl(["workspace", "focus-name", ws])
 }
 
-let logURL = URL(fileURLWithPath: "/tmp/omacosy-bar.log")
+let logURL = URL(fileURLWithPath: "/tmp/omacchiato-bar.log")
 func tlog(_ m: String) {
     let line = "\(Date()) \(m)\n"
     if let h = try? FileHandle(forWritingTo: logURL) {
@@ -212,7 +212,7 @@ private struct WorkspaceIconConfig {
 
 private func loadWorkspaceIconConfig() -> WorkspaceIconConfig {
     let file = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".config/omacosy/workspace-icons.conf")
+        .appendingPathComponent(".config/omacchiato/workspace-icons.conf")
     guard FileManager.default.fileExists(atPath: file.path) else {
         return WorkspaceIconConfig(values: [:])
     }
@@ -390,7 +390,7 @@ struct Snapshot {
     var focused = ""
 }
 
-let rebuildQueue = DispatchQueue(label: "com.omacosy.bar.rebuild")
+let rebuildQueue = DispatchQueue(label: "com.omacchiato.bar.rebuild")
 
 // with no window manager the snapshot is empty, and the bar draws no chips
 func fetchSnapshot() -> Snapshot {
@@ -416,7 +416,7 @@ func omniwmSnapshot() -> Snapshot {
     }
     // visible/focused come from the DISPLAYS query: the workspaces
     // query's isVisible/isFocused go dark on EMPTY workspaces (the
-    // same trap omacosy-ws hit), and the pill for a focused empty 8/9
+    // same trap omacchiato-ws hit), and the pill for a focused empty 8/9
     // never lit up
     if let displays = omniQuery("displays", [])?["displays"] as? [[String: Any]] {
         for d in displays {
@@ -612,10 +612,10 @@ struct BarItem: Equatable {
 // screen order, left to right
 let rightOrderAll = ["weather", "wifi", "bluetooth", "brightness", "mic", "volume", "battery", "clock", "activity"]
 
-// `<key> = <value>` lines in ~/.config/omacosy/<name>
+// `<key> = <value>` lines in ~/.config/omacchiato/<name>
 func readConf(_ name: String) -> [String: String] {
     let file = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".config/omacosy/\(name)")
+        .appendingPathComponent(".config/omacchiato/\(name)")
     guard let text = try? String(contentsOf: file, encoding: .utf8) else { return [:] }
     var pairs: [String: String] = [:]
     for raw in text.split(separator: "\n") {
@@ -631,7 +631,7 @@ func readConf(_ name: String) -> [String: String] {
 // `<pill> = hide` or `<pill> = icon` per line. Read once at startup.
 let pillModes = readConf("bar-pills.conf")
 
-// A pill defined in ~/.config/omacosy/bar-plugins.conf: an INI section
+// A pill defined in ~/.config/omacchiato/bar-plugins.conf: an INI section
 // per pill, with a shell command whose stdout becomes the label. This is
 // the escape hatch from rebuilding for every new widget.
 struct BarPlugin {
@@ -644,7 +644,7 @@ struct BarPlugin {
 
 let barPlugins: [BarPlugin] = {
     let file = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".config/omacosy/bar-plugins.conf")
+        .appendingPathComponent(".config/omacchiato/bar-plugins.conf")
     guard let text = try? String(contentsOf: file, encoding: .utf8) else { return [] }
     var found: [BarPlugin] = []
     var current: BarPlugin?
@@ -754,7 +754,7 @@ func pluginPopupRows(_ raw: [[String: Any]]) -> [PopupRow] {
             action = {
                 DispatchQueue.global(qos: .userInitiated).async {
                     _ = shell("/usr/bin/open", ["-na", terminalApp, "--args",
-                                                "--title=omacosy-plugin", "--command=\(command)"])
+                                                "--title=omacchiato-plugin", "--command=\(command)"])
                 }
             }
         }
@@ -780,7 +780,7 @@ func pluginEnv(_ plugin: BarPlugin) -> [String: String] {
         + (env["PATH"] ?? "/usr/bin:/bin")
     // the configured icon, so a command can decorate it rather than
     // having to hardcode the glyph its own config already names
-    env["OMACOSY_PILL_ICON"] = plugin.icon
+    env["OMACCHIATO_PILL_ICON"] = plugin.icon
     return env
 }
 
@@ -1024,7 +1024,7 @@ func writeVolume(_ percent: Int) {
 }
 
 // the output devices the volume popup lists — the same enumeration
-// helper/main.swift does for `omacosy-helper audio`, without the round trip
+// helper/main.swift does for `omacchiato-helper audio`, without the round trip
 func audioOutputDevices() -> [(id: AudioDeviceID, name: String)] {
     var addr = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDevices,
                                           mScope: kAudioObjectPropertyScopeGlobal,
@@ -1110,7 +1110,7 @@ func updateVolume() {
 //
 // Bonus: unlike DisplayServices this reaches EXTERNAL displays, which have
 // no backlight API without DDC.
-let shadeFile = "\(NSHomeDirectory())/.local/state/omacosy/shade"
+let shadeFile = "\(NSHomeDirectory())/.local/state/omacchiato/shade"
 let shadeFloor: Double = 0.15 // never darker than this fraction of output
 
 var shade: Double = {
@@ -1183,7 +1183,7 @@ func updateBrightness() {
 // launchd-started bar may prompt and running it by hand stays quiet.
 final class LocationGate: NSObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
-    private var managed: Bool { ProcessInfo.processInfo.environment["OMACOSY_MANAGED"] != nil }
+    private var managed: Bool { ProcessInfo.processInfo.environment["OMACCHIATO_MANAGED"] != nil }
 
     func start() {
         manager.delegate = self
@@ -1211,7 +1211,7 @@ final class LocationGate: NSObject, CLLocationManagerDelegate {
 let locationGate = LocationGate()
 
 // --- night shift (CBBlueLightClient publishes) ---------------------------
-// Private CoreBrightness, reached by reflection the way omacosy-helper
+// Private CoreBrightness, reached by reflection the way omacchiato-helper
 // reaches it. It has a publisher: setStatusNotificationBlock fires on
 // every change whoever made it — the schedule, Control Center, System
 // Settings, us. The popup used to cache what one subprocess printed
@@ -1337,9 +1337,9 @@ final class BluetoothWatcher: NSObject, CBCentralManagerDelegate {
     // shell the whole process is killed (SIGABRT, exit 134, no report),
     // embedded Info.plist and signature notwithstanding. Under launchd it
     // is responsible for itself and may prompt — which is the only reason
-    // watcher.swift could. The plist sets OMACOSY_MANAGED so that running
+    // watcher.swift could. The plist sets OMACCHIATO_MANAGED so that running
     // this by hand for a test stays safe instead of dying.
-    private var managed: Bool { ProcessInfo.processInfo.environment["OMACOSY_MANAGED"] != nil }
+    private var managed: Bool { ProcessInfo.processInfo.environment["OMACCHIATO_MANAGED"] != nil }
 
     func start() {
         switch CBCentralManager.authorization {
@@ -1912,7 +1912,7 @@ func volumeRows() -> [PopupRow] {
                      updateVolume()
                  }),
     ]
-    // output devices, current one marked — the same list `omacosy-helper
+    // output devices, current one marked — the same list `omacchiato-helper
     // audio` offers, read here without the round trip
     let current = defaultOutputDevice()
     for device in audioOutputDevices() {
@@ -1936,7 +1936,7 @@ func volumeRows() -> [PopupRow] {
 // the one number you actually want when the network misbehaves, was
 // never shown at all.
 func wifiIPv4() -> (ip: String, router: String) {
-    guard let store = SCDynamicStoreCreate(nil, "omacosy-bar-ipv4" as CFString, nil, nil)
+    guard let store = SCDynamicStoreCreate(nil, "omacchiato-bar-ipv4" as CFString, nil, nil)
     else { return ("", "") }
     let global = SCDynamicStoreCopyValue(store, "State:/Network/Global/IPv4" as CFString)
         as? [String: Any]
@@ -2126,7 +2126,7 @@ func weatherRows() -> [PopupRow] {
 }
 
 // The system menu the hidden native menu bar used to carry, plus the two
-// omacosy actions. "Reload Bar" has no counterpart here on purpose: there
+// omacchiato actions. "Reload Bar" has no counterpart here on purpose: there
 // is no config to re-read, the theme is watched, and a row that did
 // nothing would be worse than a row that is absent.
 func appleRows() -> [PopupRow] {
@@ -2149,7 +2149,7 @@ func appleRows() -> [PopupRow] {
         // pmset displaysleepnow only darkens the panel — whether that
         // locks depends on the screenLock delay, so it usually did not
         PopupRow(text: "Lock Screen",
-                 action: run("\(NSHomeDirectory())/.local/bin/omacosy-helper", ["lock"])),
+                 action: run("\(NSHomeDirectory())/.local/bin/omacchiato-helper", ["lock"])),
         PopupRow(text: "Sleep", action: run("/usr/bin/pmset", ["sleepnow"])),
         PopupRow(text: "Restart…", action: systemEvents("restart")),
         PopupRow(text: "Shut Down…", action: systemEvents("shut down")),
@@ -2322,7 +2322,7 @@ func showMenuBar() {
 func menuBarAppRows() -> [PopupRow] {
     let opts = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
     guard AXIsProcessTrustedWithOptions(opts) else {
-        return [PopupRow(text: "grant Accessibility to omacosy-bar", hero: true),
+        return [PopupRow(text: "grant Accessibility to omacchiato-bar", hero: true),
                 PopupRow(text: "System Settings opened the pane — toggle the bar on,", dim: true),
                 PopupRow(text: "then click the pill again", dim: true)]
     }
@@ -2493,7 +2493,7 @@ func frontAppAXMenuBar() -> AXUIElement? {
 
 // The REAL Apple menu — child 0 of the front app's menu bar, the item
 // the app drill-down skips — through the same drill machinery, with
-// omacosy's own extras appended. Falls back to the hand-rolled rows
+// omacchiato's own extras appended. Falls back to the hand-rolled rows
 // when Accessibility is not granted or AX has nothing.
 func appleMenuRows() -> [PopupRow] {
     guard AXIsProcessTrusted(),
@@ -2518,7 +2518,7 @@ func appleMenuRows() -> [PopupRow] {
 func appMenuRows() -> [PopupRow] {
     let opts = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
     guard AXIsProcessTrustedWithOptions(opts) else {
-        return [PopupRow(text: "grant Accessibility to omacosy-bar", hero: true),
+        return [PopupRow(text: "grant Accessibility to omacchiato-bar", hero: true),
                 PopupRow(text: "System Settings opened the pane — toggle the bar on,", dim: true),
                 PopupRow(text: "then click the app name again", dim: true)]
     }
@@ -2558,7 +2558,7 @@ extension String {
 }
 
 // --- cheatsheet (Super+K) --------------------------------------------------
-// Rendered from the LIVE config — OmniWM's settings.toml and omacosy's
+// Rendered from the LIVE config — OmniWM's settings.toml and omacchiato's
 // Karabiner rules — never from a list kept here: a cheatsheet that can
 // disagree with the keys is worse than no cheatsheet. The config's own
 // section comments become the headings, so the grouping is the author's
@@ -2710,7 +2710,7 @@ func omniwmCheatEntries() -> [CheatEntry] {
     return entries
 }
 
-// "omacosy-omniwm: terminal" rules out of karabiner.json — description
+// "omacchiato-omniwm: terminal" rules out of karabiner.json — description
 // carries the action, from.key_code + modifiers carry the chord
 func karabinerExecCheatEntries() -> [CheatEntry] {
     let path = "\(NSHomeDirectory())/.config/karabiner/karabiner.json"
@@ -2724,7 +2724,7 @@ func karabinerExecCheatEntries() -> [CheatEntry] {
             let rules = cm["rules"] as? [[String: Any]] else { continue }
         for rule in rules {
             guard let desc = rule["description"] as? String,
-                desc.hasPrefix("omacosy-omniwm: "),
+                desc.hasPrefix("omacchiato-omniwm: "),
                 let manips = rule["manipulators"] as? [[String: Any]],
                 let from = manips.first?["from"] as? [String: Any],
                 let keyCode = from["key_code"] as? String else { continue }
@@ -2734,7 +2734,7 @@ func karabinerExecCheatEntries() -> [CheatEntry] {
                 : keyCode == "spacebar" ? "Space" : keyCode.uppercased()
             let chord = "Super+" + (hasShift ? "Shift+" : "") + key
             entries.append(CheatEntry(group: "Apps and system (Karabiner)",
-                key: chord, action: String(desc.dropFirst("omacosy-omniwm: ".count))))
+                key: chord, action: String(desc.dropFirst("omacchiato-omniwm: ".count))))
         }
     }
     return entries
@@ -3068,7 +3068,7 @@ let btopBin = ["/opt/homebrew/bin/btop", "/usr/local/bin/btop"]
 
 let terminalApp: String = {
     let config = URL(fileURLWithPath: NSHomeDirectory())
-        .appendingPathComponent(".config/omacosy/apps.conf")
+        .appendingPathComponent(".config/omacchiato/apps.conf")
     guard let text = try? String(contentsOf: config, encoding: .utf8) else { return "Ghostty" }
     for line in text.split(separator: "\n") where line.hasPrefix("TERMINAL=") {
         return line.dropFirst("TERMINAL=".count)
@@ -3350,7 +3350,7 @@ final class BarView: NSView {
 
     var appPillRect = NSRect.zero
 
-    // A click on an item and omacosy-popup both open its popup through here.
+    // A click on an item and omacchiato-popup both open its popup through here.
     func showItemPopup(_ name: String) {
         guard let surface else { return }
         switch name {
@@ -3407,7 +3407,7 @@ final class BarView: NSView {
         switch name {
         case "activity":
             DispatchQueue.global(qos: .userInitiated).async {
-                _ = shell("/usr/bin/open", ["-na", terminalApp, "--args", "--title=omacosy-activity", "--command=\(btopBin)"])
+                _ = shell("/usr/bin/open", ["-na", terminalApp, "--args", "--title=omacchiato-activity", "--command=\(btopBin)"])
             }
         default:
             // a plugin pill: clicking asks for a fresh value now
@@ -3463,7 +3463,7 @@ final class BarWindow: NSWindow {
     override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect { frameRect }
 }
 
-// The bar owns the top strip. OMACOSY_BAR_STACK=1 drops it one bar-height
+// The bar owns the top strip. OMACCHIATO_BAR_STACK=1 drops it one bar-height
 // so it can run alongside another bar for comparison, which is how this
 // was built.
 // Breathing room above the pills. The window grows DOWNWARD by this much
@@ -3472,7 +3472,7 @@ final class BarWindow: NSWindow {
 // no drawing constant has to change.
 let barTopPad: CGFloat = 3
 
-let stackOffset: CGFloat = ProcessInfo.processInfo.environment["OMACOSY_BAR_STACK"] == nil ? 0 : barHeight
+let stackOffset: CGFloat = ProcessInfo.processInfo.environment["OMACCHIATO_BAR_STACK"] == nil ? 0 : barHeight
 
 // One surface per display. Each owns its screen's workspace set and its
 // own window; everything else it reads from the shared model.
@@ -3750,13 +3750,13 @@ func watch(_ path: String, create: Bool, handler: @escaping () -> Void) {
 // screen, so SkyLight reports nothing at all — measured with a probe:
 // not an order change, not a visibility change, no event of any kind.
 // No publisher exists for it, so the commands that do the moving say so
-// themselves (omacosy-ws, and the overview's drag-reorder).
+// themselves (omacchiato-ws, and the overview's drag-reorder).
 // Super+K writes this; the bar has no key tap and should not grow one
-let cheatPath = "/tmp/omacosy-bar-cheatsheet"
+let cheatPath = "/tmp/omacchiato-bar-cheatsheet"
 watch(cheatPath, create: true) { toggleCheatsheet() }
 
-// omacosy-popup writes "<item> [display name]" here; an empty line closes the popup
-let popupPath = "/tmp/omacosy-bar-popup"
+// omacchiato-popup writes "<item> [display name]" here; an empty line closes the popup
+let popupPath = "/tmp/omacchiato-bar-popup"
 var popupPoke: DispatchWorkItem?
 watch(popupPath, create: true) {
     // a shell redirect empties the file before it writes, and each step can
@@ -3778,7 +3778,7 @@ watch(popupPath, create: true) {
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: poke)
 }
 
-let movedPath = "/tmp/omacosy-bar-moved"
+let movedPath = "/tmp/omacchiato-bar-moved"
 watch(movedPath, create: true) {
     tlog("moved poke")
     kickRebuild()
@@ -3826,7 +3826,7 @@ func omniWorkspaceBarEvent(_ line: Data) {
             // no floating filter here: OmniWM leaves floating windows out of
             // this payload unless its showFloatingWindows is on
             let wins = ((w["windows"] as? [[String: Any]]) ?? [])
-                .filter { ($0["appName"] as? String)?.hasPrefix("omacosy") != true }
+                .filter { ($0["appName"] as? String)?.hasPrefix("omacchiato") != true }
             if !wins.isEmpty {
                 occupied.insert(name)
                 hands[name] = handOf(wins.compactMap { $0["appName"] as? String })
@@ -3953,7 +3953,7 @@ NSWorkspace.shared.notificationCenter.addObserver(
 // This is also where a second display's set gets folded and unfolded.
 // Undocked, OmniWM moves that set's workspaces to the one display, but
 // their windows stay on two-digit workspaces that Super+N does not reach
-// from there. omacosy-ws-collapse moves those windows into the empty 1-9
+// from there. omacchiato-ws-collapse moves those windows into the empty 1-9
 // slots and remembers where they came from.
 //
 // It used to be driven by sketchybar's display_change.sh, which went
@@ -3993,7 +3993,7 @@ NotificationCenter.default.addObserver(
         // off-main: it makes IPC calls per window, and sleeps between
         // moves while OmniWM settles
         DispatchQueue.global(qos: .userInitiated).async {
-            _ = shell("\(NSHomeDirectory())/.local/bin/omacosy-ws-collapse", [op])
+            _ = shell("\(NSHomeDirectory())/.local/bin/omacchiato-ws-collapse", [op])
             DispatchQueue.main.async { kickRebuild() }
         }
     }
@@ -4107,7 +4107,7 @@ func followAppearance() {
           spec.contains(":") else { return }
     appearanceDark = dark
     var env = ProcessInfo.processInfo.environment
-    env["OMACOSY_APPEARANCE"] = dark ? "dark" : "light"
+    env["OMACCHIATO_APPEARANCE"] = dark ? "dark" : "light"
     DispatchQueue.global(qos: .utility).async {
         _ = shell(NSHomeDirectory() + "/.local/bin/theme-set", [spec], env: env)
     }
@@ -4254,7 +4254,7 @@ watchNightShift()
 
 // network: the same SCDynamicStore keys the watcher uses
 var storeContext = SCDynamicStoreContext(version: 0, info: nil, retain: nil, release: nil, copyDescription: nil)
-if let store = SCDynamicStoreCreate(nil, "omacosy-bar" as CFString,
+if let store = SCDynamicStoreCreate(nil, "omacchiato-bar" as CFString,
                                     { _, _, _ in DispatchQueue.main.async { updateWifi() } }, &storeContext) {
     SCDynamicStoreSetNotificationKeys(store, nil, [
         "State:/Network/Global/IPv4",
@@ -4322,7 +4322,7 @@ model.focused = omniwmActive()
     : ""
 rebuildSurfaces()
 guard !surfaces.isEmpty else {
-    FileHandle.standardError.write("omacosy-bar: no screen to draw on\n".data(using: .utf8)!)
+    FileHandle.standardError.write("omacchiato-bar: no screen to draw on\n".data(using: .utf8)!)
     exit(1)
 }
 apply(fetchSnapshot()) // blocking is fine here: the run loop has not started
@@ -4346,5 +4346,5 @@ startPlugins()
 repaint()
 primeMedia()
 startOmniWatch() // a no-op until OmniWM runs; the WM observer starts it then
-tlog("omacosy-bar up on " + surfaces.map { "\($0.screen.localizedName)=m\($0.monitorID)\($0.notched ? " (notched)" : "")" }.joined(separator: ", "))
+tlog("omacchiato-bar up on " + surfaces.map { "\($0.screen.localizedName)=m\($0.monitorID)\($0.notched ? " (notched)" : "")" }.joined(separator: ", "))
 app.run()

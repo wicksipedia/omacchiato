@@ -102,7 +102,7 @@ static Config load_config()
 	struct passwd* pw = getpwuid(getuid());
 	if (pw) {
 		snprintf(fallback_path, sizeof(fallback_path),
-			"%s/.config/omacosy/gesture.json", pw->pw_dir);
+			"%s/.config/omacchiato/gesture.json", pw->pw_dir);
 		paths[1] = fallback_path;
 	}
 
@@ -172,7 +172,7 @@ static Config load_config()
 	config.swipe_right = config.natural_swipe ? "prev" : "next";
 
 	// Optional overrides. next and prev cycle workspaces, a string with
-	// a '/' runs as a command, and anything else is a no-op. omacosy
+	// a '/' runs as a command, and anything else is a no-op. omacchiato
 	// sets both to "", so the daemon serves only the vertical gestures
 	// while OmniWM owns the horizontal ones.
 	item = yyjson_obj_get(root, "swipe_left");

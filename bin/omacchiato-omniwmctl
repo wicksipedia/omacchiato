@@ -1,5 +1,5 @@
 #!/bin/sh
-# omacosy-omniwmctl — run omniwmctl from wherever OmniWM is installed.
+# omacchiato-omniwmctl — run omniwmctl from wherever OmniWM is installed.
 #
 # The Homebrew link can point at nothing after a cask upgrade, and a dev
 # build from OmniWM's own scripts ships its own copy, so the path is found
@@ -9,5 +9,5 @@ for ctl in /opt/homebrew/bin/omniwmctl \
     "$HOME/Applications/OmniWM Dev.app/Contents/MacOS/omniwmctl"; do
   [ -x "$ctl" ] && exec "$ctl" "$@"
 done
-echo "omacosy-omniwmctl: no omniwmctl found" >&2
+echo "omacchiato-omniwmctl: no omniwmctl found" >&2
 exit 127

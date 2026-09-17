@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# omacosy-ws-collapse <collapse|restore> — fold the second display's
+# omacchiato-ws-collapse <collapse|restore> — fold the second display's
 # workspaces into the primary set when a monitor unplugs, and unfold
-# on replug. Called by omacosy-bar when the monitor count changes
+# on replug. Called by omacchiato-bar when the monitor count changes
 # (it is the one long-lived process already watching for that).
 #
 # collapse: with one display left, every non-empty guest workspace
@@ -18,11 +18,11 @@
 # is the same one the overview's drag-reorder uses.
 export PATH="/opt/homebrew/bin:$PATH"
 
-STATE_DIR="$HOME/.local/state/omacosy"
+STATE_DIR="$HOME/.local/state/omacchiato"
 MAP="$STATE_DIR/collapse-map"
 mkdir -p "$STATE_DIR"
 
-OMNI="$HOME/.local/bin/omacosy-omni"
+OMNI="$HOME/.local/bin/omacchiato-omni"
 case "${1:-}" in
   collapse)
     NDISP="$("$OMNI" query displays 2>/dev/null | /usr/bin/python3 -c 'import sys,json;print(len(json.load(sys.stdin)["result"]["payload"]["displays"]))' 2>/dev/null)" || exit 0
@@ -34,7 +34,7 @@ used = set(); guests = {}
 for w in wins:
     ws = (w.get("workspace") or {}).get("rawName") or ""
     a = (w.get("app") or {}).get("name","")
-    if not ws.isdigit() or a.startswith("omacosy"): continue
+    if not ws.isdigit() or a.startswith("omacchiato"): continue
     n = int(ws)
     if n <= 9: used.add(n)
     else: guests.setdefault(n, []).append(w["id"])
@@ -54,9 +54,9 @@ for gws in sorted(guests):
         printf '%s	%s
 ' "$wid" "$gws" >>"$MAP"
       sleep 0.3
-      echo "$(date '+%F %T') collapsed (omniwm) window -> $target (from $gws)" >>/tmp/omacosy-ws-collapse.log
+      echo "$(date '+%F %T') collapsed (omniwm) window -> $target (from $gws)" >>/tmp/omacchiato-ws-collapse.log
     done
-    : > /tmp/omacosy-bar-moved
+    : > /tmp/omacchiato-bar-moved
     ;;
   restore)
     [ -s "$MAP" ] || exit 0
@@ -67,11 +67,11 @@ for gws in sorted(guests):
       "$OMNI" focus-window "$wid" >/dev/null 2>&1 || continue
       sleep 0.4
       "$OMNI" command move-to-workspace "{\"workspaceNumber\":$gws}" >/dev/null 2>&1 &&
-        echo "$(date '+%F %T') restored (omniwm) window -> $gws" >>/tmp/omacosy-ws-collapse.log
+        echo "$(date '+%F %T') restored (omniwm) window -> $gws" >>/tmp/omacchiato-ws-collapse.log
       sleep 0.3
     done <"$MAP.run"
     rm -f "$MAP.run"
-    : > /tmp/omacosy-bar-moved
+    : > /tmp/omacchiato-bar-moved
     ;;
-  *) echo "usage: omacosy-ws-collapse <collapse|restore>" >&2; exit 2 ;;
+  *) echo "usage: omacchiato-ws-collapse <collapse|restore>" >&2; exit 2 ;;
 esac
