@@ -599,6 +599,12 @@ func thumbnail(_ image: NSImage, side: CGFloat) -> NSImage {
 // list, so adding a pill is one entry and one provider — no per-item
 // geometry, no padding arithmetic, no width caches.
 
+struct BarPart: Equatable {
+    var icon = ""
+    var iconColor: NSColor?
+    var label = ""
+}
+
 struct BarItem: Equatable {
     var icon = ""
     var label = ""
@@ -607,6 +613,9 @@ struct BarItem: Equatable {
     // plugin's colour has to be able to land on the label instead
     var labelColor: NSColor?
     var drawing = true
+    // more icon and label pairs after the first, so one plugin pill can
+    // show several icons in their own colours
+    var parts: [BarPart] = []
 }
 
 // screen order, left to right
@@ -836,7 +845,8 @@ func pluginPopupRows(_ raw: [[String: Any]]) -> [PopupRow] {
                 }
             }
         }
-        return PopupRow(text: spec["text"] as? String ?? "",
+        return PopupRow(icon: spec["icon"] as? String ?? "",
+                        text: spec["text"] as? String ?? "",
                         detail: spec["detail"] as? String ?? "",
                         separator: spec["separator"] as? Bool ?? false,
                         hero: spec["hero"] as? Bool ?? false,
@@ -845,8 +855,41 @@ func pluginPopupRows(_ raw: [[String: Any]]) -> [PopupRow] {
                         marker: spec["marker"] as? Double,
                         inlineBar: spec["bar"] as? Double,
                         action: action,
-                        tint: pluginColor(spec["color"] as? String))
+                        tint: pluginColor(spec["color"] as? String),
+                        iconTint: pluginColor(spec["icon_color"] as? String),
+                        section: spec["section"] as? String)
     }
+}
+
+// the sections a click opened or closed, by plugin, header text and the
+// count of earlier headers with that text. The bar forgets them when it restarts.
+var sectionOpen: [String: Bool] = [:]
+
+// A header row toggles the rows after it, up to the next header or "end" row.
+// A separator right before the next header stays, so closed sections keep their rules.
+func foldSections(_ name: String, _ rows: [PopupRow]) -> [PopupRow] {
+    var out: [PopupRow] = []
+    var hiding = false
+    var seen: [String: Int] = [:]
+    for (index, var row) in rows.enumerated() {
+        switch row.section {
+        case "open", "closed":
+            // the detail changes as numbers change, so the key cannot use it
+            seen[row.text, default: 0] += 1
+            let key = "\(name)\t\(row.text)\t\(seen[row.text]!)"
+            let open = sectionOpen[key] ?? (row.section == "open")
+            row.detail = [row.detail, open ? "▾" : "▸"].filter { !$0.isEmpty }.joined(separator: " ")
+            row.action = { sectionOpen[key] = !open; refreshPopup() }
+            hiding = !open
+        case "end":
+            hiding = false
+        default:
+            let next = index + 1 < rows.count ? rows[index + 1].section : nil
+            if hiding && !(row.separator && next != nil) { continue }
+        }
+        out.append(row)
+    }
+    return out
 }
 
 func pluginEnv(_ plugin: BarPlugin) -> [String: String] {
@@ -876,15 +919,22 @@ func runPlugin(_ plugin: BarPlugin) {
         let plain = out.split(separator: "\n").first.map(String.init) ?? ""
         let label = String((obj?["label"] as? String ?? plain)
             .trimmingCharacters(in: .whitespaces).prefix(32))
+        let rawParts = obj?["parts"] as? [[String: Any]] ?? []
         DispatchQueue.main.async {
             pluginRows[plugin.name] = pluginPopupRows(obj?["rows"] as? [[String: Any]] ?? [])
             let color = pluginColor(obj?["color"] as? String)
             let icon = obj?["icon"] as? String ?? plugin.icon
+            let parts = rawParts.map {
+                BarPart(icon: $0["icon"] as? String ?? "",
+                        iconColor: pluginColor($0["icon_color"] as? String) ?? color,
+                        label: String(($0["label"] as? String ?? "").prefix(32)))
+            }
             set(plugin.name) {
                 $0.icon = icon
                 $0.label = label
                 $0.iconColor = pluginColor(plugin.iconColor) ?? color
                 $0.labelColor = color
+                $0.parts = parts
             }
         }
     }
@@ -1615,6 +1665,8 @@ struct PopupRow {
     // space-padded text drifts out of the header's columns
     var columns: [String]? = nil
     var tint: NSColor? // overrides the hero/dim colour for one row
+    var iconTint: NSColor? // overrides the accent colour of the icon
+    var section: String? // plugin rows: "open" or "closed" starts a section, "end" ends one
 }
 
 let rowHeight: CGFloat = 26
@@ -1719,7 +1771,7 @@ final class PopupView: NSView {
                 // cap height — one way of placing things in this file
                 let iconFont = nerdFont("Bold", 13)
                 let w = inkBox(row.icon, iconFont).width
-                drawIcon(row.icon, iconFont, palette.accent,
+                drawIcon(row.icon, iconFont, row.iconTint ?? palette.accent,
                          centeredIn: NSRect(x: x, y: rect.minY, width: w, height: rect.height))
                 x += w + 8
             }
@@ -2248,7 +2300,7 @@ func popupRows(for name: String) -> [PopupRow] {
     case "bluetooth": return bluetoothRows()
     case "appmenu": return appMenuRows()
     case "menubar": return menuBarAppRows()
-    default: return pluginRows[name] ?? []
+    default: return foldSections(name, pluginRows[name] ?? [])
     }
 }
 
@@ -3371,36 +3423,44 @@ final class BarView: NSView {
         // changing width never shifts the ones outside it
         var cursor = bounds.maxX - padLeft
         for name in rightOrder.reversed() {
-            guard let item = rightItems[name], item.drawing,
-                  !(item.icon.isEmpty && item.label.isEmpty) else { continue }
+            guard let item = rightItems[name], item.drawing else { continue }
+            let parts = ([BarPart(icon: item.icon, iconColor: item.iconColor, label: item.label)] + item.parts)
+                .filter { !($0.icon.isEmpty && $0.label.isEmpty) }
+            guard !parts.isEmpty else { continue }
             let labelFont = chipFont
-            let iconColor = item.iconColor ?? palette.label
-            let hasIcon = !item.icon.isEmpty
-            // icon-only is ignored where there is no icon: the weather pill
-            // keeps its glyph in the label, so suppressing it draws nothing
-            let hasLabel = !item.label.isEmpty && !(hasIcon && iconOnly.contains(name))
             // An icon-only pill is sized and centred on the glyph's INK, so
             // a lopsided side bearing cannot push it off centre. A pill with
             // a label flows icon-then-text, and the gap between them exists
             // only when both do — the weather pill has no icon (its glyph
             // lives in the label) and inherited the gap anyway, which is the
             // 7 px it sat right of centre by.
-            let iconInk = hasIcon ? inkBox(item.icon, iconFont).width : 0
-            let labelAdv = hasLabel ? advance(item.label, labelFont) : 0
-            let innerGap: CGFloat = hasIcon && hasLabel ? 7 : 0
-            let width = pillPad + iconInk + innerGap + labelAdv + pillPad
+            let sizes = parts.map { part -> (icon: CGFloat, gap: CGFloat, label: CGFloat) in
+                let hasIcon = !part.icon.isEmpty
+                // icon-only is ignored where there is no icon: the weather pill
+                // keeps its glyph in the label, so suppressing it draws nothing
+                let hasLabel = !part.label.isEmpty && !(hasIcon && iconOnly.contains(name))
+                return (hasIcon ? inkBox(part.icon, iconFont).width : 0,
+                        hasIcon && hasLabel ? 7 : 0,
+                        hasLabel ? advance(part.label, labelFont) : 0)
+            }
+            let partGap: CGFloat = 10
+            let width = pillPad * 2 + partGap * CGFloat(parts.count - 1)
+                + sizes.reduce(0) { $0 + $1.icon + $1.gap + $1.label }
             let pill = NSRect(x: cursor - width, y: (barHeight - pillHeight) / 2,
                               width: width, height: pillHeight)
             palette.itemBG.setFill()
             NSBezierPath(roundedRect: pill, xRadius: radius, yRadius: radius).fill()
-            if hasIcon {
-                drawIcon(item.icon, iconFont, iconColor,
-                         centeredIn: NSRect(x: pill.minX + pillPad, y: pill.minY,
-                                            width: iconInk, height: pill.height))
-            }
-            if hasLabel {
-                drawText(item.label, labelFont, item.labelColor ?? palette.label,
-                         leftAt: pill.minX + pillPad + iconInk + innerGap, midY: pill.midY)
+            var x = pill.minX + pillPad
+            for (part, size) in zip(parts, sizes) {
+                if size.icon > 0 {
+                    drawIcon(part.icon, iconFont, part.iconColor ?? palette.label,
+                             centeredIn: NSRect(x: x, y: pill.minY, width: size.icon, height: pill.height))
+                }
+                if size.label > 0 {
+                    drawText(part.label, labelFont, item.labelColor ?? palette.label,
+                             leftAt: x + size.icon + size.gap, midY: pill.midY)
+                }
+                x += size.icon + size.gap + size.label + partGap
             }
             itemRects.append((name, NSRect(x: pill.minX, y: 0, width: width, height: barHeight)))
             cursor = pill.minX - gap

@@ -98,7 +98,11 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   keys: `text`, `detail`, `hero`, `dim`, `separator`, `slider`,
   `marker`, `bar`, `color`, `url` (https only) and `terminal`. Labels
   are cut at 32 characters. The bar puts `~/.local/bin` and Homebrew
-  first on `PATH` and sets `OMACCHIATO_PILL_ICON`. Plugin commands run with
+  first on `PATH` and sets `OMACCHIATO_PILL_ICON`. A row also takes `icon`,
+  `icon_color` and `section` (`open`, `closed` or `end`). `foldSections`
+  keys a section's open state by header text, because the detail changes.
+  `parts` is a list of `icon`, `icon_color` and `label` that the pill
+  draws after its own icon and label. Plugin commands run with
   the bar's TCC grants.
 - AppKit hit-tests a non-opaque window by alpha, so a pill background
   with zero alpha takes no clicks. `NSColor.clickable` raises zero alpha

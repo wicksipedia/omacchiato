@@ -672,6 +672,27 @@ the label. A row takes the same `color` names. A row with an `https`
 your terminal on that command instead, the way the activity pill opens
 btop; it runs with the same trust as the plugin command that printed
 it. A colour emoji draws its own colours and ignores the icon tint,
+A row's `icon` draws a glyph before its text, in the accent colour or
+in the row's `icon_color`, which takes a theme colour name or
+`#RRGGBB`.
+
+A row with `"section": "closed"` or `"section": "open"` is a header.
+A click on it shows or hides the rows after it, up to the next header
+or a row with `"section": "end"`. The value sets how the section starts,
+and the bar keeps each click until it restarts. The header shows ▸ when
+the section is closed and ▾ when it is open.
+
+`parts` adds more icons to the pill, each in its own colour, after the
+icon and label:
+
+```json
+{"label": "", "color": "green", "parts": [
+  {"icon": "\uec82", "icon_color": "#D97757", "label": "27%"},
+  {"icon": "\uec81", "icon_color": "label", "label": "0%"}
+]}
+```
+
+Each part's label takes the pill's `color`.
 which is why the label carries it too. `icon` overrides the config.
 
 A `slider` between 0 and 1 draws a progress track. On a slider row
