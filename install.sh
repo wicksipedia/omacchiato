@@ -289,7 +289,7 @@ else
   log "  Accounts > Manage Certificates > + > Apple Development, then re-run."
 fi
 # (omacchiato-gesture is signed in section 5, right after its build —
-# the makefile re-signs ad-hoc as part of the build, so signing here
+# the linker signs each build ad-hoc, so signing here
 # would be overwritten and every rebuild would invalidate the
 # Accessibility grant again)
 
