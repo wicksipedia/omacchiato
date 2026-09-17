@@ -71,6 +71,15 @@ def seconds_until(value):
         return None
 
 
+# thin spaces: a normal space is a whole cell in the bar's monospace font
+LABEL_DOT = "\u2009·\u2009"
+
+
+def clock(left):
+    h, m = divmod(int(left) // 60, 60)
+    return "%d:%02d" % (h, m)
+
+
 def countdown(left):
     h, m = divmod(int(left) // 60, 60)
     return "%dh %dm" % (h, m) if h else "%dm" % m
@@ -402,7 +411,7 @@ def render_api(body):
 
     label = "%d%%" % round(pct)
     if left is not None and left > 0:
-        label += " · " + countdown(left)
+        label += LABEL_DOT + clock(left)
     return {"label": label, "color": colour_for(pct), "rows": rows}
 
 
@@ -441,7 +450,7 @@ def render_capture(limits):
     rows = [{"text": "Claude usage", "hero": True}, {"separator": True}]
     if five_pct is not None:
         window_rows(rows, "Session, 5-hour", five_pct, five_reset, FIVE_HOURS)
-        label, colour = "%d%% · %s" % (five_pct, countdown(seconds_until(five_reset))), colour_for(five_pct)
+        label, colour = "%d%%%s%s" % (five_pct, LABEL_DOT, clock(seconds_until(five_reset))), colour_for(five_pct)
     else:
         label, colour = "--", "muted"
         rows += [{"text": "Session, 5-hour", "detail": "--"},
