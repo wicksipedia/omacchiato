@@ -154,10 +154,14 @@ The design and the test results are in
   reloads its `settings.toml`. So theme-set writes the Ghostty palette
   before it edits OmniWM's settings.
 - Under a pair, OmniWM's `[appearance] mode` is `automatic`.
-- OmniWM draws the focus border (`[borders]` in settings.toml).
-  theme-set writes the theme's `ACTIVE_COLOR` from
-  `themes/<name>/borders.sh` into `[borders.color]`, and the overview
-  reads its accent from the same file.
+- OmniWM draws the focus border (`[borders]` in settings.toml). theme-set
+  rebuilds every `[borders.*]` table from `themes/<name>/borders.sh`:
+  `ACTIVE_COLOR` is the colour, `GRADIENT_COLOR` adds a gradient and
+  `GLOW=1` a glow. A pair also writes `darkColor` and dark gradient
+  endpoints. OmniWM has one glow switch for both appearances, so a pair
+  glows only if both halves set `GLOW=1`. It keeps the user's `[borders]`
+  on/off and width, glow radius and opacity, and gradient direction. The
+  overview reads its accent from the same file.
 - `theme-next` (`Super+Shift+T`) calls theme-set with one name, so it
   ends a light/dark pair.
 

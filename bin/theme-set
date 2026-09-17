@@ -119,47 +119,106 @@ PY
   "$HOME/.local/bin/omacosy-helper" ghostty-reload >/dev/null || true
 fi
 
-# OmniWM draws the focus border. Its color lives in settings.toml as 0-1
-# floats; write the theme's ACTIVE_COLOR (0xAARRGGBB) into it. OmniWM
-# live-reloads, so this recolors at once.
+# OmniWM draws the focus border and tints its own chrome from settings.toml.
+# The theme owns every [borders.*] table: color from ACTIVE_COLOR, and a
+# gradient to GRADIENT_COLOR and a glow when borders.sh sets them. A
+# light/dark pair also writes the dark half as darkColor, so OmniWM switches
+# the border itself when macOS changes appearance. [borders] keeps the user's
+# on/off and width. [appearance] mode follows the palette background's
+# luminance, or is "automatic" for a pair. Both edits land in one atomic
+# rename: OmniWM reloads this file on every change and must never read it
+# half-written.
 OMNIWM_SETTINGS="$HOME/.config/omniwm/settings.toml"
-if [ -f "$OMNIWM_SETTINGS" ] && [ -f "$THEMES_DIR/$NAME/borders.sh" ]; then
-  ACTIVE="$(grep -o 'ACTIVE_COLOR=0x[0-9a-fA-F]*' "$THEMES_DIR/$NAME/borders.sh" | head -1 | cut -d= -f2)"
-  if [ -n "$ACTIVE" ]; then
-    python3 - "$OMNIWM_SETTINGS" "$ACTIVE" <<'PY'
-import re, sys
-path, argb = sys.argv[1], sys.argv[2]
-v = int(argb, 16)
-r, g, b = (v >> 16 & 0xFF) / 255, (v >> 8 & 0xFF) / 255, (v & 0xFF) / 255
+if [ -f "$OMNIWM_SETTINGS" ]; then
+  python3 - "$OMNIWM_SETTINGS" "$THEMES_DIR" "$NAME" "$SPEC" <<'PY'
+import os, re, sys, tempfile, tomllib
+path, themes, name, spec = sys.argv[1:]
 t = open(path).read()
-sec = re.search(r'\[borders\.color\]\n(?:[a-z]+ = [0-9.]+\n)+', t)
-if sec:
-    new = f"[borders.color]\nalpha = 1.0\nblue = {b}\ngreen = {g}\nred = {r}\n"
-    t = t[:sec.start()] + new + t[sec.end():]
-    open(path, 'w').write(t)
-PY
-  fi
-fi
+# glow strength and gradient direction are the user's taste, not the theme's
+try:
+    mine = tomllib.loads(t).get("borders", {})
+except tomllib.TOMLDecodeError:
+    mine = {}
+glow, gradient = mine.get("glow", {}), mine.get("gradient", {})
+halves = {k.strip(): v.strip() for k, v in (part.split(":", 1) for part in spec.split(",") if ":" in part)}
+light, dark = halves.get("light", name), halves.get("dark", name)
 
-# OmniWM tints its own chrome (overview, command palette) from
-# [appearance] mode, which no theme file carries. Derive it from the
-# palette's background luminance so every theme, present and future, gets
-# it right without a new convention to remember. A light/dark pair
-# writes "automatic" instead: OmniWM can follow the system itself.
-if [ -f "$OMNIWM_SETTINGS" ] && [ -f "$THEMES_DIR/$NAME/colors.toml" ]; then
-  python3 - "$OMNIWM_SETTINGS" "$THEMES_DIR/$NAME/colors.toml" "$SPEC" <<'PY'
-import re, sys
-settings, colors, spec = sys.argv[1], sys.argv[2], sys.argv[3]
-m = re.search(r'^background = "#([0-9a-fA-F]{6})"', open(colors).read(), re.M)
-if m:
-    r, g, b = (int(m.group(1)[i:i+2], 16) / 255 for i in (0, 2, 4))
-    mode = "light" if 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.5 else "dark"
-    if ":" in spec:
-        mode = "automatic"
-    t = open(settings).read()
-    t2 = re.sub(r'(\[appearance\]\nmode = )"[a-z]+"', r'\1"%s"' % mode, t, count=1)
-    if t2 != t:
-        open(settings, 'w').write(t2)
+
+def border(theme):
+    try:
+        text = open(os.path.join(themes, theme, "borders.sh")).read()
+    except OSError:
+        return {}
+    return {k: v.strip("'\"") for k, v in re.findall(r'^\s*(?:export\s+)?([A-Z_]+)=(\S+)', text, re.M)}
+
+
+def color(table, argb):
+    v = int(argb, 16)
+    return "[%s]\nalpha = %s\nblue = %s\ngreen = %s\nred = %s\n" % (
+        table, (v >> 24 & 0xFF) / 255, (v & 0xFF) / 255, (v >> 8 & 0xFF) / 255, (v >> 16 & 0xFF) / 255)
+
+
+new, rebuilt = t, False
+lit, dim = border(light), border(dark)
+try:
+    # a colour that is not hex leaves the border as it is
+    [int(c, 16) for c in (lit.get("ACTIVE_COLOR"), dim.get("ACTIVE_COLOR"),
+                          lit.get("GRADIENT_COLOR", "0"), dim.get("GRADIENT_COLOR", "0")) if c]
+except ValueError:
+    lit = dim = {}
+if lit.get("ACTIVE_COLOR") and dim.get("ACTIVE_COLOR"):
+    tables = [color("borders.color", lit["ACTIVE_COLOR"])]
+    if dark != light:
+        tables.append(color("borders.darkColor", dim["ACTIVE_COLOR"]))
+    # glow has one on/off for both appearances, so a pair glows only when both halves do
+    if lit.get("GLOW") == "1" and dim.get("GLOW") == "1":
+        tables.append("[borders.glow]\nenabled = true\nopacity = %s\nradius = %s\n"
+                      % (float(glow.get("opacity", 0.6)), float(glow.get("radius", 8.0))))
+    if "GRADIENT_COLOR" in lit or "GRADIENT_COLOR" in dim:
+        tables.append('[borders.gradient]\ndirection = "%s"\nenabled = true\n'
+                      % gradient.get("direction", "topLeftToBottomRight"))
+        if dark != light:
+            tables.append(color("borders.gradient.dark.end", dim.get("GRADIENT_COLOR", dim["ACTIVE_COLOR"])))
+            tables.append(color("borders.gradient.dark.start", dim["ACTIVE_COLOR"]))
+        tables.append(color("borders.gradient.end", lit.get("GRADIENT_COLOR", lit["ACTIVE_COLOR"])))
+        tables.append(color("borders.gradient.start", lit["ACTIVE_COLOR"]))
+    kept, current = [], ""
+    for line in new.splitlines(keepends=True):
+        header = re.match(r'^\[+([^\]]+)\]+\s*$', line)
+        if header:
+            current = header.group(1)
+        if not current.startswith("borders."):
+            kept.append(line)
+    at = next((i for i, line in enumerate(kept) if line.strip() == "[borders]"), None)
+    if at is not None:
+        end = next((i for i in range(at + 1, len(kept)) if kept[i].startswith("[")), len(kept))
+        while end > at + 1 and not kept[end - 1].strip():
+            end -= 1
+        kept[end:end] = ["\n" + "\n".join(tables)]
+        new, rebuilt = "".join(kept), True
+
+colors = os.path.join(themes, name, "colors.toml")
+if os.path.isfile(colors):
+    m = re.search(r'^background = "#([0-9a-fA-F]{6})"', open(colors).read(), re.M)
+    if m:
+        r, g, b = (int(m.group(1)[i:i+2], 16) / 255 for i in (0, 2, 4))
+        mode = "light" if 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.5 else "dark"
+        if ":" in spec:
+            mode = "automatic"
+        new = re.sub(r'(\[appearance\]\nmode = )"[a-z]+"', r'\1"%s"' % mode, new, count=1)
+# rebuilding the border tables writes even when unchanged: the reload makes
+# OmniWM's quake terminal pick up the Ghostty palette written above
+if new != t or rebuilt:
+    target = os.path.realpath(path)
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(target), prefix=".settings.toml.")
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(new)
+        os.chmod(tmp, os.stat(target).st_mode & 0o777)
+        os.replace(tmp, target)
+    except BaseException:
+        os.unlink(tmp)
+        raise
 PY
 fi
 

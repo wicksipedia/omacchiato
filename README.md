@@ -639,6 +639,16 @@ accent, omarchy's own convention), and `backgrounds/` (wallpapers from
 omarchy's MIT-licensed theme packs; catppuccin-latte's is drawn for this
 repo). Copy a directory to add one.
 
+OmniWM's focus border comes from `borders.sh` too. `ACTIVE_COLOR` is the
+border colour. An optional `GRADIENT_COLOR` turns the border into a gradient
+from `ACTIVE_COLOR` to that colour, and `GLOW=1` adds OmniWM's glow, which
+takes the border's colours. With a light/dark pair, `theme-set` also writes
+the dark theme's colours as OmniWM's dark-mode border colours, so the border
+changes with the macOS appearance at once. The theme owns the border
+colours and turns the gradient and glow on or off. OmniWM's border on/off
+and width, the glow's radius and opacity, and the gradient's direction stay
+yours, so set those in OmniWM's Settings.
+
 Every colour in `sketchybar.sh` is `0xAARRGGBB`, so the leading byte sets
 opacity. `ITEM_BG` fills the pills on the bar and `ROW_BG` fills a
 highlighted row or a slider track inside a popup. They are separate
