@@ -168,8 +168,8 @@ Left to right:
   row opens the app instead. `Show menu bar ⌃F8` reveals the menu bar
   with keyboard focus on its icons.
 - **Plugin pills**: anything you add in `bar-plugins.conf`. The
-  repo ships an AI usage pill, a GitHub pull requests pill and a
-  keep-awake pill; see [Plugin pills](#plugin-pills).
+  repo ships an AI usage pill, a GitHub pull requests pill, a
+  keep-awake pill and an AirPods pill; see [Plugin pills](#plugin-pills).
 - **Weather**: wttr.in, with a details popup.
 - **Wi-fi**: the pill is the icon alone. The popup names the network
   and adds the IP and router, signal with a verdict, link rate and
@@ -242,6 +242,11 @@ popup rows, and the bar draws the result. The format is under
   rather than any app's saved setting, ignores the ones the system
   holds as a matter of course, and lists the holders and how long each
   has held on a click.
+- **AirPods** (`omacchiato-airpods`): shows only while AirPods Pro or
+  AirPods Max are connected, with the lowest battery level. The popup
+  lists the battery of each earbud and the case, lists the noise
+  control modes with a check on the current one, and links to Sound
+  settings. Click a mode to switch to it.
 
 <table>
   <tr>
@@ -338,6 +343,7 @@ the code this repo absorbed, with what Omacchiato uses each for.
 | Tool | Used for | Source |
 |---|---|---|
 | Homebrew | Installed if missing, then `brew bundle` | [Homebrew/brew](https://github.com/Homebrew/brew) |
+| airpods-control | The AirPods pill's noise control modes. It ships source only, so `install.sh` builds the tagged release with the Command Line Tools, pinned by version and checksum. It uses a private Apple API; see [The AirPods pill](#the-airpods-pill) | [raulgg/airpods-control](https://github.com/raulgg/airpods-control) |
 | tokscale | The AI usage pill: plan usage for each provider, and the last seven days of tokens, sessions and cost. Homebrew has no formula, so `install.sh` takes the macOS binary from the npm package, pinned by version and checksum | [junhoyeo/tokscale](https://github.com/junhoyeo/tokscale) |
 | herdr | Optional. If herdr is installed, `install.sh` adds the keys in `config/herdr/keys.toml`, `theme-set` sets its theme, and `Ctrl+Alt+G` opens a worktree off a branch you pick | [herdrdev/herdr](https://github.com/herdrdev/herdr) |
 
@@ -346,6 +352,7 @@ the code this repo absorbed, with what Omacchiato uses each for.
 | Script | What it does | Talks to |
 |---|---|---|
 | [`omacchiato-ai-usage`](bin/omacchiato-ai-usage) | The AI usage pill | tokscale, and the status page of each provider it shows |
+| [`omacchiato-airpods`](bin/omacchiato-airpods) | The AirPods pill | `system_profiler`, `airpods-control` |
 | [`omacchiato-github-prs`](bin/omacchiato-github-prs) | The GitHub pull requests pill | `api.github.com` through `gh` |
 | [`omacchiato-keep-awake`](bin/omacchiato-keep-awake) | The keep-awake pill | `pmset` |
 | [`omacchiato-herdr-worktree`](bin/omacchiato-herdr-worktree) | herdr's `Ctrl+Alt+G` worktree picker | `git`, `herdr` |
@@ -778,6 +785,46 @@ popup keeps its last numbers for 15 more minutes. tokscale reads the
 Claude Code token and never refreshes it or writes it back: a third
 party that rewrites the CLI's own credentials can race Claude Code and
 sign you out. For the icon, the Nerd Font Claude glyph is U+EC82.
+
+### The AirPods pill
+
+`omacchiato-airpods` shows a pill while AirPods Pro or AirPods Max are
+connected, and prints no pill otherwise. Add it to `bar-plugins.conf`:
+
+```ini
+[airpods]
+command = omacchiato-airpods
+interval = 10
+```
+
+With `interval = 10`, the pill shows up to 10 seconds after the AirPods
+connect. The label is the lowest battery level of the earbuds, or of
+the AirPods Max, and turns red at 20% or less. The case does not count.
+
+The popup shows a battery bar for each earbud and the case, or one for
+AirPods Max. Below it, one row for each noise control mode that the
+device supports: Off, Transparency, Adaptive and Noise Cancellation.
+The current mode has a check, and a click switches to that mode. The
+last row opens Sound settings. With two devices connected, each device
+is a section that starts closed.
+
+You can rename AirPods, so the script finds the model from the
+device's Bluetooth product ID. macOS ships the product ID of each Apple
+model in `CoreTypes.bundle`, and the script counts any model whose type
+starts with `com.apple.airpods-pro` or `com.apple.airpods-max`. A new
+model works after the macOS update that adds it. The script holds the
+IDs of the two models that are older than that list: AirPods Pro and
+AirPods Max (Lightning). It reads the battery from
+`system_profiler SPBluetoothDataType -json`, which comes with macOS.
+
+The noise control rows come from
+[airpods-control](https://github.com/raulgg/airpods-control), which
+`install.sh` builds from source at a pinned version. macOS gives the
+noise control mode only to a process with a private Apple entitlement.
+airpods-control loads a small library into its own process that answers
+yes to that one check, and to no other. Its `SECURITY.md` describes the
+library. It is a new project, and a macOS update can break it. Without
+it, or when it fails, the popup shows the battery rows only.
 
 ### The GitHub pull requests pill
 

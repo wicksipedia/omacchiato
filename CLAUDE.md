@@ -292,6 +292,15 @@ The design and the test results are in
   user out. Check that again before you raise `TOKSCALE_VERSION`.
   `tokscale usage` has no provider filter and asks every provider on
   each run, so the script runs it at most every 5 minutes.
+- `omacchiato-airpods` reads `device_productID` from
+  `system_profiler SPBluetoothDataType -json` and finds the model in the
+  `public.bluetooth-vendor-product-id` tags of
+  `/System/Library/CoreServices/CoreTypes.bundle/Contents/Library/*/Contents/Info.plist`.
+  Those tags start at `0x2014`, so `OLDER` holds `0x200A` and `0x200E`. A
+  connected device can also have a BLE entry with the same name and no
+  product ID.
+  `airpods-control` sets the noise mode through a private API, and
+  `install.sh` builds it at a pinned version and SHA-256.
 
 ## Security notes
 

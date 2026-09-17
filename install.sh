@@ -331,6 +331,7 @@ link "$REPO_DIR/bin/theme-next" "$HOME/.local/bin/theme-next"
 link "$REPO_DIR/bin/theme-bg-next" "$HOME/.local/bin/theme-bg-next"
 link "$REPO_DIR/bin/omacchiato-toggle" "$HOME/.local/bin/omacchiato-toggle"
 link "$REPO_DIR/bin/omacchiato-ai-usage" "$HOME/.local/bin/omacchiato-ai-usage"
+link "$REPO_DIR/bin/omacchiato-airpods" "$HOME/.local/bin/omacchiato-airpods"
 link "$REPO_DIR/bin/omacchiato-github-prs" "$HOME/.local/bin/omacchiato-github-prs"
 link "$REPO_DIR/bin/omacchiato-keep-awake" "$HOME/.local/bin/omacchiato-keep-awake"
 link "$REPO_DIR/bin/omacchiato-ws" "$HOME/.local/bin/omacchiato-ws"
@@ -392,6 +393,35 @@ if [ ! -x "$TOKSCALE_DIR/tokscale" ]; then
 fi
 if [ -x "$TOKSCALE_DIR/tokscale" ]; then
   ln -sfn "$TOKSCALE_DIR/tokscale" "$HOME/.local/bin/tokscale"
+fi
+
+# airpods-control, for the AirPods pill's noise control. It ships source only,
+# so build the tagged release, pinned by version and checksum. Change both
+# together.
+AIRPODS_CONTROL_VERSION=0.4.0
+AIRPODS_CONTROL_SHA256=53c7f9ed1846e2dab806301521bee8c3742149e2b4c45c9abf9b2550edd817ad
+AIRPODS_CONTROL_DIR="$HOME/.local/lib/airpods-control-$AIRPODS_CONTROL_VERSION"
+AIRPODS_CONTROL_BIN="$AIRPODS_CONTROL_DIR/libexec/airpods-control/airpods-control"
+if [ ! -x "$AIRPODS_CONTROL_BIN" ]; then
+  log "Building airpods-control $AIRPODS_CONTROL_VERSION"
+  tmp="$(mktemp -d)"
+  if curl -fsSL -o "$tmp/src.tgz" \
+       "https://github.com/raulgg/airpods-control/archive/refs/tags/v$AIRPODS_CONTROL_VERSION.tar.gz" \
+     && [ "$(shasum -a 256 "$tmp/src.tgz" | cut -d' ' -f1)" = "$AIRPODS_CONTROL_SHA256" ] \
+     && tar -xzf "$tmp/src.tgz" -C "$tmp" \
+     && make -C "$tmp/airpods-control-$AIRPODS_CONTROL_VERSION" install PREFIX="$AIRPODS_CONTROL_DIR" >/dev/null; then
+    # older versions go only once the new one is in place
+    for old in "$HOME"/.local/lib/airpods-control-*; do
+      [ "$old" = "$AIRPODS_CONTROL_DIR" ] || rm -rf "$old"
+    done
+  else
+    rm -rf "$AIRPODS_CONTROL_DIR"
+    log "WARNING: airpods-control did not build; the AirPods pill shows the battery only."
+  fi
+  rm -rf "$tmp"
+fi
+if [ -x "$AIRPODS_CONTROL_BIN" ]; then
+  ln -sfn "$AIRPODS_CONTROL_BIN" "$HOME/.local/bin/airpods-control"
 fi
 
 # --- 3. omarchy theme convention -------------------------------------------

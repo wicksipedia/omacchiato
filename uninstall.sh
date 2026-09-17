@@ -165,6 +165,10 @@ case "$(readlink "$HOME/.local/bin/tokscale" 2>/dev/null || true)" in
   "$HOME"/.local/lib/tokscale-*) rm -f "$HOME/.local/bin/tokscale" ;;
 esac
 rm -rf "$HOME"/.local/lib/tokscale-*
+case "$(readlink "$HOME/.local/bin/airpods-control" 2>/dev/null || true)" in
+  "$HOME"/.local/lib/airpods-control-*) rm -f "$HOME/.local/bin/airpods-control" ;;
+esac
+rm -rf "$HOME"/.local/lib/airpods-control-*
 
 # Put the pre-omacchiato wallpaper back — theme-set overwrote every display
 # and the picture would otherwise stay as a souvenir. Restores only when

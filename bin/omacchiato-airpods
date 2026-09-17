@@ -1,0 +1,155 @@
+#!/usr/bin/env python3
+"""AirPods Pro and AirPods Max for a bar pill, as the JSON a bar plugin can return.
+
+system_profiler reads the battery. airpods-control reads and sets the
+listening mode. Without airpods-control, the popup shows the battery only.
+"""
+import glob
+import json
+import plistlib
+import shlex
+import shutil
+import subprocess
+
+EARBUDS = "\U000F184F"
+HEADPHONES = "\U000F02CB"
+# The user can rename a device, so the model comes from its Bluetooth product ID.
+# macOS ships the ID of each Apple model as a tag of a type in CoreTypes.
+CORETYPES = "/System/Library/CoreServices/CoreTypes.bundle/Contents/Library/*/Contents/Info.plist"
+PRODUCT_TAG = "public.bluetooth-vendor-product-id"
+APPLE = 76
+# CoreTypes lists 0x2014 and newer only
+OLDER = {0x200A: ("com.apple.airpods-max", None), 0x200E: ("com.apple.airpods-pro", None)}
+FAMILIES = [("com.apple.airpods-pro", "AirPods Pro", EARBUDS),
+            ("com.apple.airpods-max", "AirPods Max", HEADPHONES)]
+MODES = {"off": "Off", "transparency": "Transparency", "adaptive": "Adaptive",
+         "noise-cancellation": "Noise Cancellation"}
+BATTERY_NAMES = {"Main": "Battery"}
+BATTERY_ORDER = ["Left", "Right", "Battery", "Case"]
+SOUND_SETTINGS = "x-apple.systempreferences:com.apple.Sound-Settings.extension"
+LOW = 20
+TIMEOUT_S = 5
+
+
+def run_json(args):
+    try:
+        r = subprocess.run(args, capture_output=True, text=True, timeout=TIMEOUT_S)
+        return json.loads(r.stdout)
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+
+
+def apple_types():
+    """Apple Bluetooth product ID -> (type identifier, description), from CoreTypes."""
+    types = dict(OLDER)
+    for path in glob.glob(CORETYPES):
+        # one odd system file must not hide the pill
+        try:
+            with open(path, "rb") as f:
+                data = f.read()
+            if PRODUCT_TAG.encode() not in data:
+                continue
+            for declaration in plistlib.loads(data).get("UTExportedTypeDeclarations") or []:
+                tags = (declaration.get("UTTypeTagSpecification") or {}).get(PRODUCT_TAG) or []
+                for tag in [tags] if isinstance(tags, str) else tags:
+                    vendor, _, product = str(tag).partition(":")
+                    if vendor == str(APPLE) and product.isdigit():
+                        types[int(product)] = (str(declaration.get("UTTypeIdentifier", "")),
+                                               declaration.get("UTTypeDescription"))
+        except (OSError, ValueError, AttributeError, TypeError):
+            continue
+    return types
+
+
+def airpods_model(types, info):
+    """(model, icon) of AirPods Pro or AirPods Max, else None."""
+    try:
+        if int(info.get("device_vendorID", ""), 16) != APPLE:
+            return None
+        identifier, description = types.get(int(info.get("device_productID", ""), 16), ("", None))
+    except (TypeError, ValueError):
+        return None
+    for prefix, family, icon in FAMILIES:
+        if identifier.startswith(prefix):
+            return description or family, icon
+    return None
+
+
+def connected():
+    """(name, model, icon, {battery name: percent}) for each connected AirPods Pro or Max."""
+    found = []
+    report = run_json(["/usr/sbin/system_profiler", "SPBluetoothDataType", "-json"]) or {}
+    types = None
+    for controller in report.get("SPBluetoothDataType") or []:
+        for device in controller.get("device_connected") or []:
+            for name, info in device.items():
+                # a BLE entry of the same device has no product ID
+                if "device_productID" not in info:
+                    continue
+                types = types or apple_types()
+                model_icon = airpods_model(types, info)
+                if not model_icon:
+                    continue
+                battery = {}
+                for key, value in info.items():
+                    part = key.removeprefix("device_batteryLevel")
+                    if part != key and str(value).rstrip("%").isdigit():
+                        battery[BATTERY_NAMES.get(part, part)] = int(str(value).rstrip("%"))
+                found.append((name, *model_icon, battery))
+    return found
+
+
+def listening(tool, name):
+    """The current mode and the supported modes, or None."""
+    if not tool:
+        return None
+    reply = run_json([tool, "--device", name, "listening-mode", "list", "--json"])
+    if not reply or reply.get("result") != "ok":
+        return None
+    return reply.get("listeningMode"), reply.get("supportedListeningModes") or []
+
+
+def device_rows(tool, name, model, icon, battery):
+    rows = [{"text": name, "detail": model, "hero": True, "icon": icon}]
+    order = lambda part: BATTERY_ORDER.index(part) if part in BATTERY_ORDER else len(BATTERY_ORDER)
+    for part in sorted(battery, key=order):
+        pct = battery[part]
+        row = {"text": part, "bar": pct / 100, "detail": "%d%%" % pct}
+        if pct <= LOW:
+            row["color"] = "red"
+        rows.append(row)
+    modes = listening(tool, name)
+    if modes:
+        current, supported = modes
+        rows.append({"separator": True})
+        for mode in supported:
+            rows.append({"text": MODES.get(mode, mode), "detail": "✓" if mode == current else "",
+                         "run": " ".join(shlex.quote(a) for a in
+                                         [tool, "--device", name, "listening-mode", "set", mode])})
+    return rows
+
+
+def main():
+    devices = connected()
+    if not devices:
+        print(json.dumps({"label": "", "icon": ""}))
+        return
+    tool = shutil.which("airpods-control")
+    rows = []
+    for n, (name, model, icon, battery) in enumerate(devices):
+        section = device_rows(tool, name, model, icon, battery)
+        if len(devices) > 1:
+            section[0]["section"] = "closed"
+        rows += ([{"separator": True}] if n else []) + section
+    rows += [{"separator": True, "section": "end"},
+             {"text": "Sound settings…", "dim": True, "url": SOUND_SETTINGS}]
+
+    levels = [pct for _, _, _, battery in devices for part, pct in battery.items() if part != "Case"]
+    lowest = min(levels, default=None)
+    payload = {"label": "" if lowest is None else "%d%%" % lowest, "icon": devices[0][2], "rows": rows}
+    if lowest is not None and lowest <= LOW:
+        payload["color"] = "red"
+    print(json.dumps(payload))
+
+
+main()
