@@ -638,6 +638,7 @@ struct BarPlugin {
     var name = ""
     var command = ""
     var icon = ""
+    var iconColor = ""
     var interval: TimeInterval = 30
 }
 
@@ -667,6 +668,7 @@ let barPlugins: [BarPlugin] = {
         switch key {
         case "command": current?.command = value
         case "icon": current?.icon = value
+        case "icon_color": current?.iconColor = value
         // a runaway interval would spawn a process per frame
         case "interval": current?.interval = max(1, Double(value) ?? 30)
         default: break
@@ -727,7 +729,12 @@ func pluginColor(_ name: String?) -> NSColor? {
     case "red": return palette.red
     case "green": return palette.green
     case "yellow": return palette.yellow
-    default: return nil
+    default:
+        // #RRGGBB, for a brand colour that no theme carries
+        guard let hex = name, hex.count == 7, hex.hasPrefix("#"),
+              let rgb = UInt32(hex.dropFirst(), radix: 16) else { return nil }
+        return NSColor(srgbRed: CGFloat(rgb >> 16 & 0xFF) / 255, green: CGFloat(rgb >> 8 & 0xFF) / 255,
+                       blue: CGFloat(rgb & 0xFF) / 255, alpha: 1)
     }
 }
 
@@ -758,6 +765,7 @@ func pluginPopupRows(_ raw: [[String: Any]]) -> [PopupRow] {
                         dim: spec["dim"] as? Bool ?? false,
                         slider: spec["slider"] as? Double,
                         marker: spec["marker"] as? Double,
+                        inlineBar: spec["bar"] as? Double,
                         action: action,
                         tint: pluginColor(spec["color"] as? String))
     }
@@ -797,7 +805,7 @@ func runPlugin(_ plugin: BarPlugin) {
             set(plugin.name) {
                 $0.icon = icon
                 $0.label = label
-                $0.iconColor = color
+                $0.iconColor = pluginColor(plugin.iconColor) ?? color
                 $0.labelColor = color
             }
         }
@@ -1522,6 +1530,7 @@ struct PopupRow {
     var highlight = false // today's week, the active device
     var slider: Double? // 0...1 draws a track instead of text
     var marker: Double? // 0...1 draws a tick across the slider track
+    var inlineBar: Double? // 0...1 draws a track between the text and the detail
     var onSlide: ((Double) -> Void)?
     var action: (() -> Void)?
     // fixed-width cells, calendar only — the font isn't monospaced, so
@@ -1587,6 +1596,7 @@ final class PopupView: NSView {
             if !row.icon.isEmpty { w += inkBox(row.icon, nerdFont("Bold", 13)).width + 8 }
             if row.image != nil { w += 22 }
             if row.slider != nil { w = max(w, 150) }
+            if row.inlineBar != nil { w += 112 }
             if let cells = row.columns { w = max(w, CGFloat(cells.count) * colW) }
             width = max(width, w)
             height += rowH(row)
@@ -1602,6 +1612,10 @@ final class PopupView: NSView {
         bounds.fill()
 
         let colW = columnWidth()
+        // inline bars share one column, so every bar starts and ends together
+        let barred = rows.filter { $0.inlineBar != nil }
+        let barLabelW = barred.map { advance($0.text, font($0)) }.max() ?? 0
+        let barDetailW = barred.map { advance($0.detail, nerdFont("Regular", 11)) }.max() ?? 0
         var y = bounds.height - popupPad
         for (index, row) in rows.enumerated() {
             let h = rowH(row)
@@ -1665,6 +1679,18 @@ final class PopupView: NSView {
                     let df = nerdFont("Regular", 11)
                     drawText(row.detail, df, palette.label.withAlphaComponent(0.5),
                              leftAt: rect.maxX - advance(row.detail, df) - 4, midY: rect.midY)
+                }
+                if let share = row.inlineBar {
+                    let left = x + barLabelW + 12
+                    let track = NSRect(x: left, y: rect.midY - 3,
+                                       width: max(0, rect.maxX - 4 - barDetailW - 12 - left), height: 6)
+                    palette.rowBG.setFill()
+                    NSBezierPath(roundedRect: track, xRadius: 3, yRadius: 3).fill()
+                    (row.tint ?? palette.accent).setFill()
+                    NSBezierPath(roundedRect: NSRect(x: track.minX, y: track.minY,
+                                                     width: track.width * CGFloat(max(0, min(1, share))),
+                                                     height: track.height),
+                                 xRadius: 3, yRadius: 3).fill()
                 }
             }
             rowRects.append((index, rect))

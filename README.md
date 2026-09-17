@@ -264,7 +264,9 @@ launchctl kickstart -k "gui/$(id -u)/com.omacosy.bar"
 `~/.config/omacosy/bar-plugins.conf` adds pills without a rebuild. Each
 `[name]` section takes a `command`, run by `/bin/sh -c`, whose first line
 of stdout becomes the label. `interval` is the gap between runs in seconds
-(minimum 1, default 30) and `icon` is an optional glyph.
+(minimum 1, default 30) and `icon` is an optional glyph. The icon takes the
+pill's colour unless `icon_color` names one: a theme colour such as
+`accent`, or `#RRGGBB` for a brand colour.
 
 ```
 [cpu]
@@ -313,7 +315,9 @@ and 1 draws a progress track, and on a slider row `text` is a short
 right-aligned readout rather than a label, so put the label on the row
 above. On a slider row, `color` sets the fill. A `marker` between 0 and 1
 draws a tick across the track. The
-Claude pill uses it to show how far through each usage window you are. Give a pill rows and clicking it opens the popup instead of
+Claude pill uses it to show how far through each usage window you are. A
+`bar` between 0 and 1 draws the same track inside an ordinary row, between
+its `text` and its `detail`; all such bars in a popup share one column. Give a pill rows and clicking it opens the popup instead of
 re-running the command.
 
 A pill draws nothing while its label and its icon are both empty, which is
