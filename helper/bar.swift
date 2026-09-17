@@ -825,15 +825,23 @@ func pluginColor(_ name: String?) -> NSColor? {
     }
 }
 
-func pluginPopupRows(_ raw: [[String: Any]]) -> [PopupRow] {
+func pluginPopupRows(_ raw: [[String: Any]], of plugin: BarPlugin) -> [PopupRow] {
     raw.map { spec in
-        // a row's "url" becomes the action a click performs: JSON cannot
-        // carry a closure, and opening a link is the only action a plugin
-        // popup needs so far
+        // a row's "url", "terminal" or "run" becomes the action a click
+        // performs: JSON cannot carry a closure
         var action: (() -> Void)?
+        // x-apple.systempreferences opens a System Settings page and nothing else
         if let link = spec["url"] as? String, let url = URL(string: link),
-           url.scheme == "https" {
+           ["https", "x-apple.systempreferences"].contains(url.scheme) {
             action = { NSWorkspace.shared.open(url) }
+        } else if let command = spec["run"] as? String, !command.isEmpty {
+            // same trust as "terminal"; the plugin runs again so an open popup shows the change
+            action = {
+                DispatchQueue.global(qos: .userInitiated).async {
+                    _ = shell("/bin/sh", ["-c", command], env: pluginEnv(plugin))
+                    runPlugin(plugin)
+                }
+            }
         } else if let command = spec["terminal"] as? String, !command.isEmpty {
             // The plugin's own command already runs with the bar's grants, so a
             // row it prints may name a command too. Ghostty gets it as
@@ -921,7 +929,7 @@ func runPlugin(_ plugin: BarPlugin) {
             .trimmingCharacters(in: .whitespaces).prefix(32))
         let rawParts = obj?["parts"] as? [[String: Any]] ?? []
         DispatchQueue.main.async {
-            pluginRows[plugin.name] = pluginPopupRows(obj?["rows"] as? [[String: Any]] ?? [])
+            pluginRows[plugin.name] = pluginPopupRows(obj?["rows"] as? [[String: Any]] ?? [], of: plugin)
             let color = pluginColor(obj?["color"] as? String)
             let icon = obj?["icon"] as? String ?? plugin.icon
             let parts = rawParts.map {
@@ -936,6 +944,8 @@ func runPlugin(_ plugin: BarPlugin) {
                 $0.labelColor = color
                 $0.parts = parts
             }
+            // set() refreshes an open popup only when the pill changed, and the rows can change alone
+            if openPopup == plugin.name { refreshPopup() }
         }
     }
 }

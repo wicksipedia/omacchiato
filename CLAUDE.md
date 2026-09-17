@@ -96,10 +96,12 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
 - Plugin pills come from `~/.config/omacchiato/bar-plugins.conf`. A command
   prints a label, or JSON with `label`, `color`, `icon` and `rows`. Row
   keys: `text`, `detail`, `hero`, `dim`, `separator`, `slider`,
-  `marker`, `bar`, `color`, `url` (https only) and `terminal`. Labels
+  `marker`, `bar`, `color`, `url` and `terminal`. Labels
   are cut at 32 characters. The bar puts `~/.local/bin` and Homebrew
   first on `PATH` and sets `OMACCHIATO_PILL_ICON`. A row also takes `icon`,
-  `icon_color` and `section` (`open`, `closed` or `end`). `foldSections`
+  `icon_color`, `run` (a command with no window, then the plugin runs
+  again) and `section` (`open`, `closed` or `end`). A row `url` may also
+  use `x-apple.systempreferences:`. `foldSections`
   keys a section's open state by header text, because the detail changes.
   `parts` is a list of `icon`, `icon_color` and `label` that the pill
   draws after its own icon and label. Plugin commands run with

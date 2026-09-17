@@ -667,11 +667,14 @@ pill's colour and give it a popup:
 `color` is one of `accent`, `label`, `muted`, `red`, `green` or
 `yellow`, resolved from the current theme, and tints both the icon and
 the label. A row takes the same `color` names. A row with an `https`
-`url` opens it when clicked, and a row with a `terminal` command opens
-your terminal on that command instead, the way the activity pill opens
-btop; it runs with the same trust as the plugin command that printed
-it. A colour emoji draws its own colours and ignores the icon tint,
-which is why the label carries it too. `icon` overrides the config.
+or `x-apple.systempreferences:` `url` opens it when clicked, and a row
+with a `terminal` command opens your terminal on that command instead,
+the way the activity pill opens btop. A row with a `run` command runs
+it with no window, then runs the plugin again, so the popup shows what
+the command changed. Both run with the same trust as the plugin
+command that printed them. A colour emoji draws its own colours and
+ignores the icon tint, which is why the label carries it too. `icon`
+overrides the config.
 A row's `icon` draws a glyph before its text, in the accent colour or
 in the row's `icon_color`, which takes a theme colour name or
 `#RRGGBB`.
