@@ -3245,7 +3245,8 @@ final class BarView: NSView {
                 palette.accent.setFill()
                 NSBezierPath(ovalIn: NSRect(x: box.midX - 2, y: 2, width: 4, height: 4)).fill()
             }
-            let tint: NSColor = ws == surface.visible ? palette.accent : palette.muted
+            // the accent marks keyboard focus; the dot alone marks what this display shows
+            let tint: NSColor = ws == model.focused ? palette.accent : palette.muted
             switch workspaceIconConfig.icon(for: ws) {
             case .some(.glyph(let glyph)):
                 drawIcon(glyph, iconFont, tint, centeredIn: box)
