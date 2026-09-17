@@ -622,10 +622,30 @@ void waitForAccessibilityAndRestart(void)
 	exit(0);
 }
 
+// A direct run asks for the terminal's grants, so start the switch through
+// omacchiato-permissions.
+static int request_permissions(void)
+{
+	// A swipe starts omacchiato-overview as a child, and the child uses this
+	// app's Screen Recording grant.
+	CGRequestScreenCaptureAccess();
+	printf("screen-recording %s\n", CGPreflightScreenCaptureAccess() ? "granted" : "denied");
+	// last, because its dialog stays up after the exit
+	NSDictionary* options = @{(__bridge id)kAXTrustedCheckOptionPrompt : @YES};
+	printf("accessibility %s\n", AXIsProcessTrustedWithOptions((__bridge CFDictionaryRef)options) ? "granted" : "denied");
+	printf("done\n");
+	return 0;
+}
+
 int main(int argc, const char* argv[])
 {
 	signal(SIGCHLD, SIG_IGN);
 	signal(SIGPIPE, SIG_IGN);
+
+	// before the lock file, because the running daemon holds the lock
+	for (int i = 1; i < argc; i++)
+		if (strcmp(argv[i], "--request-permissions") == 0)
+			return request_permissions();
 
 	acquire_lockfile();
 

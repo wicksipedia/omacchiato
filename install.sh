@@ -341,6 +341,7 @@ link "$REPO_DIR/bin/omacchiato-karabiner-omniwm" "$HOME/.local/bin/omacchiato-ka
 link "$REPO_DIR/bin/omacchiato-omniwmctl" "$HOME/.local/bin/omacchiato-omniwmctl"
 link "$REPO_DIR/bin/omacchiato-herdr-worktree" "$HOME/.local/bin/omacchiato-herdr-worktree"
 link "$REPO_DIR/bin/omacchiato-popup" "$HOME/.local/bin/omacchiato-popup"
+link "$REPO_DIR/bin/omacchiato-permissions" "$HOME/.local/bin/omacchiato-permissions"
 
 # tokscale, for the Claude pill's last seven days. Homebrew has no formula, so
 # take the macOS binary from tokscale's npm package, pinned by version and
@@ -489,14 +490,6 @@ cat > "$HOME/Library/LaunchAgents/com.omacchiato.gesture.plist" <<PLIST
 PLIST
 launchctl unload "$HOME/Library/LaunchAgents/com.omacchiato.gesture.plist" 2>/dev/null || true
 launchctl load "$HOME/Library/LaunchAgents/com.omacchiato.gesture.plist" 2>/dev/null || true
-# a rebuild strands the daemon in its permission-wait loop with no
-# visible symptom but dead swipes — check and say so out loud
-sleep 2
-if tail -5 /tmp/omacchiato-gesture.log 2>/dev/null | grep -q "Waiting for accessibility"; then
-  log "WARNING: omacchiato-gesture is waiting for its Accessibility grant"
-  log "  (a rebuild makes macOS treat it as a new app — this is a macOS rule, not a bug)."
-  log "  Fix: System Settings -> Privacy & Security -> Accessibility -> toggle omacchiato-gesture"
-fi
 
 # --- 6. macOS look ----------------------------------------------------------
 "$REPO_DIR/macos-defaults.sh"
@@ -529,6 +522,9 @@ else
   log "Starting Karabiner-Elements (approve its driver extension, then quit the app)"
   open -a Karabiner-Elements
 fi
+
+log "Checking the permissions of the bar and the gesture daemon"
+"$REPO_DIR/bin/omacchiato-permissions" || log "WARNING: a permission above is still off. Run omacchiato-permissions to try again."
 
 cat <<EOF
 

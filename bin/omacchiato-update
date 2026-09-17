@@ -38,6 +38,13 @@ requirements() {
   "$REPO/bin/omacchiato-requirements" || say "WARNING: an app above is older than omacchiato needs"
 }
 
+# The same for permissions. --check only reports, so it opens no Settings page.
+MODE="${1:-}"
+permissions() {
+  [ "$MODE" = --check ] && return
+  "$REPO/bin/omacchiato-permissions" || say "WARNING: a permission above is still off. Run omacchiato-permissions to try again."
+}
+
 BRANCH="$(git -C "$REPO" rev-parse --abbrev-ref HEAD)"
 say "clone: $REPO (on $BRANCH)"
 
@@ -59,6 +66,7 @@ REMOTE="$(git -C "$REPO" rev-parse "$UPSTREAM")"
 if [ "$LOCAL" = "$REMOTE" ]; then
   say "already up to date ($(git -C "$REPO" log -1 --format='%h %s'))"
   requirements
+  permissions
   exit 0
 fi
 
@@ -70,6 +78,7 @@ if git -C "$REPO" merge-base --is-ancestor "$REMOTE" "$LOCAL"; then
   AHEAD="$(git -C "$REPO" rev-list --count "$REMOTE..$LOCAL")"
   say "nothing to pull — you are $AHEAD commit(s) ahead of $UPSTREAM"
   requirements
+  permissions
   exit 0
 fi
 if ! git -C "$REPO" merge-base --is-ancestor "$LOCAL" "$REMOTE"; then

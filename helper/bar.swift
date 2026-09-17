@@ -631,6 +631,84 @@ func readConf(_ name: String) -> [String: String] {
 // `<pill> = hide` or `<pill> = icon` per line. Read once at startup.
 let pillModes = readConf("bar-pills.conf")
 
+// --- --request-permissions -------------------------------------------------
+// A direct run asks for the terminal's grants, so start the switch through
+// omacchiato-permissions. It runs before the bar draws or subscribes to
+// anything. It can read only the globals above this line.
+
+final class PermissionAnswer: NSObject, CBCentralManagerDelegate, CLLocationManagerDelegate {
+    var answered = false
+    func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        if CBCentralManager.authorization != .notDetermined { answered = true }
+    }
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        if manager.authorizationStatus != .notDetermined { answered = true }
+    }
+    // the prompt stays up until the person answers it
+    func wait() {
+        let deadline = Date().addingTimeInterval(120)
+        while !answered, Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.2)) }
+    }
+}
+
+func requestPermissions() -> Never {
+    func report(_ name: String, _ state: String) {
+        print(name, state)
+        fflush(stdout)
+    }
+
+    // AEDeterminePermissionToAutomateTarget blocks until the person answers
+    for (name, bundleID) in [("automation-system-events", "com.apple.systemevents"),
+                             ("automation-ghostty", "com.mitchellh.ghostty"),
+                             ("automation-music", musicBundleID)] {
+        let target = NSAppleEventDescriptor(bundleIdentifier: bundleID)
+        switch AEDeterminePermissionToAutomateTarget(target.aeDesc, typeWildCard, typeWildCard, true) {
+        case noErr: report(name, "granted")
+        case OSStatus(errAEEventNotPermitted): report(name, "denied")
+        default: report(name, "unknown") // procNotFound: the app is not running
+        }
+    }
+
+    // Skip the grant of a hidden pill. The bar never uses it.
+    if pillModes["bluetooth"] != "hide" {
+        let answer = PermissionAnswer()
+        var central: CBCentralManager?
+        if CBCentralManager.authorization == .notDetermined {
+            central = CBCentralManager(delegate: answer, queue: .main)
+            answer.wait()
+        }
+        _ = central
+        switch CBCentralManager.authorization {
+        case .allowedAlways: report("bluetooth", "granted")
+        case .notDetermined: report("bluetooth", "unknown")
+        default: report("bluetooth", "denied")
+        }
+    }
+
+    if pillModes["wifi"] != "hide" {
+        let answer = PermissionAnswer()
+        let manager = CLLocationManager()
+        manager.delegate = answer
+        if manager.authorizationStatus == .notDetermined {
+            manager.requestWhenInUseAuthorization()
+            answer.wait()
+        }
+        switch manager.authorizationStatus {
+        case .authorizedAlways, .authorized: report("location", "granted")
+        case .notDetermined: report("location", "unknown")
+        default: report("location", "denied")
+        }
+    }
+
+    // Last, because its dialog does not block: it stays up after the exit.
+    let prompt = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+    report("accessibility", AXIsProcessTrustedWithOptions(prompt) ? "granted" : "denied")
+    report("done", "")
+    exit(0)
+}
+
+if CommandLine.arguments.contains("--request-permissions") { requestPermissions() }
+
 // A pill defined in ~/.config/omacchiato/bar-plugins.conf: an INI section
 // per pill, with a shell command whose stdout becomes the label. This is
 // the escape hatch from rebuilding for every new widget.

@@ -1,0 +1,173 @@
+#!/usr/bin/env bash
+# omacchiato-permissions: check the privacy permissions of omacchiato-bar and
+# omacchiato-gesture, and walk through each one that is off.
+#
+# Without a terminal it prints a Settings link for each permission that is
+# off. It exits 1 when a permission is still off.
+set -uo pipefail
+
+SELF="${BASH_SOURCE[0]}"
+while [ -L "$SELF" ]; do
+  LINK="$(readlink "$SELF")"
+  case "$LINK" in /*) SELF="$LINK" ;; *) SELF="$(dirname "$SELF")/$LINK" ;; esac
+done
+REPO="$(cd "$(dirname "$SELF")/.." && pwd)"
+"$REPO/bin/omacchiato-banner"
+export OMACCHIATO_BANNER_SHOWN=1
+
+APPS="$HOME/.local/share/omacchiato"
+SETTINGS="x-apple.systempreferences:com.apple.preference.security?Privacy_"
+
+say() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
+
+label() {
+  case "$1" in
+    accessibility) echo "Accessibility" ;;
+    screen-recording) echo "Screen Recording" ;;
+    bluetooth) echo "Bluetooth" ;;
+    location) echo "Location Services" ;;
+    automation-*) echo "Automation: $(target "$1")" ;;
+    *) echo "$1" ;;
+  esac
+}
+
+pane() {
+  case "$1" in
+    screen-recording) echo ScreenCapture ;;
+    location) echo LocationServices ;;
+    automation-*) echo Automation ;;
+    *) label "$1" ;;
+  esac
+}
+
+target() {
+  case "$1" in
+    automation-system-events) echo "System Events" ;;
+    automation-ghostty) echo "Ghostty" ;;
+    automation-music) echo "Music" ;;
+  esac
+}
+
+# The launchd label and the bundle ID are the same.
+bundle() { echo "com.omacchiato.${1#omacchiato-}"; }
+
+# request <app>: print one `<permission> <state>` line for each permission.
+# `open -n` makes the app responsible for itself. A direct run of the binary
+# asks for the terminal's grants.
+request() {
+  local out
+  out="$(mktemp -t omacchiato-permissions)"
+  open -n -W --stdout "$out" "$APPS/$1.app" --args --request-permissions 2>/dev/null
+  # `open -W` returns at once if the app exits before `open` finds it
+  while ! grep -q '^done' "$out" && pgrep -qf -- "$1 --request-permissions"; do
+    sleep 0.2
+  done
+  grep -v '^done' "$out"
+  rm -f "$out"
+}
+
+# fix <app> <permission>: open the page and check again after Enter.
+# Returns 0 when the permission is on, 1 when it is off, 2 when skipped.
+fix() {
+  local reply
+  case "$2" in
+    automation-*) echo "    In the list, open $1 and switch on $(target "$2")." ;;
+    *) echo "    Switch on $1 on the page that opens." ;;
+  esac
+  open "$SETTINGS$(pane "$2")"
+  read -r -p "    Press Enter when done, or type s to skip: " reply
+  [ "$reply" = s ] && return 2
+  [ "$(request "$1" | awk -v k="$2" '$1 == k { print $2 }')" = granted ]
+}
+
+# System Events answers Apple Events only while it runs.
+open -gj -b com.apple.systemevents 2>/dev/null || true
+
+off=()
+unanswered=0
+for app in omacchiato-bar omacchiato-gesture; do
+  if [ ! -d "$APPS/$app.app" ]; then
+    say "$app is not installed"
+    continue
+  fi
+  say "$app"
+  while read -r key state; do
+    [ -n "$key" ] || continue
+    case "$state" in
+      granted) echo "    ✅ $(label "$key")" ;;
+      denied)
+        echo "    ❌ $(label "$key")"
+        off+=("$app $key")
+        ;;
+      *)
+        unanswered=$((unanswered + 1))
+        case "$key" in
+          automation-*) echo "    ❔ $(label "$key"): open $(target "$key"), then run omacchiato-permissions again" ;;
+          *) echo "    ❔ $(label "$key"): no answer, run omacchiato-permissions again" ;;
+        esac
+        ;;
+    esac
+  done <<EOF
+$(request "$app")
+EOF
+done
+
+if [ ${#off[@]} -eq 0 ]; then
+  if [ "$unanswered" = 0 ]; then
+    say "All Omacchiato permissions are on"
+  else
+    say "No permission is off, but the ❔ ones above have no answer yet"
+  fi
+  exit 0
+fi
+
+if [ ! -t 0 ] || [ ! -t 1 ]; then
+  say "Switch these on in System Settings:"
+  for item in "${off[@]}"; do
+    set -- $item
+    echo "    $1, $(label "$2"): $SETTINGS$(pane "$2")"
+  done
+  exit 1
+fi
+
+status=0
+for item in "${off[@]}"; do
+  set -- $item
+  app=$1 key=$2
+  echo
+  say "$app needs $(label "$key")"
+  fix "$app" "$key"
+  result=$?
+  if [ "$result" = 1 ]; then
+    service=""
+    case "$key" in
+      accessibility) service=Accessibility ;;
+      screen-recording) service=ScreenCapture ;;
+    esac
+    if [ -n "$service" ]; then
+      read -r -p "    Still off. If the switch shows on, an older build owns it. Reset the entry and ask again? [y/N] " reply
+      if [ "$reply" = y ] || [ "$reply" = Y ]; then
+        tccutil reset "$service" "$(bundle "$app")"
+        # the reset removes the entry, and a new request adds it back
+        request "$app" >/dev/null
+        fix "$app" "$key"
+        result=$?
+      fi
+    fi
+  fi
+  case "$result" in
+    0)
+      launchctl kickstart -k "gui/$(id -u)/$(bundle "$app")"
+      echo "    ✅ on, $app restarted"
+      ;;
+    2)
+      echo "    skipped"
+      status=1
+      ;;
+    *)
+      echo "    ❌ still off"
+      status=1
+      ;;
+  esac
+done
+exit "$status"

@@ -492,11 +492,21 @@ every grant, which binary asks, what it is used for, and what you lose
 by refusing it. Everything is refusable; the parts that depend on a
 grant hide themselves rather than half-work.
 
+`omacchiato-permissions` checks the grants of `omacchiato-bar` and
+`omacchiato-gesture`. For each one that is off, it opens the page in
+System Settings, waits for you to switch it on, and checks again.
+`install.sh` runs it at the end. It does not check the grants of
+Karabiner-Elements or OmniWM.
+
+macOS gives a grant to the app that starts a program, not to the program
+itself. So a swipe opens the overview with the gesture daemon's Screen
+Recording grant, and `Super+O` opens it with Karabiner's.
+
 | Grant | Who asks | What it does | Without it |
 |---|---|---|---|
 | **Accessibility** | OmniWM, `omacchiato-gesture`, `omacchiato-bar` (reads the focused app's menus for the app-pill popup, and reads and clicks other apps' menu bar icons for the menu bar apps pill) | Move, resize and focus other apps' windows. This is the tiling itself, and it is the broadest permission here. | Nothing tiles. Not optional in practice. |
-| **Input Monitoring** | Karabiner-Elements, `omacchiato-gesture`, and OmniWM | Karabiner reads keys to remap Caps Lock; `omacchiato-gesture` reads raw trackpad contacts, because macOS 26 stopped carrying touch data in normal events. | No Super key, no swipe gestures. |
-| **Screen Recording** | `omacchiato-overview`; OmniWM (optional) | Captures a thumbnail per window for the overview cards, including windows the window manager has stashed offscreen. OmniWM uses it for its own overview thumbnails, the image of a window you drag, and Hidden Bar icons. | Cards fall back to app icons and titles. OmniWM starts without it. |
+| **Input Monitoring** | Karabiner-Elements and OmniWM; `omacchiato-gesture` on macOS 26 | Karabiner reads keys to remap Caps Lock; `omacchiato-gesture` reads raw trackpad contacts, because macOS 26 stopped carrying touch data in normal events. On macOS 27 it reads them without this grant. | No Super key, no swipe gestures. |
+| **Screen Recording** | `omacchiato-gesture` for a swipe, Karabiner-Elements for `Super+O`; OmniWM (optional) | Captures a thumbnail per window for the overview cards, including windows the window manager has stashed offscreen. OmniWM uses it for its own overview thumbnails, the image of a window you drag, and Hidden Bar icons. | Cards fall back to app icons and titles. OmniWM starts without it. |
 | **Bluetooth** | `omacchiato-bar` | Reads adapter power and the paired-device list for the bluetooth pill and its menu. | The pill hides itself. |
 | **Location** | `omacchiato-bar` | Reads **only** the wi-fi network's name, which macOS classes as location data. No coordinate is requested; the authorisation itself is what unlocks `CWInterface.ssid()`. | The wi-fi popup's title row reads "wi-fi" instead of your network's name. |
 | **Automation** | `omacchiato-bar`, `theme-set`, and the terminal that runs `install.sh` | Apple Events to **Music** (the current track and its artwork), to **Ghostty** (reloading its colours after a theme change) and to **System Events** (sleep, lock and restart from the Apple menu; setting the wallpaper; adding OmniWM as a login item). | The media pill has no artwork; those menu rows do nothing; OmniWM does not start at login until you add it under System Settings > General > Login Items. |

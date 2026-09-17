@@ -244,6 +244,32 @@ The design and the test results are in
   `migrate-omacosy.sh` first, so it also removes the retired agents of an
   install that never ran a newer `install.sh`.
 
+## Permissions (`bin/omacchiato-permissions`)
+
+- TCC charges a request to the responsible process. A child that `popen`,
+  `posix_spawn` or `Process` starts uses its parent's grants. A swipe
+  starts the overview through the gesture daemon, so the overview uses
+  that daemon's Screen Recording grant.
+- `install.sh` runs `omacchiato-permissions` at the end.
+  `omacchiato-update` runs it on every run except `--check`, also when
+  there is nothing to pull.
+- `omacchiato-permissions` starts each app with
+  `open -n -W --stdout <file> <app> --args --request-permissions`.
+  LaunchServices makes that copy responsible for itself. If you run the
+  binary directly, it reports the terminal's grants.
+- The switch runs before other startup code. In the bar it comes right
+  after `pillModes`, so it can read only the globals above it. In the
+  gesture daemon it comes before the lock file, which the running daemon
+  holds. It prints `<permission> granted|denied|unknown` lines, then
+  `done`.
+- `open -W` returns at once if the app exits before `open` finds it. So
+  the script waits for the `done` line.
+- `tccutil reset <Service> <bundle-id>` fails with `-10814` when
+  LaunchServices does not know the bundle.
+- `install.sh`, `uninstall.sh`, `omacchiato-update` and
+  `omacchiato-permissions` run `bin/omacchiato-banner` first and export
+  `OMACCHIATO_BANNER_SHOWN=1`, so a nested run prints no second banner.
+
 ## Pill scripts in `bin/`
 
 - `omacchiato-github-prs [search qualifiers]` lists open PRs by
