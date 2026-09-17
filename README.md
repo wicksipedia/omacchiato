@@ -66,6 +66,12 @@ one whose branch has diverged, rather than deciding either for you. It
 pulls the remote branch that your branch tracks, so a clone of a fork
 updates from the fork.
 
+Both commands also check app versions. `config/requirements.conf` lists
+the minimum version of each app whose settings omacosy writes, starting
+with OmniWM 0.7.0. An app that is too old or missing is reported with the
+`brew` command that fixes it. Run `bin/omacosy-requirements` for the check
+alone.
+
 There is no background update check. By default the bar makes one network
 call (the weather), and a daemon polling GitHub on a timer would
 quietly make that two. Nothing here contacts the network unless you

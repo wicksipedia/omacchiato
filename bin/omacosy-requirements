@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# omacosy-requirements [file] — check installed apps against the minimum
+# versions in config/requirements.conf. Exits 1 when one is too old or missing.
+set -euo pipefail
+
+SELF="${BASH_SOURCE[0]}"
+while [ -L "$SELF" ]; do
+  LINK="$(readlink "$SELF")"
+  case "$LINK" in /*) SELF="$LINK" ;; *) SELF="$(dirname "$SELF")/$LINK" ;; esac
+done
+FILE="${1:-$(cd "$(dirname "$SELF")/.." && pwd)/config/requirements.conf}"
+
+status=0
+while read -r app need cask; do
+  case "$app" in '' | '#'*) continue ;; esac
+  have=""
+  for dir in /Applications "$HOME/Applications"; do
+    plist="$dir/$app.app/Contents/Info.plist"
+    if [ -f "$plist" ]; then
+      have="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist" 2>/dev/null || true)"
+      break
+    fi
+  done
+  if [ -z "$have" ]; then
+    printf '  %s: not installed, needs %s or newer (brew install --cask %s)\n' "$app" "$need" "$cask"
+    status=1
+  elif [ "$(printf '%s\n%s\n' "$need" "$have" | sort -V | head -1)" != "$need" ]; then
+    printf '  %s %s: too old, needs %s or newer (brew upgrade --cask %s)\n' "$app" "$have" "$need" "$cask"
+    status=1
+  else
+    printf '  %s %s: ok (needs %s)\n' "$app" "$have" "$need"
+  fi
+done < <(tr -d '\r' < "$FILE")
+exit "$status"

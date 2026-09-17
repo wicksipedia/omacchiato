@@ -14,6 +14,9 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   `git fetch origin && git merge origin/main`.
 - `omacosy-update` pulls the branch that the local branch tracks, then
   runs `install.sh` again.
+- `config/requirements.conf` holds the minimum app versions that
+  `bin/omacosy-requirements` checks. Raise one when omacosy starts to
+  write a setting that only a newer version of the app reads.
 - The clone lives at `~/.local/share/omacosy`, and configs are symlinked
   into it, so an edit to a symlinked config is live. A clone in
   `~/Documents`, `~/Desktop` or `~/Downloads` gets copies instead,

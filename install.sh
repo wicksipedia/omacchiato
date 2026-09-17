@@ -79,6 +79,10 @@ comm -13 <(printf '%s\n' "$PRE_FORMULAE") <(brew list --formula 2>/dev/null | so
 comm -13 <(printf '%s\n' "$PRE_CASKS") <(brew list --cask 2>/dev/null | sort) \
   | while read -r c; do [ -n "$c" ] && mark "brew-cask $c"; done
 
+log "Checking app versions"
+"$REPO_DIR/bin/omacosy-requirements" ||
+  log "WARNING: an app above is older than omacosy needs; its settings may be rejected."
+
 # --- 2. Symlinks ------------------------------------------------------------
 # Existing non-symlink targets are backed up, never deleted. A
 # pre-existing SYMLINK (dotfiles managers) is recorded in the manifest

@@ -30,6 +30,12 @@ REPO="$(cd "$(dirname "$SELF")/.." && pwd)"
 [ -f "$REPO/install.sh" ] || die "could not find the omacosy clone (looked in $REPO)"
 git -C "$REPO" rev-parse --git-dir >/dev/null 2>&1 || die "$REPO is not a git clone; update by hand"
 
+# install.sh checks app versions itself; this covers the exits that skip it
+requirements() {
+  say "app versions"
+  "$REPO/bin/omacosy-requirements" || say "WARNING: an app above is older than omacosy needs"
+}
+
 BRANCH="$(git -C "$REPO" rev-parse --abbrev-ref HEAD)"
 say "clone: $REPO (on $BRANCH)"
 
@@ -50,6 +56,7 @@ REMOTE="$(git -C "$REPO" rev-parse "$UPSTREAM")"
 
 if [ "$LOCAL" = "$REMOTE" ]; then
   say "already up to date ($(git -C "$REPO" log -1 --format='%h %s'))"
+  requirements
   exit 0
 fi
 
@@ -60,6 +67,7 @@ fi
 if git -C "$REPO" merge-base --is-ancestor "$REMOTE" "$LOCAL"; then
   AHEAD="$(git -C "$REPO" rev-list --count "$REMOTE..$LOCAL")"
   say "nothing to pull — you are $AHEAD commit(s) ahead of $UPSTREAM"
+  requirements
   exit 0
 fi
 if ! git -C "$REPO" merge-base --is-ancestor "$LOCAL" "$REMOTE"; then
@@ -73,6 +81,7 @@ git -C "$REPO" log --no-merges --format='    %h %s' "$LOCAL..$REMOTE" | head -20
 
 if [ "${1:-}" = "--check" ]; then
   say "run without --check to apply"
+  requirements
   exit 0
 fi
 
