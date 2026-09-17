@@ -49,6 +49,20 @@ if ! command -v brew >/dev/null 2>&1; then
   mark "installed-homebrew"
 fi
 
+# OmniWM asks to be quit before Homebrew upgrades it, because Homebrew swaps
+# the app out underneath a running copy. The start step at the end of this
+# script brings it back.
+if pgrep -xq OmniWM && [ "$(brew outdated --cask --greedy --quiet omniwm 2>/dev/null)" = omniwm ]; then
+  log "Quitting OmniWM while Homebrew upgrades it"
+  osascript -e 'quit app "OmniWM"' 2>/dev/null || true
+  for _ in 1 2 3 4 5 6 7 8 9 10; do pgrep -xq OmniWM || break; sleep 1; done
+  if pgrep -xq OmniWM; then
+    # a hung quit must not leave Homebrew swapping the app underneath it
+    pkill -x OmniWM 2>/dev/null || true
+    for _ in 1 2 3 4 5; do pgrep -xq OmniWM || break; sleep 1; done
+  fi
+fi
+
 log "Installing packages (brew bundle)"
 PRE_FORMULAE="$(brew list --formula 2>/dev/null | sort)"
 PRE_CASKS="$(brew list --cask 2>/dev/null | sort)"

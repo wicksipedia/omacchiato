@@ -197,6 +197,12 @@ The design and the test results are in
   Match OmniWM by bundle-ID prefix. An exact match once made the bar
   treat the dev build as no window manager.
 - Screen Recording is optional for OmniWM.
+- If OmniWM cannot use `settings.toml` at startup, it runs with its
+  defaults, which turn IPC off. An explicit settings save then moves the
+  file to `settings.toml.corrupt`. Check that file before you edit the
+  defaults: OmniWM reloads a copied-back file live, and `omniwmctl` answers
+  again once IPC is on. `settings.toml.pre-v3` is the byte copy from a
+  schema upgrade. OmniWM's Health panel lists both files until they move.
 - To work on upstream OmniWM (BarutSRB/OmniWM), run
   `./Scripts/dev-tools.sh setup` once. CI runs `make verify` (format,
   lint and build) and
