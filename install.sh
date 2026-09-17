@@ -330,7 +330,7 @@ link "$REPO_DIR/bin/theme-set"  "$HOME/.local/bin/theme-set"
 link "$REPO_DIR/bin/theme-next" "$HOME/.local/bin/theme-next"
 link "$REPO_DIR/bin/theme-bg-next" "$HOME/.local/bin/theme-bg-next"
 link "$REPO_DIR/bin/omacchiato-toggle" "$HOME/.local/bin/omacchiato-toggle"
-link "$REPO_DIR/bin/omacchiato-claude-usage" "$HOME/.local/bin/omacchiato-claude-usage"
+link "$REPO_DIR/bin/omacchiato-ai-usage" "$HOME/.local/bin/omacchiato-ai-usage"
 link "$REPO_DIR/bin/omacchiato-github-prs" "$HOME/.local/bin/omacchiato-github-prs"
 link "$REPO_DIR/bin/omacchiato-keep-awake" "$HOME/.local/bin/omacchiato-keep-awake"
 link "$REPO_DIR/bin/omacchiato-ws" "$HOME/.local/bin/omacchiato-ws"
@@ -343,7 +343,25 @@ link "$REPO_DIR/bin/omacchiato-herdr-worktree" "$HOME/.local/bin/omacchiato-herd
 link "$REPO_DIR/bin/omacchiato-popup" "$HOME/.local/bin/omacchiato-popup"
 link "$REPO_DIR/bin/omacchiato-permissions" "$HOME/.local/bin/omacchiato-permissions"
 
-# tokscale, for the Claude pill's last seven days. Homebrew has no formula, so
+# omacchiato-claude-usage became omacchiato-ai-usage, whose default is the
+# Claude pill. sed -i replaces a symlink with a file, so edit its target.
+PLUGINS_CONF="$HOME/.config/omacchiato/bar-plugins.conf"
+if [ -f "$PLUGINS_CONF" ] && grep -q 'omacchiato-claude-usage' "$PLUGINS_CONF"; then
+  sed -i '' 's/omacchiato-claude-usage/omacchiato-ai-usage/g' "$(readlink -f "$PLUGINS_CONF")"
+fi
+OLD_USAGE="$HOME/.local/bin/omacchiato-claude-usage"
+case "$(readlink "$OLD_USAGE" 2>/dev/null || true)" in *omacchiato* | *omacosy*) rm -f "$OLD_USAGE" ;; esac
+if have "copied-config $OLD_USAGE"; then
+  rm -f "$OLD_USAGE"
+  { grep -vxF "copied-config $OLD_USAGE" "$MANIFEST" || true; } > "$MANIFEST.tmp"
+  mv "$MANIFEST.tmp" "$MANIFEST"
+fi
+rm -f "$HOME/.config/omacchiato/claude-usage-cache.json"
+if grep -qs 'omacchiato-claude-statusline' "$HOME/.claude/settings.json"; then
+  log "WARNING: ~/.claude/settings.json runs omacchiato-claude-statusline, which is gone. Remove it from the statusLine command."
+fi
+
+# tokscale, for the AI usage pill. Homebrew has no formula, so
 # take the macOS binary from tokscale's npm package, pinned by version and
 # checksum. Change all three together.
 TOKSCALE_VERSION=4.17.0
@@ -368,7 +386,7 @@ if [ ! -x "$TOKSCALE_DIR/tokscale" ]; then
     done
   else
     rm -rf "$TOKSCALE_DIR"
-    log "WARNING: tokscale did not install; the Claude pill skips its weekly stats."
+    log "WARNING: tokscale did not install; the AI usage pill has no data."
   fi
   rm -rf "$tmp"
 fi

@@ -1,0 +1,448 @@
+#!/usr/bin/env python3
+"""AI plan usage for a bar pill, as the JSON a bar plugin can return.
+
+    omacchiato-ai-usage [--pill <id>[:<metric>],...] [--panel <id>,...]
+
+--pill sets the providers in the label, --panel the providers in the popup.
+A metric is a tokscale metric label such as weekly, 5h (the default) or max.
+
+tokscale reads the quotas (`tokscale usage`) and the local session logs
+(`tokscale graph`). tokscale 4.17.0 reads Claude Code's token and never
+writes it back. A refresh races Claude Code and signs the user out, so check
+this again before a raise of the tokscale version in install.sh.
+"""
+import argparse
+import json
+import os
+import re
+import shutil
+import subprocess
+import textwrap
+import time
+import urllib.error
+import urllib.request
+from datetime import datetime, timedelta, timezone
+
+HOME = os.path.expanduser("~")
+CACHE = os.environ.get("OMACCHIATO_AI_USAGE_CACHE",
+                       os.path.join(HOME, ".config/omacchiato/ai-usage-cache.json"))
+
+FIVE_HOURS = 5 * 3600
+WEEK = 7 * 24 * 3600
+MONTH = 30 * 24 * 3600
+
+# The id is the tokscale client id and, ignoring case, its usage provider name.
+# span: the window length of a metric label that SPANS does not name.
+# colour: a bar colour name or #RRGGBB. The OpenAI and Copilot logos are
+# black or white, so they take the theme's label colour.
+PROVIDERS = {
+    "claude": {"page": "https://status.claude.com", "component": "Claude Code",
+               "span": WEEK, "glyph": "\uec82", "colour": "#D97757"},
+    "codex": {"page": "https://status.openai.com", "component": "Codex",
+              "span": WEEK, "glyph": "\uec81", "colour": "label"},
+    "copilot": {"page": "https://www.githubstatus.com", "component": "Copilot",
+                "span": MONTH, "glyph": "\uec1e", "colour": "label"},
+}
+SPANS = {"session": FIVE_HOURS, "5h": FIVE_HOURS, "weekly": WEEK, "30d": MONTH}
+# Statuspage indicators, best first. A page's overall rating also drops for
+# products the pill does not track, so health reads the matching components.
+INDICATORS = ["none", "minor", "major", "critical"]
+COMPONENT_INDICATOR = {"operational": "none", "degraded_performance": "minor",
+                       "under_maintenance": "minor", "partial_outage": "major",
+                       "major_outage": "critical"}
+
+FRESH_S = 300          # run tokscale usage and read status pages at most this often
+SERVE_STALE_S = 900    # keep a provider that a run did not return this long past FRESH_S
+TIMEOUT_S = 5          # the pill must not hang on a slow network
+USAGE_TIMEOUT_S = 20   # tokscale usage asks every provider it knows
+STATS_S = 600          # re-read the week from tokscale at most this often
+STATS_TIMEOUT_S = 20   # tokscale reads every session log, and a long history is slow
+WRAP = 40              # split incident text into rows this long, to keep the popup narrow
+
+NOW = time.time()
+
+
+def ids(value):
+    return [v.strip().lower() for v in value.split(",") if v.strip()]
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--pill", type=ids, default=["claude"])
+parser.add_argument("--panel", type=ids)
+args = parser.parse_args()
+PILL = [(pid, want or "5h") for pid, _, want in (p.partition(":") for p in args.pill)]
+PANEL = args.panel or [pid for pid, _ in PILL]
+
+
+def seconds_until(value):
+    try:
+        when = datetime.fromisoformat(value)
+        # a bare date, as Copilot sends, is midnight UTC
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=timezone.utc)
+        return when.timestamp() - NOW
+    except (TypeError, ValueError):
+        return None
+
+
+# thin spaces: a normal space is a whole cell in the bar's monospace font
+LABEL_DOT = " · "
+
+
+def clock(left):
+    h, m = divmod(int(left) // 60, 60)
+    return "%dd" % (h // 24) if h >= 24 else "%d:%02d" % (h, m)
+
+
+def countdown(left):
+    d, rest = divmod(int(left) // 60, 24 * 60)
+    h, m = divmod(rest, 60)
+    return "%dd %dh" % (d, h) if d else "%dh %dm" % (h, m) if h else "%dm" % m
+
+
+def colour_for(pct):
+    return "green" if pct < 50 else "yellow" if pct < 80 else "red"
+
+
+# --- cache -----------------------------------------------------------------
+def read_cache():
+    try:
+        with open(CACHE) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def write_cache(entry):
+    try:
+        os.makedirs(os.path.dirname(CACHE), exist_ok=True)
+        tmp = CACHE + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(entry, f)
+        os.replace(tmp, CACHE)
+    except OSError:
+        pass
+
+
+def find_tokscale():
+    """install.sh links tokscale into ~/.local/bin."""
+    path = os.path.join(HOME, ".local/bin/tokscale")
+    return path if os.access(path, os.X_OK) else shutil.which("tokscale")
+
+
+# --- quotas ----------------------------------------------------------------
+def usage(entry, tokscale):
+    """The tokscale usage entries of each provider id. A Codex id can have
+    one entry for each account."""
+    seen = entry.get("usage") or {}
+    # a failed run waits too, so a broken tokscale does not run on every refresh
+    if tokscale and NOW - entry.get("usage_at", 0) >= FRESH_S:
+        entry["usage_at"] = NOW
+        try:
+            r = subprocess.run([tokscale, "usage", "--json"],
+                               capture_output=True, text=True, timeout=USAGE_TIMEOUT_S)
+            fresh = {}
+            for output in json.loads(r.stdout):
+                fresh.setdefault(output["provider"].lower(), []).append(output)
+            seen.update({pid: {"at": NOW, "outputs": o} for pid, o in fresh.items()})
+        except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError, AttributeError):
+            pass
+        entry["usage"] = seen
+        write_cache(entry)
+    return {pid: u["outputs"] for pid, u in seen.items() if NOW - u["at"] < FRESH_S + SERVE_STALE_S}
+
+
+def pick(metrics, want):
+    """The metric that --pill names, else the most used one."""
+    names = ("5h", "session") if want == "5h" else (want,)
+    for m in metrics:
+        if m.get("label", "").lower() in names:
+            return m
+    return max(metrics, key=lambda m: m.get("used_percent") or 0, default=None)
+
+
+def active(outputs):
+    return next((o for o in outputs if (o.get("account") or {}).get("is_active")), outputs[0])
+
+
+# --- health ----------------------------------------------------------------
+def get_json(url):
+    with urllib.request.urlopen(url, timeout=TIMEOUT_S) as r:
+        return json.load(r)
+
+
+def component_status(summary, prefix):
+    worst = None
+    for c in summary.get("components") or []:
+        if not c.get("name", "").startswith(prefix):
+            continue
+        s = c.get("status", "")
+        indicator = COMPONENT_INDICATOR.get(s, "major")
+        if worst is None or INDICATORS.index(indicator) > INDICATORS.index(worst["indicator"]):
+            worst = {"indicator": indicator,
+                     "description": "%s: %s" % (c["name"], s.replace("_", " ").capitalize())}
+    # renamed or gone: the page-wide rating is better than no signal
+    return worst or summary.get("status") or {}
+
+
+def open_incidents(summary, prefix, page):
+    """Unresolved incidents that name a matching component, or name no component."""
+    found = []
+    for i in summary.get("incidents") or []:
+        names = [c.get("name", "") for c in i.get("components") or []]
+        if names and not any(n.startswith(prefix) for n in names):
+            continue
+        latest = (i.get("incident_updates") or [{}])[0]
+        found.append({"name": i.get("name", ""),
+                      "status": latest.get("status") or i.get("status", ""),
+                      "at": latest.get("created_at"),
+                      "url": i.get("shortlink") or page})
+    return found
+
+
+def health(entry, pid):
+    if pid not in PROVIDERS:
+        return None
+    page, prefix = PROVIDERS[pid]["page"], PROVIDERS[pid]["component"]
+    known = entry.setdefault("health", {})
+    cached = known.get(pid)
+    if cached is None or NOW - cached["at"] >= FRESH_S:
+        try:
+            summary = get_json(page + "/api/v2/summary.json")
+            cached = {"status": component_status(summary, prefix),
+                      "incidents": open_incidents(summary, prefix, page)}
+        except (urllib.error.URLError, OSError, ValueError):
+            # keep the last status, and wait before the next try
+            cached = cached or {"status": None, "incidents": []}
+        cached["at"] = NOW
+        known[pid] = cached
+        write_cache(entry)
+    return cached
+
+
+def local_time(value):
+    try:
+        return datetime.fromisoformat(value).astimezone().strftime("%H:%M")
+    except (TypeError, ValueError):
+        return ""
+
+
+def incident_rows(incident):
+    url = incident["url"]
+    rows = [{"text": line, "url": url}
+            for line in textwrap.wrap(incident["name"], WRAP, max_lines=3, placeholder=" …")]
+    when = " · ".join(filter(None, [incident["status"].capitalize(), local_time(incident["at"])]))
+    if when:
+        rows.append({"text": when, "dim": True, "url": url})
+    return rows
+
+
+def health_rows(pid, state):
+    status = (state or {}).get("status") or {}
+    if not status.get("description"):
+        return []
+    colour = {"none": "green", "minor": "yellow"}.get(status.get("indicator"), "red")
+    rows = [{"text": status["description"], "detail": "status", "color": colour,
+             "url": PROVIDERS[pid]["page"]}]
+    for n, incident in enumerate(state.get("incidents") or []):
+        rows += ([{"separator": True}] if n else []) + incident_rows(incident)
+    return rows
+
+
+def health_mark(states):
+    """An emoji when a --pill provider is not healthy."""
+    indicators = [s["status"]["indicator"] for s in states
+                  if s and s.get("status") and s["status"].get("indicator") in INDICATORS]
+    if not indicators:
+        return ""
+    worst = max(indicators, key=INDICATORS.index)
+    return {"none": "", "minor": "\U0001F3E5"}.get(worst, "\U0001FAA6")
+
+
+# --- seven-day stats -------------------------------------------------------
+def tokens_row(tokscale):
+    """A row that opens tokscale's full report in a terminal."""
+    return {"text": "Token usage", "detail": "tokscale", "terminal": tokscale}
+
+
+def week_stats(entry, tokscale, clients):
+    """Seven days of use, from tokscale's read of the local session logs."""
+    key = ",".join(clients)
+    if NOW - entry.get("week_at", 0) < STATS_S and entry.get("week_key") == key:
+        return entry.get("week")
+    stats = entry.get("week") if entry.get("week_key") == key else None
+    try:
+        r = subprocess.run([tokscale, "graph", "--week", "-c", key, "--no-spinner"],
+                           capture_output=True, text=True, timeout=STATS_TIMEOUT_S)
+        graph = json.loads(r.stdout)
+        days, models = {}, {}
+        for day in graph["contributions"]:
+            days[day["date"]] = [day["totals"]["tokens"], day["totals"].get("cost", 0)]
+            for use in day.get("clients") or []:
+                tokens, cost = models.get(use["modelId"], [0, 0])
+                models[use["modelId"]] = [tokens + sum(use["tokens"].values()), cost + use.get("cost", 0)]
+        metrics = graph.get("timeMetrics") or {}
+        stats = {"days": days,
+                 "models": sorted(([m] + v for m, v in models.items()), key=lambda m: -m[1]),
+                 "sessions": metrics.get("sessionCount", 0),
+                 "active_ms": metrics.get("totalActiveTimeMs", 0),
+                 "active_days": (graph.get("summary") or {}).get("activeDays", 0)}
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError, AttributeError):
+        pass  # keep the last week on screen
+    # a failed read waits too, so a broken tokscale does not run on every refresh
+    entry.update({"week": stats, "week_at": NOW, "week_key": key})
+    write_cache(entry)
+    return stats
+
+
+def human(n):
+    for unit, size in (("B", 1e9), ("M", 1e6), ("K", 1e3)):
+        if round(n / size, 1) >= 1:
+            return "%.1f%s" % (n / size, unit)
+    return str(int(n))
+
+
+def dollars(amount):
+    return "$%.0f" % amount if amount >= 10 or amount == 0 else "$%.2f" % amount
+
+
+def model_name(model_id):
+    """claude-haiku-4-5-20251001 reads as Haiku 4.5."""
+    parts = re.sub(r"-\d{8}$", "", model_id.removeprefix("claude-")).split("-")
+    version = ".".join(p for p in parts if p.isdigit())
+    return " ".join(p.title() for p in parts if not p.isdigit()) + (" " + version if version else "")
+
+
+def stats_rows(stats):
+    today = datetime.now().date()
+    week = [today - timedelta(days=n) for n in range(6, -1, -1)]
+    spend = [stats["days"].get(day.isoformat(), [0, 0]) for day in week]
+    peak = max(n for n, _ in spend) or 1
+    rows = [{"separator": True},
+            {"text": "Last 7 days at API prices", "hero": True, "section": "closed", "detail": "%s · %s" % (
+                human(sum(n for n, _ in spend)), dollars(sum(c for _, c in spend)))},
+            {"text": "%d sessions · %d active days · %dh" % (
+                stats["sessions"], stats["active_days"], stats["active_ms"] // 3_600_000), "dim": True}]
+    for day, (n, cost) in zip(week, spend):
+        rows.append({"text": "Today" if day == today else day.strftime("%a"), "bar": n / peak,
+                     "detail": "%s · %s" % (human(n), dollars(cost))})
+    models = stats["models"][:3]
+    if models:
+        rows.append({"separator": True})
+        for model, n, cost in models:
+            rows.append({"text": model_name(model), "bar": n / (models[0][1] or 1),
+                         "detail": "%s · %s" % (human(n), dollars(cost))})
+    return rows
+
+
+# --- rendering -------------------------------------------------------------
+def pace_colour(pct, elapsed):
+    """Green at or near an even pace, yellow ahead of it, red well ahead of
+    it or close to the limit. Without a clock, the usage alone decides."""
+    if elapsed is None:
+        return colour_for(pct)
+    ahead = pct - elapsed * 100
+    if pct >= 90 or ahead > 20:
+        return "red"
+    return "yellow" if ahead > 5 else "green"
+
+
+def span_of(pid, label):
+    return SPANS.get(label.lower()) or (PROVIDERS.get(pid) or {}).get("span")
+
+
+def metric_rows(rows, pid, metric):
+    pct = metric.get("used_percent") or 0
+    span = span_of(pid, metric.get("label", ""))
+    left = seconds_until(metric.get("resets_at"))
+    rows.append({"text": metric.get("label", ""), "detail": "%d%%" % round(pct)})
+    slider = {"text": "", "slider": max(0.0, min(1.0, pct / 100.0))}
+    # the tick marks how far through the window the clock is, so the fill
+    # reads as ahead of or behind an even pace
+    elapsed = 1 - left / span if left is not None and span and 0 < left <= span else None
+    if elapsed is not None:
+        slider["marker"] = elapsed
+    slider["color"] = pace_colour(pct, elapsed)
+    rows.append(slider)
+    below = [metric.get("remaining_label")]
+    if left is not None and left > 0:
+        below.append("Resets in " + countdown(left))
+    if any(below):
+        rows.append({"text": " · ".join(filter(None, below)), "dim": True})
+
+
+def logo(pid):
+    """The icon keys of a row or a bar part: the provider's logo in its brand colour."""
+    brand = PROVIDERS.get(pid)
+    return {"icon": brand["glyph"], "icon_color": brand["colour"]} if brand else {}
+
+
+def provider_rows(pid, outputs, state):
+    if not outputs:
+        return ([{"text": pid.capitalize(), "hero": True, "section": "closed", **logo(pid)}]
+                + health_rows(pid, state)
+                + [{"text": "No data for %s" % pid, "dim": True}])
+    rows = []
+    for n, output in enumerate(outputs):
+        plan = " · ".join(filter(None, [output.get("plan"), (output.get("account") or {}).get("label")]))
+        rows += [{"separator": True}] if n else []
+        rows.append({"text": output["provider"], "detail": plan, "hero": True, "section": "closed",
+                     **logo(pid)})
+        if not n:
+            rows += health_rows(pid, state)
+        for metric in output.get("metrics") or []:
+            rows.append({"separator": True})
+            metric_rows(rows, pid, metric)
+    return rows
+
+
+def label(quotas):
+    """The label text, its colour, and the bar parts when --pill names more than one provider."""
+    picked = []
+    for pid, want in PILL:
+        outputs = quotas.get(pid)
+        picked.append(pick(active(outputs).get("metrics") or [], want) if outputs else None)
+    found = [m for m in picked if m]
+    if not found:
+        return "--", "muted", []
+    percents = ["%d%%" % round(m.get("used_percent") or 0) if m else "--" for m in picked]
+    worst = colour_for(max(m.get("used_percent") or 0 for m in found))
+    if len(PILL) > 1:
+        # one icon cannot name several providers, so each percent gets its logo
+        return "", worst, [{"label": pct, **logo(pid)} for (pid, _), pct in zip(PILL, percents)]
+    text = percents[0]
+    left = seconds_until(found[0].get("resets_at"))
+    if left is not None and left > 0:
+        text += LABEL_DOT + clock(left)
+    return text, worst, []
+
+
+entry = read_cache() or {}
+tokscale = find_tokscale()
+quotas = usage(entry, tokscale)
+states = {pid: health(entry, pid) for pid in dict.fromkeys(PANEL + [pid for pid, _ in PILL])}
+
+# nothing to report: the pill takes no space
+if not any(quotas.get(pid) or health_rows(pid, state) for pid, state in states.items()):
+    print(json.dumps({"label": ""}))
+    raise SystemExit
+
+rows = []
+for pid in PANEL:
+    rows += ([{"separator": True}] if rows else []) + provider_rows(pid, quotas.get(pid), states[pid])
+
+text, colour, parts = label(quotas)
+payload = {"label": text, "color": colour, "rows": rows}
+mark = health_mark([states[pid] for pid, _ in PILL])
+if parts:
+    payload["parts"] = parts
+    payload["icon"] = mark
+elif mark:
+    payload["icon"] = os.environ.get("OMACCHIATO_PILL_ICON", "") + mark
+if tokscale:
+    clients = [pid for pid in PANEL if pid in PROVIDERS]
+    stats = week_stats(entry, tokscale, clients) if clients else None
+    if stats:
+        payload["rows"] += stats_rows(stats)
+    payload["rows"] += [{"separator": True, "section": "end"}, tokens_row(tokscale)]
+print(json.dumps(payload))

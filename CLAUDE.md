@@ -282,13 +282,14 @@ The design and the test results are in
   wins: 📝 draft, 💥 CI failed or merge conflicts, 🏗️ CI running,
   💬 changes requested or an unresolved thread from someone else,
   ✅ approved, ⏳ waiting for a review.
-- `omacchiato-claude-usage` reads the Claude Code OAuth token from the
-  keychain and never refreshes it, because a refresh races Claude Code
-  and signs the user out. A request that carries the token follows no
-  redirect. The status row reads the "Claude Code" component of
-  status.claude.com. The bars are coloured by pace against elapsed time.
-  Without the token it uses the payload that `omacchiato-claude-statusline`
-  saves.
+- `omacchiato-ai-usage --pill <id>[:<window>],... --panel <id>,...` reads
+  plan usage from `tokscale usage --json` and the week from
+  `tokscale graph`. `PROVIDERS` maps each id to a status page and a
+  component name prefix. tokscale 4.17.0 reads the Claude Code token and
+  never refreshes it, because a refresh races Claude Code and signs the
+  user out. Check that again before you raise `TOKSCALE_VERSION`.
+  `tokscale usage` has no provider filter and asks every provider on
+  each run, so the script runs it at most every 5 minutes.
 
 ## Security notes
 

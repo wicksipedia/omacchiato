@@ -168,7 +168,7 @@ Left to right:
   row opens the app instead. `Show menu bar ⌃F8` reveals the menu bar
   with keyboard focus on its icons.
 - **Plugin pills**: anything you add in `bar-plugins.conf`. The
-  repo ships a Claude usage pill, a GitHub pull requests pill and a
+  repo ships an AI usage pill, a GitHub pull requests pill and a
   keep-awake pill; see [Plugin pills](#plugin-pills).
 - **Weather**: wttr.in, with a details popup.
 - **Wi-fi**: the pill is the icon alone. The popup names the network
@@ -223,13 +223,13 @@ command prints a label, or a JSON object with a colour, an icon and
 popup rows, and the bar draws the result. The format is under
 [Adding pills](#adding-pills). Three plugins ship in `bin/`:
 
-- **Claude usage** (`omacchiato-claude-usage`): the pill shows how far
-  into the five-hour window you are and the time until it resets,
-  coloured by pace. The popup adds the weekly window, each per-model
-  weekly window, extra usage credits, the status of the Claude Code
-  component on status.claude.com with any open incident, and the last
-  seven days from tokscale: tokens per day and per model at API prices,
-  sessions, active days and active hours.
+- **AI usage** (`omacchiato-ai-usage`): the plan usage of Claude, Codex
+  or Copilot, from tokscale. By default the pill shows how much of
+  Claude's five-hour window you used and the time until it resets. The
+  popup shows each usage window of each provider you choose, the status
+  of that provider's service with any open incident, and the last seven
+  days: tokens per day and per model at API prices, sessions, active
+  days and active hours.
 - **GitHub pull requests** (`omacchiato-github-prs`): the pill counts your
   open PRs and adds `!` when one has an unread notification. The popup
   groups them by repository, marks each with what it needs next
@@ -245,7 +245,7 @@ popup rows, and the bar draws the result. The format is under
 
 <table>
   <tr>
-    <td valign="top"><img src="docs/screenshots/popup-claude.png" alt="The Claude usage popup: the Claude Code status row, the five-hour session window at 43% with a tick at the time elapsed, the weekly window for all models and for one model, extra usage credits, and the last seven days from tokscale as tokens and cost per day and per model"></td>
+    <td valign="top"><img src="docs/screenshots/popup-claude.png" alt="The AI usage popup, from before it read other providers: the Claude Code status row, the five-hour session window at 43% with a tick at the time elapsed, the weekly window for all models and for one model, extra usage credits, and the last seven days from tokscale as tokens and cost per day and per model"></td>
     <td valign="top"><img src="docs/screenshots/popup-github.png" width="540" alt="The GitHub pull requests popup: open PRs grouped by repository with a count per group, an hourglass mark and a Waiting for a first review line under each, and stacked PRs indented under their base. Repository names and titles are blacked out here"></td>
   </tr>
 </table>
@@ -338,15 +338,14 @@ the code this repo absorbed, with what Omacchiato uses each for.
 | Tool | Used for | Source |
 |---|---|---|
 | Homebrew | Installed if missing, then `brew bundle` | [Homebrew/brew](https://github.com/Homebrew/brew) |
-| tokscale | The Claude pill's last seven days of tokens, sessions and cost. Homebrew has no formula, so `install.sh` takes the macOS binary from the npm package, pinned by version and checksum | [junhoyeo/tokscale](https://github.com/junhoyeo/tokscale) |
+| tokscale | The AI usage pill: plan usage for each provider, and the last seven days of tokens, sessions and cost. Homebrew has no formula, so `install.sh` takes the macOS binary from the npm package, pinned by version and checksum | [junhoyeo/tokscale](https://github.com/junhoyeo/tokscale) |
 | herdr | Optional. If herdr is installed, `install.sh` adds the keys in `config/herdr/keys.toml`, `theme-set` sets its theme, and `Ctrl+Alt+G` opens a worktree off a branch you pick | [herdrdev/herdr](https://github.com/herdrdev/herdr) |
 
 ### Plugins and scripts in this repo
 
 | Script | What it does | Talks to |
 |---|---|---|
-| [`omacchiato-claude-usage`](bin/omacchiato-claude-usage) | The Claude usage pill | `api.anthropic.com`, `status.claude.com`, tokscale |
-| [`omacchiato-claude-statusline`](bin/omacchiato-claude-statusline) | Saves the Claude Code statusline payload, the pill's offline fallback | nothing |
+| [`omacchiato-ai-usage`](bin/omacchiato-ai-usage) | The AI usage pill | tokscale, and the status page of each provider it shows |
 | [`omacchiato-github-prs`](bin/omacchiato-github-prs) | The GitHub pull requests pill | `api.github.com` through `gh` |
 | [`omacchiato-keep-awake`](bin/omacchiato-keep-awake) | The keep-awake pill | `pmset` |
 | [`omacchiato-herdr-worktree`](bin/omacchiato-herdr-worktree) | herdr's `Ctrl+Alt+G` worktree picker | `git`, `herdr` |
@@ -511,7 +510,7 @@ Recording grant, and `Super+O` opens it with Karabiner's.
 | **Location** | `omacchiato-bar` | Reads **only** the wi-fi network's name, which macOS classes as location data. No coordinate is requested; the authorisation itself is what unlocks `CWInterface.ssid()`. | The wi-fi popup's title row reads "wi-fi" instead of your network's name. |
 | **Automation** | `omacchiato-bar`, `theme-set`, and the terminal that runs `install.sh` | Apple Events to **Music** (the current track and its artwork), to **Ghostty** (reloading its colours after a theme change) and to **System Events** (sleep, lock and restart from the Apple menu; setting the wallpaper; adding OmniWM as a login item). | The media pill has no artwork; those menu rows do nothing; OmniWM does not start at login until you add it under System Settings > General > Login Items. |
 | **Files and Folders** | `omacchiato-bar` | Only if your clone lives in `~/Documents`, `~/Desktop` or `~/Downloads`. The bar reads its palette from the theme directory inside the repo, and macOS walls launchd agents off from those folders. | The bar **hangs at startup** waiting on the prompt. Clone to `~/.local/share/omacchiato` and this never comes up. |
-| **Keychain** | `omacchiato-claude-usage`, only if you add the Claude pill | Reads the Claude Code sign-in token from your login keychain with `security`, to ask Anthropic for your usage. It never writes to the keychain and never refreshes the token. | The pill falls back to the statusline payload, which has only the five-hour and weekly windows. |
+| **Keychain** | tokscale, when the AI usage pill shows Claude | Reads the Claude Code sign-in token from your login keychain with `security`, to ask Anthropic for your usage. It never writes to the keychain and never refreshes the token. | The Claude section has no usage windows. |
 | **Allow in the Background** | `install.sh` (launch agents for the bar and the gesture daemon) | macOS lists the agents under System Settings > General > Login Items & Extensions. They start at login and restart if they quit. | The parts whose switch is off do not run. |
 
 On **Location**: it buys one string. The bar requests authorisation and
@@ -533,9 +532,9 @@ treats each rebuild as a new app and you re-grant after every install.
   long timer, for the weather pill. wttr.in infers your city from the
   IP the request arrives on; the bar sends no coordinates and holds no
   location API. Delete the weather pill and nothing leaves the
-  machine. The plugin pills contact more hosts: the Claude pill calls
-  `api.anthropic.com` and `status.claude.com`, and the GitHub pill
-  calls `api.github.com` through `gh`.
+  machine. The plugin pills contact more hosts: the AI usage pill
+  calls each provider's usage API through tokscale and each provider's
+  status page, and the GitHub pill calls `api.github.com` through `gh`.
 - **Omacchiato's own binaries never run as root.** `install.sh` uses no
   sudo, installs no LaunchDaemon, and every helper it builds runs as
   you, in your login session.
@@ -656,7 +655,7 @@ pill's colour and give it a popup:
   "label": "10% - 2h 6m",
   "color": "green",
   "rows": [
-    {"text": "Claude usage", "hero": true},
+    {"text": "Claude", "hero": true},
     {"separator": true},
     {"text": "Session", "detail": "10%"},
     {"text": "5-hour window", "slider": 0.1, "marker": 0.58},
@@ -672,6 +671,7 @@ the label. A row takes the same `color` names. A row with an `https`
 your terminal on that command instead, the way the activity pill opens
 btop; it runs with the same trust as the plugin command that printed
 it. A colour emoji draws its own colours and ignores the icon tint,
+which is why the label carries it too. `icon` overrides the config.
 A row's `icon` draws a glyph before its text, in the accent colour or
 in the row's `icon_color`, which takes a theme colour name or
 `#RRGGBB`.
@@ -693,12 +693,11 @@ icon and label:
 ```
 
 Each part's label takes the pill's `color`.
-which is why the label carries it too. `icon` overrides the config.
 
 A `slider` between 0 and 1 draws a progress track. On a slider row
 `text` is a short right-aligned readout rather than a label, so put
 the label on the row above, and `color` sets the fill. A `marker`
-between 0 and 1 draws a tick across the track; the Claude pill uses it
+between 0 and 1 draws a tick across the track; the AI usage pill uses it
 to show how far through each usage window you are. A `bar` between 0
 and 1 draws the same track inside an ordinary row, between its `text`
 and its `detail`, and all such bars in a popup share one column. Give
@@ -710,54 +709,72 @@ which is how a pill reports a state worth no space at all. Send
 `"icon": ""` to hide one, because an absent `icon` falls back to the
 glyph the config names.
 
-### The Claude pill
+### The AI usage pill
 
-`omacchiato-claude-usage` colours the pill by how far into the five-hour
-window you are, and opens a popup with that window, the weekly one,
-each per-model weekly window, and any extra usage credits. Each bar
-has a tick at the share of its window that has passed, and its colour
-compares the two: green at or near an even pace, yellow more than 5
-points ahead, and red more than 20 points ahead or at 90% used.
+`omacchiato-ai-usage` shows the plan usage of Claude, Codex and Copilot.
+[tokscale](https://github.com/junhoyeo/tokscale) reads the numbers, and
+`install.sh` installs it. Two settings on the command line choose the
+providers:
 
-The first row reports the status of the Claude Code component on
-status.claude.com and opens the status page when clicked. It ignores
-the page's overall rating, which also drops when another Claude
-product has a problem. An open incident that affects Claude Code adds
-rows below it with the incident's title, its state and the time of its
-latest update, and a click opens the incident page.
+- `--pill` sets the providers in the pill label, and the usage window
+  for each one: `<id>[:<window>]`, separated by commas. The default is
+  `claude`.
+- `--panel` sets the providers in the popup, separated by commas. The
+  default is the `--pill` providers.
 
-`install.sh` also installs [tokscale](https://github.com/junhoyeo/tokscale),
-which reads Claude Code's session logs on this Mac. The popup shows
-the last seven days from it: tokens per day and per model with their
-value at API prices, sessions, active days and active hours. It
-re-reads them every ten minutes, and the last row opens tokscale's
-full report in a terminal. For the icon, the Nerd Font Claude glyph is
-U+EC82.
+An id is `claude`, `codex` or `copilot`. A window is the name that the
+popup shows for it, such as `weekly` or `fable`, and case does not
+matter. Without a window, the pill uses the five-hour window. `5h`
+names it for every provider, and `max` takes the window with the most
+use. If a provider has no window of that name, the pill uses `max`.
 
-The script reads Anthropic's OAuth usage endpoint with the Claude
-CLI's own token, caching the answer for five minutes, because only
-that endpoint carries the per-model and credit figures. It never
-refreshes the token and never writes to the credential store: a third
-party rewriting the CLI's own credentials can race Claude Code and log
-you out.
-
-If the token is expired or the network is gone, it falls back to the
-statusline payload saved by `omacchiato-claude-statusline`, which needs
-neither. That payload has only the five-hour and weekly windows, and
-after a window rolls over with no session running it reports `--`
-rather than a percentage for a window that no longer exists.
-
-To save that payload, make `omacchiato-claude-statusline` the statusline
-command in `~/.claude/settings.json`, followed by the statusline
-command you already use. With nothing after it, the script only saves
-the payload.
-
-```json
-"statusLine": {
-  "type": "command",
-  "command": "$HOME/.local/share/omacchiato/bin/omacchiato-claude-statusline ~/.claude/statusline.sh"
-}
+```ini
+[ai]
+command = omacchiato-ai-usage --pill claude,codex:weekly --panel claude,codex,copilot
+interval = 120
+icon = 
+icon_color = #D97757
 ```
+
+With one provider, the label shows the percent used and the time until
+that window resets, such as `23% · 2:25`. With more, it shows each
+provider's logo in its brand colour and its percent, in `--pill` order.
+The `icon` setting then does not show, because one icon cannot name
+more than one provider. The Claude logo is `#D97757`. The OpenAI and
+Copilot logos are black or white, so they take the theme's label
+colour. The percents are green under 50%, yellow under 80% and red
+above.
+
+The popup has one section for each `--panel` provider, and all sections
+start closed. Click a header to open its section. If tokscale reports
+more than one Codex account, each account gets a section. The header
+shows the provider's logo, its name and the plan. The section shows the service status and each usage window. Each
+window has a bar with a tick at the share of the window that has
+passed, and its colour compares the two: green at or near an even
+pace, yellow more than 5 points ahead, and red more than 20 points
+ahead or at 90% used.
+
+The status row reads the provider's components on its status page:
+Claude Code on status.claude.com, the Codex components on
+status.openai.com, and Copilot on githubstatus.com. It ignores the
+page's overall rating, which also drops when another product of that
+company has a problem. If the worst component is not operational, the
+pill gets 🏥 for a minor problem or 🪦 for a major one. An open
+incident adds rows with its title, its state and the time of its latest
+update, and a click opens the incident page. status.openai.com lists no
+incidents, so Codex has the status row only.
+
+After the providers, a closed section holds the last seven days from
+tokscale's read of the session logs on this Mac: tokens per day and per
+model with their value at API prices, sessions, active days and active
+hours. The last row opens tokscale's full report in a terminal.
+
+The script runs `tokscale usage` at most every five minutes and reads
+the week every ten minutes. If a provider is missing from one run, the
+popup keeps its last numbers for 15 more minutes. tokscale reads the
+Claude Code token and never refreshes it or writes it back: a third
+party that rewrites the CLI's own credentials can race Claude Code and
+sign you out. For the icon, the Nerd Font Claude glyph is U+EC82.
 
 ### The GitHub pull requests pill
 
