@@ -290,7 +290,7 @@ else
   log "  System Settings > Privacy & Security. Free fix: Xcode > Settings >"
   log "  Accounts > Manage Certificates > + > Apple Development, then re-run."
 fi
-# (omacchiato-gesture is signed in section 5, right after its build —
+# (omacchiato-gesture is signed in section 4, right after its build —
 # the linker signs each build ad-hoc, so signing here
 # would be overwritten and every rebuild would invalidate the
 # Accessibility grant again)
@@ -378,10 +378,8 @@ fi
 
 # --- 3. omarchy theme convention -------------------------------------------
 # Canonical theme state lives at ~/.config/omarchy/current/theme (what the
-# shell tools read). Korren resolves the same dir via macOS config_dir
-# (~/Library/Application Support), so bridge it with a symlink.
+# shell tools read).
 mkdir -p "$HOME/.config/omarchy/current"
-link "$HOME/.config/omarchy" "$HOME/Library/Application Support/omarchy"
 
 if [ ! -e "$HOME/.config/omarchy/current/theme" ]; then
   # record the pre-omacchiato wallpaper per screen (once) so uninstall can
@@ -397,26 +395,7 @@ if [ ! -e "$HOME/.config/omarchy/current/theme" ]; then
   "$REPO_DIR/bin/theme-set" tokyo-night
 fi
 
-# --- 4. Point Korren at the omarchy theme -----------------------------------
-# Korren is the author's terminal and not something this installer can
-# get for you — so this only touches machines that HAVE it (app bundle
-# or an existing config). Everyone else skips this without a trace.
-KORREN_CFG="$HOME/Library/Application Support/korren/config.toml"
-if [ -f "$KORREN_CFG" ]; then
-  # only seed a theme when NONE is set — theme-set legitimately writes
-  # built-in names (tokyo-night etc.), and a re-run must not revert
-  # the user's pick back to omarchy
-  if ! grep -q '^name = "' "$KORREN_CFG"; then
-    printf '[theme]\nname = "omarchy"\n' >> "$KORREN_CFG"
-    log "Korren theme set to follow omarchy"
-  fi
-elif [ -d "/Applications/Korren.app" ]; then
-  mkdir -p "$(dirname "$KORREN_CFG")"
-  printf '[theme]\nname = "omarchy"\n' > "$KORREN_CFG"
-  log "Created Korren config (theme follows omarchy)"
-fi
-
-# --- 5. Trackpad gestures (omacchiato-gesture) ---------------------------------
+# --- 4. Trackpad gestures (omacchiato-gesture) ---------------------------------
 # The gesture engine — absorbed from aerospace-swipe (MIT, notice kept in
 # helper/gesture/LICENSE.aerospace-swipe) with every omacchiato fix folded
 # in — runs as a user launch agent. OmniWM owns the horizontal swipes,
@@ -491,10 +470,10 @@ PLIST
 launchctl unload "$HOME/Library/LaunchAgents/com.omacchiato.gesture.plist" 2>/dev/null || true
 launchctl load "$HOME/Library/LaunchAgents/com.omacchiato.gesture.plist" 2>/dev/null || true
 
-# --- 6. macOS look ----------------------------------------------------------
+# --- 5. macOS look ----------------------------------------------------------
 "$REPO_DIR/macos-defaults.sh"
 
-# --- 7. Services ------------------------------------------------------------
+# --- 6. Services ------------------------------------------------------------
 
 # OmniWM does not start beside another window manager, and quitting one
 # strands the windows it parked off screen, so a running AeroSpace is
@@ -532,8 +511,6 @@ Done. One-time macOS steps if this is a fresh machine:
   1. Grant OmniWM     System Settings -> Privacy & Security -> Accessibility (required) and Input Monitoring (swipes)
   2. Karabiner-Elements: approve its driver extension + Input Monitoring
      when prompted (System Settings -> Privacy & Security)
-  3. Korren isn't in the Brewfile — build it from the korren repo:
-       ./packaging/macos/build-app.sh --install
 
 Super = hold Caps Lock. Switch themes:  theme-set <name>  or  Super+Shift+T
 Back to a normal Mac any time:  ./uninstall.sh

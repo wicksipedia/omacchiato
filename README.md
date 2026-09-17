@@ -565,7 +565,7 @@ messenger). Override any of them in `config/apps.local.conf`
 
 ```sh
 # config/apps.local.conf: your picks win over apps.conf
-TERMINAL=Korren
+TERMINAL=WezTerm
 BROWSER=Arc
 ```
 

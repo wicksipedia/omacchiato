@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 # theme-set <name> | light:<name>,dark:<name> — switch the whole desktop
 # theme in one move.
-# Swaps ~/.config/omarchy/current/theme (the omarchy convention), then
-# nudges every consumer: Korren live-reloads on its own (it watches the
-# omarchy dir), and the bar watches the theme and restyles in place —
-# nothing here has to tell them.
+# Swaps ~/.config/omarchy/current/theme (the omarchy convention). The bar
+# watches the theme and restyles in place.
 
 set -euo pipefail
 # resolve through the ~/.local/bin symlink to the real repo
@@ -40,18 +38,6 @@ mkdir -p "$CURRENT_DIR" "$HOME/.config/omacchiato"
 printf 'theme = %s\n' "$SPEC" > "$HOME/.config/omacchiato/theme.conf"
 PREV="$(readlink "$CURRENT_DIR/theme" 2>/dev/null || true)"
 ln -sfn "$THEMES_DIR/$NAME" "$CURRENT_DIR/theme"
-
-# Korren: prefer its hand-tuned built-in theme when one matches; fall
-# back to live-deriving from the omarchy palette. Korren watches its
-# config file, so this repaints immediately.
-KORREN_CFG="$HOME/Library/Application Support/korren/config.toml"
-case "$NAME" in
-  tokyo-night|catppuccin|gruvbox|solarized-dark|osaka-jade|daylight) korren_theme="$NAME" ;;
-  *) korren_theme="omarchy" ;;
-esac
-if [ -f "$KORREN_CFG" ]; then
-  sed -i '' "s/^name = \".*\"/name = \"$korren_theme\"/" "$KORREN_CFG"
-fi
 
 # Wallpaper: first image in the theme's backgrounds/ dir, on every screen.
 # omacchiato-helper wraps NSWorkspace (System Events wallpaper scripting

@@ -61,7 +61,7 @@ Small repo, strong opinions. PRs are welcome when they keep these.
   stable "Apple Development" identity so TCC grants survive rebuilds.
   On Apple Silicon the linker signs each build ad-hoc, so sign with
   the identity after the last build step. For this reason install.sh
-  signs `omacchiato-gesture` in section 5, right after its build.
+  signs `omacchiato-gesture` in section 4, right after its build.
 
 ## Practical notes
 

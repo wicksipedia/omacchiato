@@ -60,7 +60,7 @@ no "quake app bundle id" config key (the `[quakeTerminal]` TOML table has ten fi
 app — `Core/Config/CanonicalTOMLConfig.swift`), no window-adoption path, and nothing under
 `QuakeTerminal/` launches or attaches to another process. The misleadingly named
 `QuakeTerminalRestoreTarget.external` is only "the foreign window that had focus before the panel
-opened", for focus hand-back. The nearest approximation for a custom terminal (e.g. korren) is the
+opened", for focus hand-back. The nearest approximation for a custom terminal is the
 **scratchpad** (`scratchpad-assign` / `scratchpad-toggle`, see §4a) plus an app rule to float it —
 but that gives a corner-park show/hide of one window, not an edge slide, and none of the quake
 position/opacity/auto-hide machinery. A true integration would need to de-type the pane tree, add a

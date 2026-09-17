@@ -189,19 +189,14 @@ if [ -x "$HOME/.local/bin/omacchiato-helper" ] \
 fi
 rm -f "$HOME/.local/bin/omacchiato-helper"
 
-# omarchy theme convention dirs (restore brings back any .bak the
-# install displaced — it was created and then orphaned before)
+# omarchy theme convention dirs. An older install linked
+# ~/Library/Application Support/omarchy, and restore brings back any .bak
+# that the link displaced.
 restore "$HOME/Library/Application Support/omarchy"
 rm -f "$HOME/.config/omarchy/current/theme"
 rmdir "$HOME/.config/omarchy/current" "$HOME/.config/omarchy" 2>/dev/null || true
 
-# --- 4. Korren back to its built-in default theme ---------------------------
-KORREN_CFG="$HOME/Library/Application Support/korren/config.toml"
-if [ -f "$KORREN_CFG" ]; then
-  sed -i '' 's/^name = "omarchy"/name = "default"/' "$KORREN_CFG"
-fi
-
-# --- 5. Homebrew packages omacchiato itself installed --------------------------
+# --- 4. Homebrew packages omacchiato itself installed --------------------------
 # Only packages the manifest says brew bundle ADDED on this machine —
 # anything the user had before is untouched.
 if [ -f "$MANIFEST" ] && grep -qE '^brew-(formula|cask) ' "$MANIFEST"; then
