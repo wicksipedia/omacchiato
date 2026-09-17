@@ -346,6 +346,39 @@ link "$REPO_DIR/bin/omacosy-karabiner-omniwm" "$HOME/.local/bin/omacosy-karabine
 link "$REPO_DIR/bin/omacosy-omniwmctl" "$HOME/.local/bin/omacosy-omniwmctl"
 link "$REPO_DIR/bin/omacosy-herdr-worktree" "$HOME/.local/bin/omacosy-herdr-worktree"
 
+# tokscale, for the Claude pill's last seven days. Homebrew has no formula, so
+# take the macOS binary from tokscale's npm package, pinned by version and
+# checksum. Change all three together.
+TOKSCALE_VERSION=4.17.0
+case "$(uname -m)" in
+  arm64) TOKSCALE_ARCH=arm64
+         TOKSCALE_SHA512="/Hmgh1VxxLdCo6ou+I7r12E0G4T4c0zzZwZ5iwdynlZKm1IEhoqPB0SagTmVEiLZSMV8zLxptO1GFuOKxMqwiQ==" ;;
+  *)     TOKSCALE_ARCH=x64
+         TOKSCALE_SHA512="AsAlm80CenvCv9pC/ys46Vmq7GJbgkufO2LxMAWRE5cubU4EBe0SqMew6+HpRY/BcAKJ5+4RFPQpEZS3Tx12lw==" ;;
+esac
+TOKSCALE_DIR="$HOME/.local/lib/tokscale-$TOKSCALE_VERSION"
+if [ ! -x "$TOKSCALE_DIR/tokscale" ]; then
+  log "Installing tokscale $TOKSCALE_VERSION"
+  tmp="$(mktemp -d)"
+  if curl -fsSL -o "$tmp/pkg.tgz" \
+       "https://registry.npmjs.org/@tokscale/cli-darwin-$TOKSCALE_ARCH/-/cli-darwin-$TOKSCALE_ARCH-$TOKSCALE_VERSION.tgz" \
+     && [ "$(openssl dgst -sha512 -binary "$tmp/pkg.tgz" | base64)" = "$TOKSCALE_SHA512" ] \
+     && tar -xzf "$tmp/pkg.tgz" -C "$tmp" \
+     && mkdir -p "$TOKSCALE_DIR" && cp "$tmp"/package/bin/* "$TOKSCALE_DIR"/; then
+    # older versions go only once the new one is in place
+    for old in "$HOME"/.local/lib/tokscale-*; do
+      [ "$old" = "$TOKSCALE_DIR" ] || rm -rf "$old"
+    done
+  else
+    rm -rf "$TOKSCALE_DIR"
+    log "WARNING: tokscale did not install; the Claude pill skips its weekly stats."
+  fi
+  rm -rf "$tmp"
+fi
+if [ -x "$TOKSCALE_DIR/tokscale" ]; then
+  ln -sfn "$TOKSCALE_DIR/tokscale" "$HOME/.local/bin/tokscale"
+fi
+
 # --- 3. omarchy theme convention -------------------------------------------
 # Canonical theme state lives at ~/.config/omarchy/current/theme (what the
 # shell tools read). Korren resolves the same dir via macOS config_dir

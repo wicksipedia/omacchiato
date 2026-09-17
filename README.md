@@ -338,8 +338,12 @@ problem. When an open incident affects Claude Code, the rows below it show
 the incident's title, its state and the time of its latest update. A click
 on those rows opens the incident page.
 
-The last row opens `tokscale` in a terminal with `npx tokscale`, which
-breaks your token use down by model, day and month.
+`install.sh` also installs [tokscale](https://github.com/junhoyeo/tokscale),
+which reads Claude Code's session logs on this Mac. The popup shows the last
+seven days from it: tokens per day and per model with their value at API
+prices, sessions, active days and active hours. It re-reads them every ten
+minutes, and the last row opens tokscale's full report in a terminal. For
+the icon, the Nerd Font Claude glyph is U+EC82.
 
 It reads Anthropic's OAuth usage endpoint with the Claude CLI's own token,
 caching the answer for five minutes, because only that endpoint carries the

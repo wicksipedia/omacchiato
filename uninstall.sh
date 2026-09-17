@@ -165,6 +165,10 @@ for t in theme-set theme-next theme-bg-next omacosy-ws omacosy-toggle omacosy-fo
   target="$(readlink "$HOME/.local/bin/$t" 2>/dev/null || true)"
   case "$target" in *omacosy*) rm -f "$HOME/.local/bin/$t" ;; esac
 done
+case "$(readlink "$HOME/.local/bin/tokscale" 2>/dev/null || true)" in
+  "$HOME"/.local/lib/tokscale-*) rm -f "$HOME/.local/bin/tokscale" ;;
+esac
+rm -rf "$HOME"/.local/lib/tokscale-*
 
 # Put the pre-omacosy wallpaper back — theme-set overwrote every display
 # and the picture would otherwise stay as a souvenir. Restores only when

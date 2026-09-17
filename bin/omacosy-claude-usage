@@ -18,13 +18,14 @@ you out. On an expired or rejected token it falls back instead.
 """
 import json
 import os
+import re
 import shutil
 import subprocess
 import textwrap
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta
 
 HOME = os.path.expanduser("~")
 CACHE = os.environ.get("OMACOSY_CLAUDE_USAGE_CACHE",
@@ -48,6 +49,8 @@ FRESH_S = 300          # re-ask the endpoint at most this often
 SERVE_STALE_S = 900    # keep serving a cached body this long past FRESH_S
 BACKOFF_S = 300        # after a failure, wait this long before trying again
 TIMEOUT_S = 5          # the pill must not hang on a slow network
+STATS_S = 600          # re-read the week from tokscale at most this often
+STATS_TIMEOUT_S = 20   # tokscale reads every session log, and a long history is slow
 WRAP = 40              # split incident text into rows this long, to keep the popup narrow
 
 NOW = time.time()
@@ -243,19 +246,84 @@ def health_rows(entry):
     return rows
 
 
-def tokens_row():
-    """A row that opens tokscale in a terminal. The terminal starts with the
-    system PATH, so the command carries the directory node lives in: npx
-    starts with `#!/usr/bin/env node` and dies without it."""
-    # a fixed path first: fnm's per-shell directory is gone by the next login
-    npx = next((p for p in [os.path.join(HOME, ".local/share/fnm/aliases/default/bin/npx"),
-                            "/opt/homebrew/bin/npx", "/usr/local/bin/npx"]
-                if os.access(p, os.X_OK)), None) or shutil.which("npx")
-    if not npx:
-        return None
-    path = "%s:/opt/homebrew/bin:/usr/bin:/bin" % os.path.dirname(npx)
-    return {"text": "Token usage", "detail": "tokscale",
-            "terminal": "/usr/bin/env PATH=%s npx tokscale" % path}
+def find_tokscale():
+    """install.sh links tokscale into ~/.local/bin."""
+    path = os.path.join(HOME, ".local/bin/tokscale")
+    return path if os.access(path, os.X_OK) else shutil.which("tokscale")
+
+
+def tokens_row(tokscale):
+    """A row that opens tokscale's full report in a terminal."""
+    return {"text": "Token usage", "detail": "tokscale", "terminal": tokscale}
+
+
+def week_stats(entry, tokscale):
+    """Seven days of Claude Code use, from tokscale's read of the local session logs."""
+    if NOW - entry.get("week_at", 0) < STATS_S:
+        return entry.get("week")
+    stats = entry.get("week")
+    try:
+        r = subprocess.run([tokscale, "graph", "--week", "-c", "claude", "--no-spinner"],
+                           capture_output=True, text=True, timeout=STATS_TIMEOUT_S)
+        graph = json.loads(r.stdout)
+        days, models = {}, {}
+        for day in graph["contributions"]:
+            days[day["date"]] = [day["totals"]["tokens"], day["totals"].get("cost", 0)]
+            for use in day.get("clients") or []:
+                tokens, cost = models.get(use["modelId"], [0, 0])
+                models[use["modelId"]] = [tokens + sum(use["tokens"].values()), cost + use.get("cost", 0)]
+        metrics = graph.get("timeMetrics") or {}
+        stats = {"days": days,
+                 "models": sorted(([m] + v for m, v in models.items()), key=lambda m: -m[1]),
+                 "sessions": metrics.get("sessionCount", 0),
+                 "active_ms": metrics.get("totalActiveTimeMs", 0),
+                 "active_days": (graph.get("summary") or {}).get("activeDays", 0)}
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
+        pass  # keep the last week on screen
+    # a failed read waits too, so a broken tokscale does not run on every refresh
+    entry.update({"week": stats, "week_at": NOW})
+    write_cache(entry)
+    return stats
+
+
+def human(n):
+    for unit, size in (("B", 1e9), ("M", 1e6), ("K", 1e3)):
+        if round(n / size, 1) >= 1:
+            return "%.1f%s" % (n / size, unit)
+    return str(int(n))
+
+
+def dollars(amount):
+    return "$%.0f" % amount if amount >= 10 or amount == 0 else "$%.2f" % amount
+
+
+def model_name(model_id):
+    """claude-haiku-4-5-20251001 reads as Haiku 4.5."""
+    parts = re.sub(r"-\d{8}$", "", model_id.removeprefix("claude-")).split("-")
+    version = ".".join(p for p in parts if p.isdigit())
+    return " ".join(p.title() for p in parts if not p.isdigit()) + (" " + version if version else "")
+
+
+def stats_rows(stats):
+    today = datetime.now().date()
+    week = [today - timedelta(days=n) for n in range(6, -1, -1)]
+    spend = [stats["days"].get(day.isoformat(), [0, 0]) for day in week]
+    peak = max(n for n, _ in spend) or 1
+    rows = [{"separator": True},
+            {"text": "Last 7 days at API prices", "detail": "%s · %s" % (
+                human(sum(n for n, _ in spend)), dollars(sum(c for _, c in spend)))},
+            {"text": "%d sessions · %d active days · %dh" % (
+                stats["sessions"], stats["active_days"], stats["active_ms"] // 3_600_000), "dim": True}]
+    for day, (n, cost) in zip(week, spend):
+        rows.append({"text": "Today" if day == today else day.strftime("%a"), "bar": n / peak,
+                     "detail": "%s · %s" % (human(n), dollars(cost))})
+    models = stats["models"][:3]
+    if models:
+        rows.append({"separator": True})
+        for model, n, cost in models:
+            rows.append({"text": model_name(model), "bar": n / (models[0][1] or 1),
+                         "detail": "%s · %s" % (human(n), dollars(cost))})
+    return rows
 
 
 def health_icon(status):
@@ -394,9 +462,12 @@ def with_health(payload):
         payload["rows"] = payload["rows"][:1] + health + [{"separator": True}] + payload["rows"][2:]
     if icon:
         payload["icon"] = icon
-    tokens = tokens_row()
-    if tokens:
-        payload["rows"] += [{"separator": True}, tokens]
+    tokscale = find_tokscale()
+    if tokscale:
+        stats = week_stats(entry, tokscale)
+        if stats:
+            payload["rows"] += stats_rows(stats)
+        payload["rows"] += [{"separator": True}, tokens_row(tokscale)]
     return payload
 
 
