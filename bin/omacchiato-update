@@ -29,6 +29,8 @@ done
 REPO="$(cd "$(dirname "$SELF")/.." && pwd)"
 [ -f "$REPO/install.sh" ] || die "could not find the omacchiato clone (looked in $REPO)"
 git -C "$REPO" rev-parse --git-dir >/dev/null 2>&1 || die "$REPO is not a git clone; update by hand"
+"$REPO/bin/omacchiato-banner"
+export OMACCHIATO_BANNER_SHOWN=1
 
 # install.sh checks app versions itself; this covers the exits that skip it
 requirements() {

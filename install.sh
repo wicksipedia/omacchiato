@@ -4,6 +4,8 @@
 
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+"$REPO_DIR/bin/omacchiato-banner"
+export OMACCHIATO_BANNER_SHOWN=1
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 

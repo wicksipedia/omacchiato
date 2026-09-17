@@ -1,0 +1,47 @@
+#!/bin/bash
+# omacchiato-banner: print a cappuccino and the wordmark in the theme accent
+# colour.
+#
+# It prints only to a terminal, so launchd, Karabiner and the bar never see
+# it. Callers export OMACCHIATO_BANNER_SHOWN=1 after they run it, so a
+# command that starts another one prints the banner once.
+[ -t 1 ] && [ -z "${OMACCHIATO_BANNER_SHOWN:-}" ] || exit 0
+
+accent="" reset=""
+if [ -z "${NO_COLOR:-}" ]; then
+  # ACCENT is 0xAARRGGBB
+  hex="$(sed -n 's/^export ACCENT=0x..\([0-9a-fA-F]\{6\}\).*/\1/p' \
+    "$HOME/.config/omarchy/current/theme/sketchybar.sh" 2>/dev/null)"
+  if [ ${#hex} -eq 6 ]; then
+    accent="$(printf '\033[38;2;%d;%d;%dm' "0x${hex:0:2}" "0x${hex:2:2}" "0x${hex:4:2}")"
+    reset=$'\033[0m'
+  fi
+fi
+
+# The steam and the foam keep the terminal's text colour.
+cup=(
+  "   ░ ░ ░    "
+  " ▗▄▒▒▒▒▒▄▖  "
+  "$accent ▐███████▌▜▖"
+  "$accent  ▜█████▛▗▘ "
+  "$accent ▀▀▀▀▀▀▀▀▀  "
+)
+wordmark=(
+  " ▄▄▄▄  ▄▄   ▄▄  ▄▄▄▄   ▄▄▄▄▄  ▄▄▄▄▄ ▄▄  ▄▄ ▄▄  ▄▄▄▄  ▄▄▄▄▄▄  ▄▄▄▄"
+  "██  ██ ██▀▄▀██ ██  ██ ██     ██     ██  ██ ██ ██  ██   ██   ██  ██"
+  "██  ██ ██ ▀ ██ ██▀▀██ ██     ██     ██▀▀██ ██ ██▀▀██   ██   ██  ██"
+  "▀█▄▄█▀ ██   ██ ██  ██ ▀█▄▄▄▄ ▀█▄▄▄▄ ██  ██ ██ ██  ██   ██   ▀█▄▄█▀"
+)
+# The cup needs 13 columns more than the wordmark. `tput cols` in a command
+# substitution has no terminal, so it reports 80 for any width.
+wide=0
+size="$(stty size </dev/tty 2>/dev/null)"
+[ "${size#* }" -ge 79 ] 2>/dev/null && wide=1
+
+echo
+for i in 0 1 2 3; do
+  [ "$wide" = 1 ] && printf '%s  ' "${cup[$i]}"
+  printf '%s%s%s\n' "$accent" "${wordmark[$i]}" "$reset"
+done
+[ "$wide" = 1 ] && printf '%s  %s' "${cup[4]}" "$reset"
+printf '   omakase + macOS + macchiato\n\n'

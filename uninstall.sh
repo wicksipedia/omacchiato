@@ -7,7 +7,10 @@ set -uo pipefail
 
 log() { printf '\033[1;33m==>\033[0m %s\n' "$*"; }
 
-"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/migrate-omacosy.sh"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+"$REPO_DIR/bin/omacchiato-banner"
+export OMACCHIATO_BANNER_SHOWN=1
+"$REPO_DIR/migrate-omacosy.sh"
 
 # Manifest written by install.sh: only what IS recorded gets removed,
 # so tools and settings that predate omacchiato are never touched.
