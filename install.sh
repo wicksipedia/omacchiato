@@ -83,6 +83,17 @@ comm -13 <(printf '%s\n' "$PRE_FORMULAE") <(brew list --formula 2>/dev/null | so
 comm -13 <(printf '%s\n' "$PRE_CASKS") <(brew list --cask 2>/dev/null | sort) \
   | while read -r c; do [ -n "$c" ] && mark "brew-cask $c"; done
 
+# Every helper here is a one-file swiftc or clang build, and airpods-control
+# builds from source too. Homebrew brings the Command Line Tools, so this only
+# catches a Mac that has Homebrew without them.
+for tool in swiftc clang; do
+  command -v "$tool" >/dev/null 2>&1 && continue
+  log "ERROR: $tool is missing. Omacchiato builds its helpers from source."
+  log "  Install the Command Line Tools, then run install.sh again:"
+  log "    xcode-select --install"
+  exit 1
+done
+
 log "Checking app versions"
 "$REPO_DIR/bin/omacchiato-requirements" ||
   log "WARNING: an app above is older than omacchiato needs; its settings may be rejected."

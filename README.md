@@ -60,6 +60,14 @@ macOS privacy (TCC) blocks launchd services from reading `~/Documents`,
 `~/Desktop` and `~/Downloads`. If you clone there anyway, the installer
 copies the configs instead; edits then need an `install.sh` re-run.
 
+`install.sh` compiles the helper binaries, so it needs Apple's Command
+Line Tools (`xcode-select --install`). Homebrew requires them too, so a
+Mac with Homebrew already has them, and `install.sh` stops with that
+command when they are missing. Full Xcode is not needed. A free Apple
+Development certificate, which you make in Xcode under Settings >
+Accounts, keeps the permission grants across rebuilds; see
+[Permissions](#permissions).
+
 `install.sh` is idempotent. It installs Homebrew if missing, runs
 `brew bundle`, compiles the helper binaries, symlinks configs (backing
 up anything it would replace), copies OmniWM's settings template once,
