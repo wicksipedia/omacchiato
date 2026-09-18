@@ -808,6 +808,13 @@ The current mode has a check, and a click switches to that mode. The
 last row opens Sound settings. With two devices connected, each device
 is a section that starts closed.
 
+Nothing on the Mac reports whether AirPods charge. A cable to this Mac
+is the closest fact, so the script marks the battery row with 🔌 while
+`ioreg` lists the AirPods as a USB device with the same serial number.
+A wall charger stays invisible. While the cable carries the audio, the
+noise control rows drop out: airpods-control controls a device only
+over Bluetooth.
+
 AirPods Max report no battery to `system_profiler`, so the script also
 runs `omacchiato-helper bt battery`, which reads the percentages that
 IOBluetooth carries. A value from `system_profiler` wins where both

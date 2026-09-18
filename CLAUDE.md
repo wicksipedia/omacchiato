@@ -303,8 +303,12 @@ The design and the test results are in
   product ID. `system_profiler` reports no battery for AirPods Max, so the
   script fills the gaps from `omacchiato-helper bt battery`, which reads
   `batteryPercentSingle` and the per-side values from IOBluetooth.
-  `airpods-control` sets the noise mode through a private API, and
-  `install.sh` builds it at a pinned version and SHA-256.
+  Nothing reports a charging state, so the plug mark means the AirPods are
+  on this Mac's USB: `ioreg -arc IOUSBHostDevice` lists them with the
+  Bluetooth serial number. `airpods-control` sets the noise mode through a
+  private API, and `install.sh` builds it at a pinned version and SHA-256.
+  It answers `no-device` while the cable carries the audio, because it
+  controls a device only over Bluetooth.
 
 ## Security notes
 

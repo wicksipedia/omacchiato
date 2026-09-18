@@ -173,6 +173,20 @@ If step 3 fails on macOS 27, build the battery half only.
    The list is `off`, `transparency` and `noise-cancellation`, with no
    Adaptive, and the popup shows exactly those three.
 
+### Results for a cable, 2026-09-18, macOS 27.0
+
+1. No source reports a charging state: not `system_profiler`, not `ioreg`,
+   and not `IOBluetoothDevice.isPluggedOverUSB()`, which stays false for
+   AirPods. So the pill marks a cable, not charging.
+2. `ioreg -arc IOUSBHostDevice` lists `AirPods Max USB Audio` with
+   `kUSBSerialNumberString` equal to the `device_serialNumber` that
+   `system_profiler` reports over Bluetooth. That match names the device.
+   The read takes 27 ms.
+3. While the cable carries the audio, `airpods-control` answers
+   `no-device`: it needs a Core Audio endpoint that maps to a classic
+   Bluetooth device. The popup then shows the battery with the plug mark
+   and no mode rows.
+
 ## Build order
 
 1. Spike.
