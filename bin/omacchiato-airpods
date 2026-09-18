@@ -26,6 +26,8 @@ MODES = {"off": "Off", "transparency": "Transparency", "adaptive": "Adaptive",
          "noise-cancellation": "Noise Cancellation"}
 BATTERY_NAMES = {"Main": "Battery"}
 BATTERY_ORDER = ["Left", "Right", "Battery", "Case"]
+# the parts that `omacchiato-helper bt battery` prints, in its order
+HELPER_PARTS = ["Battery", "Left", "Right", "Case"]
 SOUND_SETTINGS = "x-apple.systempreferences:com.apple.Sound-Settings.extension"
 LOW = 20
 TIMEOUT_S = 5
@@ -37,6 +39,29 @@ def run_json(args):
         return json.loads(r.stdout)
     except (OSError, subprocess.SubprocessError, ValueError):
         return None
+
+
+def address(value):
+    return str(value).lower().replace(":", "").replace("-", "")
+
+
+def helper_battery():
+    """{address: {part: percent}}. AirPods Max report no battery to
+    system_profiler, and omacchiato-helper reads it from IOBluetooth."""
+    helper = shutil.which("omacchiato-helper")
+    if not helper:
+        return {}
+    try:
+        r = subprocess.run([helper, "bt", "battery"], capture_output=True, text=True, timeout=TIMEOUT_S)
+    except (OSError, subprocess.SubprocessError):
+        return {}
+    found = {}
+    for line in r.stdout.splitlines():
+        device, *parts = line.split("\t")
+        if len(parts) == len(HELPER_PARTS):
+            found[address(device)] = {name: int(pct) for name, pct in zip(HELPER_PARTS, parts)
+                                      if pct.isdigit() and int(pct)}
+    return found
 
 
 def apple_types():
@@ -79,14 +104,14 @@ def connected():
     """(name, model, icon, {battery name: percent}) for each connected AirPods Pro or Max."""
     found = []
     report = run_json(["/usr/sbin/system_profiler", "SPBluetoothDataType", "-json"]) or {}
-    types = None
+    types, live = None, None
     for controller in report.get("SPBluetoothDataType") or []:
         for device in controller.get("device_connected") or []:
             for name, info in device.items():
                 # a BLE entry of the same device has no product ID
                 if "device_productID" not in info:
                     continue
-                types = types or apple_types()
+                types = types if types is not None else apple_types()
                 model_icon = airpods_model(types, info)
                 if not model_icon:
                     continue
@@ -95,6 +120,9 @@ def connected():
                     part = key.removeprefix("device_batteryLevel")
                     if part != key and str(value).rstrip("%").isdigit():
                         battery[BATTERY_NAMES.get(part, part)] = int(str(value).rstrip("%"))
+                live = helper_battery() if live is None else live
+                for part, pct in live.get(address(info.get("device_address", "")), {}).items():
+                    battery.setdefault(part, pct)
                 found.append((name, *model_icon, battery))
     return found
 

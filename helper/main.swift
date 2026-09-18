@@ -37,6 +37,15 @@ func BTGetPower() -> Int32
 @_silgen_name("IOBluetoothPreferenceSetControllerPowerState")
 func BTSetPower(_ state: Int32)
 
+// AirPods carry their battery only in these private IOBluetoothDevice
+// methods. system_profiler reports none at all for AirPods Max.
+@objc private protocol BatteryInfo {
+    @objc optional func batteryPercentSingle() -> Int
+    @objc optional func batteryPercentLeft() -> Int
+    @objc optional func batteryPercentRight() -> Int
+    @objc optional func batteryPercentCase() -> Int
+}
+
 // DisplayServices (private) — the same calls Control Center makes;
 // covers the built-in panel and Apple externals
 @_silgen_name("DisplayServicesGetBrightness")
@@ -373,13 +382,21 @@ case "bt":
             let addr = d.addressString ?? "?"
             print("\(d.isConnected() ? 1 : 0)\t\(addr)\t\(name)\t\(kind(d))")
         }
+    case "battery":
+        // percent per part, 0 where the device reports none
+        for d in (IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice]) ?? [] where d.isConnected() {
+            let b = unsafeBitCast(d, to: BatteryInfo.self)
+            let parts = [b.batteryPercentSingle?(), b.batteryPercentLeft?(),
+                         b.batteryPercentRight?(), b.batteryPercentCase?()]
+            print(([d.addressString ?? "?"] + parts.map { String($0 ?? 0) }).joined(separator: "\t"))
+        }
     case "connect", "disconnect":
         guard args.count > 3 else { fail("usage: bt \(sub) <address>") }
         guard let d = IOBluetoothDevice(addressString: args[3]) else { fail("bt: bad address") }
         let status = sub == "connect" ? d.openConnection() : d.closeConnection()
         exit(status == kIOReturnSuccess ? 0 : 1)
     default:
-        fail("usage: bt power [on|off|toggle] | bt devices | bt connect <addr> | bt disconnect <addr>")
+        fail("usage: bt power [on|off|toggle] | bt devices | bt battery | bt connect <addr> | bt disconnect <addr>")
     }
 
 default:

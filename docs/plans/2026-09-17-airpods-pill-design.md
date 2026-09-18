@@ -18,6 +18,14 @@ link to Sound settings. A click on a mode sets it.
 Out of scope: Conversation Awareness, other AirPods and Beats models, and
 automatic switching of the audio output.
 
+Spatial audio: parked on 2026-09-18. `AVOutputDevice` carries
+`supportsHeadTrackedSpatialAudio`, `allowsHeadTrackedSpatialAudio` with a
+setter, and `headTrackedSpatialAudioMode`. They need the same shared system
+audio context as the listening mode, so they need the private entitlement.
+A test with the `avbypass.dylib` of `airpods-control` read them for AirPods
+Max. `airpods-control` has no spatial audio command. To pick this up, ask
+upstream for one, or carry a second bypass in this repo.
+
 ## Data sources
 
 The data comes from two command-line tools, not from APIs in the bar.
@@ -152,7 +160,18 @@ If step 3 fails on macOS 27, build the battery half only.
    `archive/refs/tags/v0.4.0.tar.gz` is
    `53c7f9ed1846e2dab806301521bee8c3742149e2b4c45c9abf9b2550edd817ad`.
 
-AirPods Max: not tested yet.
+### Results for AirPods Max (USB-C), 2026-09-18, macOS 27.0
+
+1. `system_profiler` reports `device_productID` `0x201F` and no battery key
+   at all. `defaults read /Library/Preferences/com.apple.Bluetooth` and
+   `ioreg` carry none either.
+2. `IOBluetoothDevice.batteryPercentSingle()`, a private method, returns the
+   level. So `omacchiato-helper` gets a `bt battery` subcommand that prints
+   `<address> <single> <left> <right> <case>` for each connected device, and
+   the script fills the gaps in the `system_profiler` values from it.
+3. `airpods-control` reads and lists the modes for AirPods Max on macOS 27.
+   The list is `off`, `transparency` and `noise-cancellation`, with no
+   Adaptive, and the popup shows exactly those three.
 
 ## Build order
 

@@ -352,7 +352,7 @@ the code this repo absorbed, with what Omacchiato uses each for.
 | Script | What it does | Talks to |
 |---|---|---|
 | [`omacchiato-ai-usage`](bin/omacchiato-ai-usage) | The AI usage pill | tokscale, and the status page of each provider it shows |
-| [`omacchiato-airpods`](bin/omacchiato-airpods) | The AirPods pill | `system_profiler`, `airpods-control` |
+| [`omacchiato-airpods`](bin/omacchiato-airpods) | The AirPods pill | `system_profiler`, `omacchiato-helper`, `airpods-control` |
 | [`omacchiato-github-prs`](bin/omacchiato-github-prs) | The GitHub pull requests pill | `api.github.com` through `gh` |
 | [`omacchiato-keep-awake`](bin/omacchiato-keep-awake) | The keep-awake pill | `pmset` |
 | [`omacchiato-herdr-worktree`](bin/omacchiato-herdr-worktree) | herdr's `Ctrl+Alt+G` worktree picker | `git`, `herdr` |
@@ -513,7 +513,7 @@ Recording grant, and `Super+O` opens it with Karabiner's.
 | **Accessibility** | OmniWM, `omacchiato-gesture`, `omacchiato-bar` (reads the focused app's menus for the app-pill popup, and reads and clicks other apps' menu bar icons for the menu bar apps pill) | Move, resize and focus other apps' windows. This is the tiling itself, and it is the broadest permission here. | Nothing tiles. Not optional in practice. |
 | **Input Monitoring** | Karabiner-Elements and OmniWM; `omacchiato-gesture` on macOS 26 | Karabiner reads keys to remap Caps Lock; `omacchiato-gesture` reads raw trackpad contacts, because macOS 26 stopped carrying touch data in normal events. On macOS 27 it reads them without this grant. | No Super key, no swipe gestures. |
 | **Screen Recording** | `omacchiato-gesture` for a swipe, Karabiner-Elements for `Super+O`; OmniWM (optional) | Captures a thumbnail per window for the overview cards, including windows the window manager has stashed offscreen. OmniWM uses it for its own overview thumbnails, the image of a window you drag, and Hidden Bar icons. | Cards fall back to app icons and titles. OmniWM starts without it. |
-| **Bluetooth** | `omacchiato-bar` | Reads adapter power and the paired-device list for the bluetooth pill and its menu. | The pill hides itself. |
+| **Bluetooth** | `omacchiato-bar` | Reads adapter power and the paired-device list for the bluetooth pill and its menu. A plugin pill runs as a child of the bar, so it reads Bluetooth with this grant: the AirPods pill needs it. | The bluetooth pill hides itself, and the AirPods pill shows no battery. |
 | **Location** | `omacchiato-bar` | Reads **only** the wi-fi network's name, which macOS classes as location data. No coordinate is requested; the authorisation itself is what unlocks `CWInterface.ssid()`. | The wi-fi popup's title row reads "wi-fi" instead of your network's name. |
 | **Automation** | `omacchiato-bar`, `theme-set`, and the terminal that runs `install.sh` | Apple Events to **Music** (the current track and its artwork), to **Ghostty** (reloading its colours after a theme change) and to **System Events** (sleep, lock and restart from the Apple menu; setting the wallpaper; adding OmniWM as a login item). | The media pill has no artwork; those menu rows do nothing; OmniWM does not start at login until you add it under System Settings > General > Login Items. |
 | **Files and Folders** | `omacchiato-bar` | Only if your clone lives in `~/Documents`, `~/Desktop` or `~/Downloads`. The bar reads its palette from the theme directory inside the repo, and macOS walls launchd agents off from those folders. | The bar **hangs at startup** waiting on the prompt. Clone to `~/.local/share/omacchiato` and this never comes up. |
@@ -807,6 +807,11 @@ device supports: Off, Transparency, Adaptive and Noise Cancellation.
 The current mode has a check, and a click switches to that mode. The
 last row opens Sound settings. With two devices connected, each device
 is a section that starts closed.
+
+AirPods Max report no battery to `system_profiler`, so the script also
+runs `omacchiato-helper bt battery`, which reads the percentages that
+IOBluetooth carries. A value from `system_profiler` wins where both
+report one.
 
 You can rename AirPods, so the script finds the model from the
 device's Bluetooth product ID. macOS ships the product ID of each Apple

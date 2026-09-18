@@ -678,22 +678,23 @@ func requestPermissions() -> Never {
         }
     }
 
-    // Skip the grant of a hidden pill. The bar never uses it.
-    if pillModes["bluetooth"] != "hide" {
-        let answer = PermissionAnswer()
-        var central: CBCentralManager?
-        if CBCentralManager.authorization == .notDetermined {
-            central = CBCentralManager(delegate: answer, queue: .main)
-            answer.wait()
-        }
-        _ = central
-        switch CBCentralManager.authorization {
-        case .allowedAlways: report("bluetooth", "granted")
-        case .notDetermined: report("bluetooth", "unknown")
-        default: report("bluetooth", "denied")
-        }
+    // Asked even when the bluetooth pill is hidden: a plugin command runs as
+    // the bar's child, so it reads Bluetooth with the bar's grant. The AirPods
+    // pill does.
+    let answer = PermissionAnswer()
+    var central: CBCentralManager?
+    if CBCentralManager.authorization == .notDetermined {
+        central = CBCentralManager(delegate: answer, queue: .main)
+        answer.wait()
+    }
+    _ = central
+    switch CBCentralManager.authorization {
+    case .allowedAlways: report("bluetooth", "granted")
+    case .notDetermined: report("bluetooth", "unknown")
+    default: report("bluetooth", "denied")
     }
 
+    // Skip the grant of a hidden pill. Only the wifi pill reads the location.
     if pillModes["wifi"] != "hide" {
         let answer = PermissionAnswer()
         let manager = CLLocationManager()

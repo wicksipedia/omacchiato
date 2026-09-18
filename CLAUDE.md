@@ -264,7 +264,9 @@ The design and the test results are in
   LaunchServices makes that copy responsible for itself. If you run the
   binary directly, it reports the terminal's grants.
 - The switch runs before other startup code. In the bar it comes right
-  after `pillModes`, so it can read only the globals above it. In the
+  after `pillModes`, so it can read only the globals above it. It always
+  asks for Bluetooth, because a plugin command runs as a child of the bar
+  and reads Bluetooth with the bar's grant, whatever `bar-pills.conf` says. In the
   gesture daemon it comes before the lock file, which the running daemon
   holds. It prints `<permission> granted|denied|unknown` lines, then
   `done`.
@@ -298,7 +300,9 @@ The design and the test results are in
   `/System/Library/CoreServices/CoreTypes.bundle/Contents/Library/*/Contents/Info.plist`.
   Those tags start at `0x2014`, so `OLDER` holds `0x200A` and `0x200E`. A
   connected device can also have a BLE entry with the same name and no
-  product ID.
+  product ID. `system_profiler` reports no battery for AirPods Max, so the
+  script fills the gaps from `omacchiato-helper bt battery`, which reads
+  `batteryPercentSingle` and the per-side values from IOBluetooth.
   `airpods-control` sets the noise mode through a private API, and
   `install.sh` builds it at a pinned version and SHA-256.
 
