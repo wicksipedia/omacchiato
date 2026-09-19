@@ -2349,15 +2349,33 @@ func stopHotspotBrowse() {
     hotspotSession?.perform(NSSelectorFromString("stopBrowsing"))
 }
 
-// The phone turns its hotspot on and macOS joins it, the same two steps
-// the wi-fi menu takes. The reply carries the network name.
+// The phone turns its hotspot on and answers with the name and the
+// password of the network it raised. Joining it is still this Mac's
+// job. The two arguments are plain strings, whatever the type encoding
+// of the block says, so nothing here sends them a message.
 func startHotspot(_ device: NSObject) {
     let name = device.value(forKey: "deviceName") as? String ?? "phone"
-    typealias Done = @convention(block) (AnyObject?, NSError?) -> Void
-    let done: Done = { reply, error in
-        // the reply is the network name itself, so KVC on it throws
-        let ssid = reply as? String ?? ""
-        tlog("hotspot \(name): \(error?.localizedDescription ?? "on \(ssid)")")
+    typealias Done = @convention(block) (AnyObject?, AnyObject?) -> Void
+    let done: Done = { first, second in
+        let ssid = first as? String ?? ""
+        let secret = second as? String ?? ""
+        tlog("hotspot \(name): ssid \(ssid.isEmpty ? "none" : ssid), password \(secret.isEmpty ? "no" : "yes")")
+        guard !ssid.isEmpty else { return }
+        // the network takes a few seconds to come up after the phone agrees
+        DispatchQueue.global(qos: .userInitiated).async {
+            for attempt in 1...6 {
+                let out = shell("/usr/sbin/networksetup",
+                                ["-setairportnetwork", wifiDevice, ssid]
+                                    + (secret.isEmpty ? [] : [secret]))
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if out.isEmpty {
+                    tlog("hotspot \(name): joined \(ssid)")
+                    return
+                }
+                tlog("hotspot \(name): join \(attempt) \(out)")
+                Thread.sleep(forTimeInterval: 2)
+            }
+        }
     }
     closePopup()
     hotspotSession?.perform(NSSelectorFromString("enableHotspotForDevice:withCompletionHandler:"),

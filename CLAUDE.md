@@ -126,6 +126,13 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   `airportd` gates them behind `com.apple.wifi.tether.browse`, which
   only Apple's wi-fi agent carries. Every step gives up quietly, so a
   macOS that renames the class leaves the popup as it was.
+- The completion of `enableHotspotForDevice:` hands over two plain
+  strings, the network name and its password, although the type
+  encoding of the block names `SFRemoteHotspotInfo` and `NSError`. Send
+  either one a message and the bar dies on the XPC reply thread.
+  Turning the hotspot on does not join it: the bar joins with
+  `networksetup` and the password, and retries, because the network
+  needs a few seconds to come up.
 - Plugin pills come from `~/.config/omacchiato/bar-plugins.conf`. A command
   prints a label, or JSON with `label`, `color`, `icon` and `rows`. Row
   keys: `text`, `detail`, `hero`, `dim`, `separator`, `slider`,
