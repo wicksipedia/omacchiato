@@ -885,6 +885,7 @@ func pluginPopupRows(_ raw: [[String: Any]], of plugin: BarPlugin) -> [PopupRow]
         return PopupRow(icon: spec["icon"] as? String ?? "",
                         text: spec["text"] as? String ?? "",
                         detail: spec["detail"] as? String ?? "",
+                        subtitle: spec["subtitle"] as? String ?? "",
                         separator: spec["separator"] as? Bool ?? false,
                         hero: spec["hero"] as? Bool ?? false,
                         dim: spec["dim"] as? Bool ?? false,
@@ -1696,6 +1697,7 @@ struct PopupRow {
     var image: NSImage? // 16pt leading icon — Recent Items entries
     var text = ""
     var detail = "" // right-aligned, dim — menu shortcuts live here
+    var subtitle = "" // follows the text, small and quiet: a title's second half
     var separator = false // a thin rule instead of content
     var hero = false // accent, bold — the title row
     var dim = false // the quiet action footer
@@ -1779,6 +1781,7 @@ final class PopupView: NSView {
         for row in rows {
             var w = advance(row.text, font(row))
             if !row.detail.isEmpty { w += advance(row.detail, nerdFont("Regular", 11)) + 24 }
+            if !row.subtitle.isEmpty { w += advance(row.subtitle, nerdFont("Regular", 11)) + 8 }
             if !row.icon.isEmpty { w += inkBox(row.icon, nerdFont("Bold", 13)).width + 8 }
             if row.image != nil { w += 22 }
             if row.slider != nil { w = max(w, 150) }
@@ -1874,6 +1877,11 @@ final class PopupView: NSView {
             } else {
                 let tint = index == hoveredRow && row.action != nil ? palette.accent : color(row)
                 drawText(row.text, font(row), tint, leftAt: x, midY: rect.midY)
+                if !row.subtitle.isEmpty {
+                    drawText(row.subtitle, nerdFont("Regular", 11),
+                             palette.label.withAlphaComponent(0.5),
+                             leftAt: x + advance(row.text, font(row)) + 8, midY: rect.midY)
+                }
                 if !row.detail.isEmpty {
                     let df = nerdFont("Regular", 11)
                     drawText(row.detail, df, palette.label.withAlphaComponent(0.5),

@@ -135,8 +135,9 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   needs a few seconds to come up.
 - Plugin pills come from `~/.config/omacchiato/bar-plugins.conf`. A command
   prints a label, or JSON with `label`, `color`, `icon` and `rows`. Row
-  keys: `text`, `detail`, `hero`, `dim`, `separator`, `slider`,
-  `marker`, `bar`, `color`, `url` and `terminal`. Labels
+  keys: `text`, `subtitle`, `detail`, `hero`, `dim`, `separator`,
+  `slider`, `marker`, `bar`, `color`, `bar_color`, `url` and
+  `terminal`. Labels
   are cut at 32 characters. The bar puts `~/.local/bin` and Homebrew
   first on `PATH` and sets `OMACCHIATO_PILL_ICON`. A row also takes `icon`,
   `icon_color`, `run` (a command with no window, then the plugin runs

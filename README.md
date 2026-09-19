@@ -730,7 +730,12 @@ the label on the row above, and `color` sets the fill. A `marker`
 between 0 and 1 draws a tick across the track; the AI usage pill uses it
 to show how far through each usage window you are. A `bar` between 0
 and 1 draws the same track inside an ordinary row, between its `text`
-and its `detail`, and all such bars in a popup share one column. Give
+and its `detail`, and all such bars in a popup share one column, which
+holds still when a folded section opens. `bar_color` colours that bar
+alone and leaves the words beside it in the row's own colour.
+
+A `subtitle` follows the `text` in small quiet type, for the second
+half of a title: the AI usage pill names the provider, then the plan. Give
 a pill rows and clicking it opens the popup instead of re-running the
 command.
 
