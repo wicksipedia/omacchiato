@@ -902,6 +902,10 @@ func pluginPopupRows(_ raw: [[String: Any]], of plugin: BarPlugin) -> [PopupRow]
 // the sections a click opened or closed, by plugin, header text and the
 // count of earlier headers with that text. The bar forgets them when it restarts.
 var sectionOpen: [String: Bool] = [:]
+// The rows a popup holds before folding. Inline bars share one label
+// column and one number column, and measuring those over the VISIBLE
+// rows moved every bar when a section opened.
+var popupBarSource: [PopupRow] = []
 
 // A header row toggles the rows after it, up to the next header or "end" row.
 // A separator right before the next header stays, so closed sections keep their rules.
@@ -1758,17 +1762,29 @@ final class PopupView: NSView {
         return w + 10
     }
 
+    // the label and the numbers each side of every inline bar, measured
+    // over the unfolded rows so a section opening moves no bar
+    func barColumns() -> (label: CGFloat, detail: CGFloat) {
+        let source = popupBarSource.isEmpty ? rows : popupBarSource
+        let barred = source.filter { $0.inlineBar != nil }
+        return (barred.map { advance($0.text, font($0)) }.max() ?? 0,
+                barred.map { advance($0.detail, nerdFont("Regular", 11)) }.max() ?? 0)
+    }
+
     func measure() -> NSSize {
         var width: CGFloat = 0
         var height: CGFloat = popupPad * 2
         let colW = columnWidth()
+        let bars = barColumns()
         for row in rows {
             var w = advance(row.text, font(row))
             if !row.detail.isEmpty { w += advance(row.detail, nerdFont("Regular", 11)) + 24 }
             if !row.icon.isEmpty { w += inkBox(row.icon, nerdFont("Bold", 13)).width + 8 }
             if row.image != nil { w += 22 }
             if row.slider != nil { w = max(w, 150) }
-            if row.inlineBar != nil { w += 112 }
+            // the same three parts the row draws: label, a track of at
+            // least 100pt, and the numbers
+            if row.inlineBar != nil { w = max(w, bars.label + 12 + 100 + 12 + bars.detail) }
             if let cells = row.columns { w = max(w, CGFloat(cells.count) * colW) }
             width = max(width, w)
             height += rowH(row)
@@ -1787,9 +1803,7 @@ final class PopupView: NSView {
 
         let colW = columnWidth()
         // inline bars share one column, so every bar starts and ends together
-        let barred = rows.filter { $0.inlineBar != nil }
-        let barLabelW = barred.map { advance($0.text, font($0)) }.max() ?? 0
-        let barDetailW = barred.map { advance($0.detail, nerdFont("Regular", 11)) }.max() ?? 0
+        let (barLabelW, barDetailW) = barColumns()
         var y = bounds.height - popupPad
         for (index, row) in rows.enumerated() {
             let h = rowH(row)
@@ -2624,6 +2638,7 @@ func appleRows() -> [PopupRow] {
 }
 
 func popupRows(for name: String) -> [PopupRow] {
+    popupBarSource = []
     switch name {
     case "apple": return appleMenuRows()
     case "clock": return calendarRows()
@@ -2635,7 +2650,9 @@ func popupRows(for name: String) -> [PopupRow] {
     case "bluetooth": return bluetoothRows()
     case "appmenu": return appMenuRows()
     case "menubar": return menuBarAppRows()
-    default: return foldSections(name, pluginRows[name] ?? [])
+    default:
+        popupBarSource = pluginRows[name] ?? []
+        return foldSections(name, popupBarSource)
     }
 }
 
