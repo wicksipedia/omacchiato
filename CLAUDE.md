@@ -328,10 +328,15 @@ The design and the test results are in
 
 - `omacchiato-github-prs [search qualifiers]` lists open PRs by
   `author:@me` through `gh`. An update is an unread GitHub notification.
-  PRs that the user unsubscribed from are hidden. Marks, first match
-  wins: 📝 draft, 💥 CI failed or merge conflicts, 🏗️ CI running,
-  💬 changes requested or an unresolved thread from someone else,
-  ✅ approved, ⏳ waiting for a review.
+  PRs that the user unsubscribed from are hidden. Each PR carries one
+  Nerd Font mark in `icon`, with `icon_color`, first match wins: a merge
+  glyph for merged, an x for closed, a pencil for draft, a warning in
+  red for a failed check or a merge conflict, a progress clock in yellow
+  for a running check, a comment in yellow for changes requested or an
+  unresolved thread from someone else, a green check for approved, and a
+  muted clock for waiting. The sentence under a PR appears only when it
+  says more than the mark: merged, closed, conflicts, a failed check,
+  changes requested, or the number of threads to resolve.
 - `omacchiato-ai-usage --pill <id>[:<window>],... --panel <id>,...` reads
   plan usage from `tokscale usage --json` and the week from
   `tokscale graph`. `PROVIDERS` maps each id to a status page and a
@@ -349,9 +354,10 @@ The design and the test results are in
   product ID. `system_profiler` reports no battery for AirPods Max, so the
   script fills the gaps from `omacchiato-helper bt battery`, which reads
   `batteryPercentSingle` and the per-side values from IOBluetooth.
-  Nothing reports a charging state, so the plug mark means the AirPods are
-  on this Mac's USB: `ioreg -arc IOUSBHostDevice` lists them with the
-  Bluetooth serial number. `airpods-control` sets the noise mode through a
+  Nothing reports a charging state, so a row says the AirPods are on this
+  Mac's USB: `ioreg -arc IOUSBHostDevice` lists them with the Bluetooth
+  serial number. It is a row of its own, because a mark on one battery
+  read as that side charging. `airpods-control` sets the noise mode through a
   private API, and `install.sh` builds it at a pinned version and SHA-256.
   It answers `no-device` while the cable carries the audio, because it
   controls a device only over Bluetooth.

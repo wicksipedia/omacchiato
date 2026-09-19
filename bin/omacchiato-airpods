@@ -29,9 +29,6 @@ BATTERY_ORDER = ["Left", "Right", "Battery", "Case"]
 # the parts that `omacchiato-helper bt battery` prints, in its order
 HELPER_PARTS = ["Battery", "Left", "Right", "Case"]
 SOUND_SETTINGS = "x-apple.systempreferences:com.apple.Sound-Settings.extension"
-PLUG = "\U0001F50C"
-# the part the cable charges, first match
-PLUG_ROWS = ["Battery", "Case"]
 LOW = 20
 TIMEOUT_S = 5
 
@@ -156,21 +153,26 @@ def listening(tool, name):
 
 
 def device_rows(tool, name, model, icon, battery, cable):
-    rows = [{"text": name, "detail": model, "hero": True, "icon": icon}]
+    # "Matt's AirPods Pro" beside "AirPods Pro" says the same thing twice
+    named = model.lower() in name.lower() or name.lower() in model.lower()
+    rows = [{"text": name, "detail": "" if named else model, "hero": True, "icon": icon}]
     order = lambda part: BATTERY_ORDER.index(part) if part in BATTERY_ORDER else len(BATTERY_ORDER)
     parts = sorted(battery, key=order)
-    marked = next((p for p in PLUG_ROWS + parts if p in battery), None) if cable else None
     for part in parts:
         pct = battery[part]
-        row = {"text": part, "bar": pct / 100,
-               "detail": "%d%% %s" % (pct, PLUG) if part == marked else "%d%%" % pct}
+        row = {"text": part, "bar": pct / 100, "detail": "%d%%" % pct}
         if pct <= LOW:
             row["color"] = "red"
         rows.append(row)
+    # the plug is about the whole device, and on one battery row it read as
+    # that side charging, which nothing here can know
+    if cable:
+        rows.append({"text": "plugged into this Mac", "dim": True})
     modes = listening(tool, name)
     if modes:
         current, supported = modes
         rows.append({"separator": True})
+        rows.append({"text": "noise control", "dim": True})
         for mode in supported:
             rows.append({"text": MODES.get(mode, mode), "detail": "✓" if mode == current else "",
                          "run": " ".join(shlex.quote(a) for a in
