@@ -1703,6 +1703,7 @@ struct PopupRow {
     // fixed-width cells, calendar only — the font isn't monospaced, so
     // space-padded text drifts out of the header's columns
     var columns: [String]? = nil
+    var columnAccent: Int? // the cell that carries the today circle
     var tint: NSColor? // overrides the hero/dim colour for one row
     var iconTint: NSColor? // overrides the accent colour of the icon
     var section: String? // plugin rows: "open" or "closed" starts a section, "end" ends one
@@ -1823,9 +1824,17 @@ final class PopupView: NSView {
                 // A wide row elsewhere in the popup, such as an event title,
                 // would leave the grid on the left of an empty half.
                 x = max(x, rect.minX + (rect.width - CGFloat(cells.count) * colW) / 2)
-                for cell in cells {
-                    drawText(cell, font(row), color(row),
-                             centeredIn: NSRect(x: x, y: rect.minY, width: colW, height: rect.height))
+                for (i, cell) in cells.enumerated() {
+                    let box = NSRect(x: x, y: rect.minY, width: colW, height: rect.height)
+                    if i == row.columnAccent {
+                        let d = min(colW, rect.height) - 3
+                        palette.accent.setFill()
+                        NSBezierPath(ovalIn: NSRect(x: box.midX - d / 2, y: box.midY - d / 2,
+                                                    width: d, height: d)).fill()
+                        drawText(cell, font(row), palette.barBG, centeredIn: box)
+                    } else {
+                        drawText(cell, font(row), color(row), centeredIn: box)
+                    }
                     x += colW
                 }
             } else if let value = row.slider {
@@ -2078,10 +2087,21 @@ func loadTodayEvents() {
     }
 }
 
+// How long you have, on the next event only: the clock time is already
+// in the row, and a count on every row reads as noise.
+func countdown(to event: EKEvent, now: Date) -> String {
+    if event.isAllDay { return "" }
+    let left = event.startDate.timeIntervalSince(now)
+    if left <= 0 { return "now" }
+    if left < 3600 { return "in \(Int(left / 60)) min" }
+    if left < 12 * 3600 { return "in \(Int(left / 3600)) h" }
+    return ""
+}
+
 func eventRows() -> [PopupRow] {
     guard EKEventStore.authorizationStatus(for: .event) == .fullAccess else {
         return [PopupRow(separator: true),
-                PopupRow(text: "allow calendar access…", dim: true, action: {
+                PopupRow(text: "see today's events…", dim: true, action: {
                     NSWorkspace.shared.open(URL(
                         string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars")!)
                     closePopup()
@@ -2095,14 +2115,15 @@ func eventRows() -> [PopupRow] {
     }
     let time = DateFormatter()
     time.dateFormat = "HH:mm"
-    var rows = [PopupRow(separator: true)]
+    var rows = [PopupRow(separator: true), PopupRow(text: "today", dim: true)]
     // a long title would widen the whole popup: measure() takes the
     // widest row, and the month grid below it holds the useful width
-    for event in left.prefix(6) {
+    for (index, event) in left.prefix(6).enumerated() {
         let title = event.title ?? "event"
+        let when = event.isAllDay ? "all day" : time.string(from: event.startDate)
         rows.append(PopupRow(icon: "\u{F111}",
-                             text: title.count > 24 ? String(title.prefix(23)) + "…" : title,
-                             detail: event.isAllDay ? "all day" : time.string(from: event.startDate),
+                             text: when + "  " + (title.count > 20 ? String(title.prefix(19)) + "…" : title),
+                             detail: index == 0 ? countdown(to: event, now: now) : "",
                              iconTint: event.calendar.cgColor.flatMap { NSColor(cgColor: $0) }))
     }
     return rows
@@ -2116,7 +2137,7 @@ func calendarRows() -> [PopupRow] {
     let title = DateFormatter()
     title.dateFormat = "MMMM yyyy"
     rows.append(PopupRow(text: title.string(from: now).lowercased(), hero: true))
-    rows.append(PopupRow(dim: true, columns: ["", "mo", "tu", "we", "th", "fr", "sa", "su"]))
+    rows.append(PopupRow(dim: true, columns: ["mo", "tu", "we", "th", "fr", "sa", "su"]))
 
     guard let monthStart = cal.date(from: cal.dateComponents([.year, .month], from: now)),
           let range = cal.range(of: .day, in: .month, for: now) else { return rows }
@@ -2134,11 +2155,11 @@ func calendarRows() -> [PopupRow] {
 
     for week in stride(from: 0, to: cells.count, by: 7) {
         let slice = cells[week..<min(week + 7, cells.count)]
-        let hasToday = slice.contains { $0.0 == today && $0.1 }
         let monday = cal.date(byAdding: .day, value: week - leading, to: monthStart) ?? monthStart
-        rows.append(PopupRow(highlight: hasToday,
-                              action: { openCalendarWeek(of: monday) },
-                              columns: [hasToday ? "▸" : ""] + slice.map { String($0.0) }))
+        rows.append(PopupRow(action: { openCalendarWeek(of: monday) },
+                             columns: slice.map { String($0.0) },
+                             columnAccent: slice.firstIndex { $0.0 == today && $0.1 }
+                                 .map { $0 - slice.startIndex }))
     }
     let week = cal.component(.weekOfYear, from: now)
     rows.append(PopupRow(text: "week \(week)", dim: true))
