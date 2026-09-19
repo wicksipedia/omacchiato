@@ -1819,7 +1819,10 @@ final class PopupView: NSView {
             if let cells = row.columns {
                 // one box per cell, all the same width — centring absorbs the
                 // per-glyph advance differences a proportional font gives
-                // digits vs. letters, so every row lines up on the same grid
+                // digits vs. letters, so every row lines up on the same grid.
+                // A wide row elsewhere in the popup, such as an event title,
+                // would leave the grid on the left of an empty half.
+                x = max(x, rect.minX + (rect.width - CGFloat(cells.count) * colW) / 2)
                 for cell in cells {
                     drawText(cell, font(row), color(row),
                              centeredIn: NSRect(x: x, y: rect.minY, width: colW, height: rect.height))
