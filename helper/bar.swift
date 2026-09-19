@@ -2851,6 +2851,26 @@ private func axString(_ element: AXUIElement, _ attr: String) -> String {
     return ref as? String ?? ""
 }
 
+private func axInt(_ element: AXUIElement, _ attr: String) -> Int {
+    var ref: CFTypeRef?
+    guard AXUIElementCopyAttributeValue(element, attr as CFString, &ref) == .success else { return 0 }
+    return (ref as? NSNumber)?.intValue ?? 0
+}
+
+// AXMenuItemCmdModifiers is a mask, and bit 3 means the shortcut carries
+// NO command key. Without it, Lock Screen and Log Out both read ⌘Q.
+func menuShortcut(_ item: AXUIElement) -> String {
+    let key = axString(item, "AXMenuItemCmdChar")
+    guard !key.isEmpty else { return "" }
+    let mods = axInt(item, "AXMenuItemCmdModifiers")
+    var out = ""
+    if mods & 4 != 0 { out += "⌃" }
+    if mods & 2 != 0 { out += "⌥" }
+    if mods & 1 != 0 { out += "⇧" }
+    if mods & 8 == 0 { out += "⌘" }
+    return out + key
+}
+
 // one menu's items as popup rows — shared by the app drill-down and the
 // apple pill. A menu bar item wraps one AXMenu; the items live inside.
 // AXEnabled is a lie for closed menus: apps validate items lazily when
@@ -2921,9 +2941,8 @@ func rowsForMenu(_ element: AXUIElement, context: String = "",
                 refreshPopup()
             }))
         } else {
-            let cmd = axString(item, "AXMenuItemCmdChar")
             rows.append(PopupRow(image: recents ? recentItemIcon(title, section: section) : nil,
-                                 text: title, detail: cmd.isEmpty ? "" : "⌘\(cmd)", action: {
+                                 text: title, detail: menuShortcut(item), action: {
                 closePopup()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                     AXUIElementPerformAction(item, "AXPress" as CFString)
