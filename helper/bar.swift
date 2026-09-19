@@ -1825,8 +1825,9 @@ final class PopupView: NSView {
                 // digits vs. letters, so every row lines up on the same grid.
                 // A wide row elsewhere in the popup, such as an event title,
                 // would leave the grid on the left of an empty half.
+                let spread = max(colW, (rect.maxX - 20 - x) / CGFloat(cells.count))
                 for (i, cell) in cells.enumerated() {
-                    let box = NSRect(x: x, y: rect.minY, width: colW, height: rect.height)
+                    let box = NSRect(x: x, y: rect.minY, width: spread, height: rect.height)
                     if i == row.columnAccent {
                         let d = min(colW, rect.height) - 2
                         palette.accent.setFill()
@@ -1836,7 +1837,7 @@ final class PopupView: NSView {
                     } else {
                         drawText(cell, font(row), color(row), centeredIn: box)
                     }
-                    x += colW
+                    x += spread
                 }
             } else if let value = row.slider {
                 // track, then filled portion — the readout is the row's text
