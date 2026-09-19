@@ -893,6 +893,7 @@ func pluginPopupRows(_ raw: [[String: Any]], of plugin: BarPlugin) -> [PopupRow]
                         inlineBar: spec["bar"] as? Double,
                         action: action,
                         tint: pluginColor(spec["color"] as? String),
+                        barTint: pluginColor(spec["bar_color"] as? String),
                         iconTint: pluginColor(spec["icon_color"] as? String),
                         section: spec["section"] as? String)
     }
@@ -1705,6 +1706,7 @@ struct PopupRow {
     var columns: [String]? = nil
     var columnAccent: Int? // the cell that carries the today circle
     var tint: NSColor? // overrides the hero/dim colour for one row
+    var barTint: NSColor? // colours the inline bar alone, leaving the label
     var iconTint: NSColor? // overrides the accent colour of the icon
     var section: String? // plugin rows: "open" or "closed" starts a section, "end" ends one
 }
@@ -1868,7 +1870,7 @@ final class PopupView: NSView {
                                        width: max(0, rect.maxX - 4 - barDetailW - 12 - left), height: 6)
                     palette.rowBG.setFill()
                     NSBezierPath(roundedRect: track, xRadius: 3, yRadius: 3).fill()
-                    (row.tint ?? palette.accent).setFill()
+                    (row.barTint ?? row.tint ?? palette.accent).setFill()
                     NSBezierPath(roundedRect: NSRect(x: track.minX, y: track.minY,
                                                      width: track.width * CGFloat(max(0, min(1, share))),
                                                      height: track.height),

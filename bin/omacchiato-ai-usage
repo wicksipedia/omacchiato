@@ -328,7 +328,7 @@ def stats_rows(stats):
                 stats["sessions"], stats["active_days"], stats["active_ms"] // 3_600_000), "dim": True}]
     for day, (n, cost) in zip(week, spend):
         rows.append({"text": "Today" if day == today else day.strftime("%a"), "bar": n / peak,
-                     "detail": "%s · %s" % (human(n), dollars(cost))})
+                     "detail": "%s · %s" % (human(n), dollars(cost)), "dim": not n})
     models = stats["models"][:3]
     if models:
         rows.append({"separator": True})
@@ -368,7 +368,7 @@ def metric_rows(rows, pid, metric):
     if left is not None and left > 0:
         detail.append(countdown(left))
     row = {"text": metric.get("label", ""), "bar": max(0.0, min(1.0, pct / 100.0)),
-           "detail": " · ".join(detail), "color": pace_colour(pct, elapsed)}
+           "detail": " · ".join(detail), "bar_color": pace_colour(pct, elapsed)}
     if elapsed is not None:
         row["marker"] = elapsed
     rows.append(row)
@@ -399,7 +399,7 @@ def provider_rows(pid, outputs, state, first=False):
         rows += [{"separator": True}] if n else []
         rows.append({"text": output["provider"], "detail": summary or plan, "hero": True,
                      "section": "open" if first and not n else "closed", **logo(pid)})
-        if summary and plan:
+        if summary and plan and len(outputs) > 1:
             rows.append({"text": plan, "dim": True})
         if not n:
             rows += health_rows(pid, state)
