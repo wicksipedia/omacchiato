@@ -15,6 +15,11 @@ CFTypeRef haptic_open_default(void);
 CFMutableArrayRef haptic_open_all(void);
 
 bool haptic_actuate(CFTypeRef actuator, int32_t pattern);
+
+// One tap on the default trackpad, on a handle that lives only for the
+// tap. A handle that stays open dies after some minutes: the actuate
+// call still reports success and the trackpad stays quiet.
+void haptic_tap(int32_t pattern);
 void haptic_actuate_all(CFArrayRef actuators, int32_t pattern);
 
 void haptic_close(CFTypeRef actuator);

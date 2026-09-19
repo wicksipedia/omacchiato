@@ -206,6 +206,12 @@ The design and the test results are in
   workspaces. `omacchiato-gesture` keeps only the 4-finger vertical swipe
   for the overview. `macos-defaults.sh` turns off the system's 3- and
   4-finger horizontal swipes.
+- The trackpad taps on each fired swipe, under `haptic` in
+  `gesture.json`. The tap comes at the commit, before the switch
+  lands. `haptic_tap` opens the actuator for each tap: a handle that
+  stays open goes quiet after some minutes and still reports success,
+  which is why a tap worked only right after a restart. Pattern 6 is
+  the strongest tap, and 15 and 16 give none.
 - `followsMouse = false`, so focus follows clicks and keys only.
 - OmniWM hotkeys cannot run shell commands.
   `bin/omacchiato-karabiner-omniwm install` adds Karabiner rules for those

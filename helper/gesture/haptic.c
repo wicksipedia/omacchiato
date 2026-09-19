@@ -119,6 +119,15 @@ bool haptic_actuate(CFTypeRef act, int32_t pattern)
 	return true;
 }
 
+void haptic_tap(int32_t pattern)
+{
+	CFTypeRef act = haptic_open_default();
+	if (!act)
+		return;
+	haptic_actuate(act, pattern);
+	haptic_close(act);
+}
+
 void haptic_actuate_all(CFArrayRef arr, int32_t pattern)
 {
 	if (!arr)

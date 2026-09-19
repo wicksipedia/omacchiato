@@ -20,8 +20,21 @@
 #include <pthread.h>
 #include <IOKit/IOKitLib.h>
 
-static CFTypeRef g_haptic = NULL;
 static Config g_config;
+
+// Pattern 6 is the strongest tap this trackpad gives. 15 and 16 are silent.
+#define HAPTIC_PATTERN 6
+
+// The open costs about 20 ms, too long for the thread that reads touches.
+static void tap(void)
+{
+	if (!g_config.haptic)
+		return;
+	dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+		haptic_tap(HAPTIC_PATTERN);
+	});
+}
+
 static pthread_mutex_t g_gesture_mutex = PTHREAD_MUTEX_INITIALIZER;
 static CFMutableDictionaryRef g_tracks = NULL;
 
@@ -157,8 +170,6 @@ static void switch_workspace(const char* ws)
 			return;
 		}
 		printf("Switched workspace (omniwm) to '%d'.\n", target);
-		if (g_config.haptic && g_haptic)
-			haptic_actuate(g_haptic, 3);
 		return;
 	}
 	// omacchiato: a direction that looks like a COMMAND is run like the
@@ -218,6 +229,7 @@ static void fire_gesture(gesture_ctx* ctx, int direction)
 
 	ctx->last_fire_dir = direction;
 	ctx->state = GS_COMMITTED;
+	tap();
 
 	// a SERIAL queue: the global concurrent pool gives no ordering, so
 	// two rapid opposite-direction flicks could reach the IPC mutex out
@@ -253,8 +265,7 @@ static void fire_vertical(gesture_ctx* ctx, int direction)
 		free(owned);
 	});
 
-	if (g_config.haptic && g_haptic)
-		haptic_actuate(g_haptic, 3);
+	tap();
 }
 
 static void calculate_touch_averages(touch* touches, int count,
@@ -675,12 +686,6 @@ int main(int argc, const char* argv[])
 			g_config.swipe_right,
 			g_config.swipe_up,
 			g_config.swipe_down);
-
-		if (g_config.haptic) {
-			g_haptic = haptic_open_default();
-			if (!g_haptic)
-				fprintf(stderr, "Warning: Failed to initialize haptic actuator. Continuing without haptics.\n");
-		}
 
 		g_tracks = CFDictionaryCreateMutable(NULL, 0,
 			&kCFTypeDictionaryKeyCallBacks,
