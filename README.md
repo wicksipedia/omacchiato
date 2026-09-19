@@ -616,6 +616,11 @@ zero, as a red icon, the same way the microphone pill works.
 `battery = time` shows only the battery icon on AC power; on battery
 it adds the time left, in whole hours or in minutes under an hour.
 
+`popup = glass` draws the popups on Liquid Glass, so the desktop shows
+through them, instead of the theme's flat background. The system
+setting Accessibility > Display > Reduce transparency turns it off
+again.
+
 `media = <characters>` sets how much of the track title the music pill
 shows before the title scrolls. The default is 28. A display with a
 notch uses five sevenths of the number, so 20 by default.

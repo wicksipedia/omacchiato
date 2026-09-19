@@ -93,6 +93,11 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
 - `~/.config/omacchiato/bar-pills.conf` holds `<pill> = <mode>` lines:
   `hide`, `icon`, `volume = muted`, `battery = time` and
   `media = <characters>`. The bar reads it once at startup.
+- `popup = glass` puts the popup on an `NSGlassEffectView`, which then
+  holds the scroll view, so `refreshPopup` resizes the window's content
+  view and the glass content view, not a cast to `NSScrollView`.
+  `PopupView.draw` skips its background fill in that mode, and Reduce
+  transparency turns the mode off.
 - `dur()` in `bar.swift` and `overview.swift` returns 0 while Reduce
   motion is on. Pass every animation duration through it.
 - Plugin pills come from `~/.config/omacchiato/bar-plugins.conf`. A command

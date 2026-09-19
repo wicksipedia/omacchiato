@@ -778,6 +778,13 @@ let iconOnly = Set(pillModes.filter { $0.value == "icon" }.keys)
 func dur(_ seconds: Double) -> Double {
     NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : seconds
 }
+
+// `popup = glass` puts the popup on Liquid Glass instead of a flat fill.
+// Reduce transparency turns it off again.
+var popupGlass: Bool {
+    pillModes["popup"] == "glass"
+        && !NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+}
 var rightItems: [String: BarItem] = [:]
 // popup rows a plugin last returned, keyed by pill name
 var pluginRows: [String: [PopupRow]] = [:]
@@ -1754,8 +1761,10 @@ final class PopupView: NSView {
         rowRects.removeAll()
         // plain fill: the scroll CONTAINER carries the rounded clip and
         // border, so corners stay put while tall content scrolls
-        palette.barBG.setFill()
-        bounds.fill()
+        if !popupGlass {
+            palette.barBG.setFill()
+            bounds.fill()
+        }
 
         let colW = columnWidth()
         // inline bars share one column, so every bar starts and ends together
@@ -1923,7 +1932,9 @@ func refreshPopup() {
     }
     window.setFrame(NSRect(x: x, y: popupTopY - winH,
                            width: size.width, height: winH), display: false)
-    (window.contentView as? NSScrollView)?.frame = NSRect(origin: .zero, size: NSSize(width: size.width, height: winH))
+    let box = NSRect(origin: .zero, size: NSSize(width: size.width, height: winH))
+    window.contentView?.frame = box
+    (window.contentView as? NSGlassEffectView)?.contentView?.frame = box
     view.frame = NSRect(origin: .zero, size: size)
     view.scroll(NSPoint(x: 0, y: max(0, size.height - winH))) // drilling resets to the top
     view.needsDisplay = true
@@ -1972,7 +1983,15 @@ func showPopup(_ name: String, under anchor: NSRect, on surface: BarSurface, ali
     scroll.layer?.masksToBounds = true
     scroll.layer?.borderWidth = 1
     scroll.layer?.borderColor = palette.accent.cgColor
-    window.contentView = scroll
+    if popupGlass {
+        let glass = NSGlassEffectView(frame: scroll.frame)
+        glass.cornerRadius = popupRadius
+        glass.tintColor = palette.barBG.withAlphaComponent(0.5)
+        glass.contentView = scroll
+        window.contentView = glass
+    } else {
+        window.contentView = scroll
+    }
     view.scroll(NSPoint(x: 0, y: max(0, size.height - winH))) // start at the top
     window.alphaValue = 0
     window.orderFrontRegardless()
