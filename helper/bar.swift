@@ -2500,28 +2500,38 @@ func wifiRows() -> [PopupRow] {
     }
     scanWifi()
     let current = interface?.ssid()
-    let others = wifiNetworks.filter { $0.ssid != current }.prefix(8)
-    if !others.isEmpty {
-        rows.append(PopupRow(separator: true))
-        for network in others {
-            guard let ssid = network.ssid else { continue }
-            rows.append(PopupRow(icon: wifiStrengthGlyph(network.rssiValue), text: ssid,
-                                 detail: network.supportsSecurity(.none) ? "" : "\u{F033E}",
-                                 action: { joinWifi(ssid) }))
-        }
-    } else if wifiScanning {
-        rows.append(PopupRow(separator: true))
-        rows.append(PopupRow(text: "looking for networks…", dim: true))
+    let others = wifiNetworks.filter { $0.ssid != current }.prefix(6)
+    rows.append(PopupRow(separator: true))
+    rows.append(PopupRow(text: "networks", dim: true))
+    // the one you are on leads the list with a tick, the way the macOS
+    // menu marks it. A lock on every row says nothing, so only the rare
+    // open network carries a word.
+    if let current, !current.isEmpty {
+        rows.append(PopupRow(icon: "\u{F012C}", text: current, highlight: true,
+                             iconTint: palette.accent))
+    }
+    for network in others {
+        guard let ssid = network.ssid else { continue }
+        rows.append(PopupRow(icon: wifiStrengthGlyph(network.rssiValue), text: ssid,
+                             detail: network.supportsSecurity(.none) ? "open" : "",
+                             action: { joinWifi(ssid) }))
+    }
+    if others.isEmpty, wifiScanning {
+        rows.append(PopupRow(text: "looking…", dim: true))
     }
     startHotspotBrowse()
     if !hotspotDevices.isEmpty {
         rows.append(PopupRow(separator: true))
+        rows.append(PopupRow(text: "phones", dim: true))
         for device in hotspotDevices {
+            let name = device.value(forKey: "deviceName") as? String ?? "phone"
             let battery = device.value(forKey: "batteryLife") as? Double
-            rows.append(PopupRow(icon: "\u{F011C}",
-                                 text: device.value(forKey: "deviceName") as? String ?? "phone",
-                                 detail: battery.map { "\(Int($0))%" } ?? "",
-                                 action: { startHotspot(device) }))
+            // an iPhone hotspot takes the name of the phone
+            let sharing = name == current
+            rows.append(PopupRow(icon: "\u{F011C}", text: name,
+                                 detail: sharing ? "connected" : battery.map { "\(Int($0))%" } ?? "",
+                                 highlight: sharing,
+                                 action: sharing ? nil : { startHotspot(device) }))
         }
     }
     rows.append(PopupRow(text: "network settings…", dim: true, action: {

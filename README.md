@@ -182,8 +182,8 @@ Left to right:
 - **Wi-fi**: the pill is the icon alone. The popup names the network
   and adds the IP and router, signal with a verdict, link rate and
   security generation, and the channel with its band and width. Under
-  those, it lists the networks in range, strongest first. Click one to
-  join it. Your own iPhones follow, with the battery each one has
+  those, it lists the networks in range, strongest first, with a tick on
+  the one you are on. Click another to join it. Your own iPhones follow, with the battery each one has
   left. Click a phone to turn its Personal Hotspot on.
 - **Bluetooth**: a device menu (click to connect or disconnect) and a
   power toggle.
