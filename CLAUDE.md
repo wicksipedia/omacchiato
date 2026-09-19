@@ -116,6 +116,16 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   whole-day offset from today rather than a date string, because a date
   string parses in Calendar's locale. Midday holds the offset on the
   right day across a change of daylight saving.
+- The wi-fi popup lists the iPhones that can share a hotspot.
+  `SFRemoteHotspotSession` in the private `Sharing.framework` asks
+  `sharingd` over XPC, which needs no entitlement and no grant:
+  `setDelegate:`, `startBrowsing`, the delegate call
+  `session:updatedFoundDevices:`, then
+  `enableHotspotForDevice:withCompletionHandler:`. CoreWLAN holds the
+  same calls (`startBrowsingForTetherDevicesAndReturnError:`), but
+  `airportd` gates them behind `com.apple.wifi.tether.browse`, which
+  only Apple's wi-fi agent carries. Every step gives up quietly, so a
+  macOS that renames the class leaves the popup as it was.
 - Plugin pills come from `~/.config/omacchiato/bar-plugins.conf`. A command
   prints a label, or JSON with `label`, `color`, `icon` and `rows`. Row
   keys: `text`, `detail`, `hero`, `dim`, `separator`, `slider`,

@@ -1920,6 +1920,7 @@ var popupView: PopupView?
 var openPopup: String? // which bar item owns it
 
 func closePopup() {
+    if openPopup == "wifi" { stopHotspotBrowse() }
     popupWindow?.orderOut(nil)
     popupWindow = nil
     popupView = nil
@@ -2308,6 +2309,57 @@ func batteryRows() -> [PopupRow] {
     return rows
 }
 
+// --- personal hotspot ------------------------------------------------------
+// The phone list in the macOS wi-fi menu does not come from CoreWLAN:
+// airportd gates its tether calls behind entitlements that only Apple's
+// own wi-fi agent carries. sharingd answers the same question over XPC,
+// and it asks for no grant at all. Private API, so every step gives up
+// quietly: a macOS that renames the class leaves the popup as it was.
+final class HotspotWatcher: NSObject {
+    @objc func session(_ session: AnyObject, updatedFoundDevices devices: [AnyObject]) {
+        DispatchQueue.main.async {
+            hotspotDevices = devices.compactMap { $0 as? NSObject }
+            if openPopup == "wifi" { refreshPopup() }
+        }
+    }
+}
+
+let hotspotWatcher = HotspotWatcher()
+var hotspotSession: NSObject?
+var hotspotDevices: [NSObject] = []
+
+func startHotspotBrowse() {
+    if hotspotSession == nil {
+        guard dlopen("/System/Library/PrivateFrameworks/Sharing.framework/Sharing", RTLD_LAZY) != nil,
+              let type = NSClassFromString("SFRemoteHotspotSession") as? NSObject.Type else {
+            tlog("hotspot: no SFRemoteHotspotSession")
+            return
+        }
+        let session = type.init()
+        session.perform(NSSelectorFromString("setDelegate:"), with: hotspotWatcher)
+        hotspotSession = session
+    }
+    hotspotSession?.perform(NSSelectorFromString("startBrowsing"))
+}
+
+func stopHotspotBrowse() {
+    hotspotSession?.perform(NSSelectorFromString("stopBrowsing"))
+}
+
+// The phone turns its hotspot on and macOS joins it, the same two steps
+// the wi-fi menu takes. The reply carries the network name.
+func startHotspot(_ device: NSObject) {
+    let name = device.value(forKey: "deviceName") as? String ?? "phone"
+    typealias Done = @convention(block) (AnyObject?, NSError?) -> Void
+    let done: Done = { info, error in
+        let ssid = info?.value(forKey: "name") as? String ?? ""
+        tlog("hotspot \(name): \(error?.localizedDescription ?? "on \(ssid)")")
+    }
+    closePopup()
+    hotspotSession?.perform(NSSelectorFromString("enableHotspotForDevice:withCompletionHandler:"),
+                            with: device, with: unsafeBitCast(done, to: AnyObject.self))
+}
+
 // --- wifi networks in range ------------------------------------------------
 // A scan blocks for seconds, so it runs off the main thread and the
 // popup redraws when the answer lands. macOS also throttles scans, and
@@ -2417,6 +2469,17 @@ func wifiRows() -> [PopupRow] {
     } else if wifiScanning {
         rows.append(PopupRow(separator: true))
         rows.append(PopupRow(text: "looking for networks…", dim: true))
+    }
+    startHotspotBrowse()
+    if !hotspotDevices.isEmpty {
+        rows.append(PopupRow(separator: true))
+        for device in hotspotDevices {
+            let battery = device.value(forKey: "batteryLife") as? Double
+            rows.append(PopupRow(icon: "\u{F011C}",
+                                 text: device.value(forKey: "deviceName") as? String ?? "phone",
+                                 detail: battery.map { "\(Int($0))%" } ?? "",
+                                 action: { startHotspot(device) }))
+        }
     }
     rows.append(PopupRow(text: "network settings…", dim: true, action: {
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.wifi-settings-extension")!)
