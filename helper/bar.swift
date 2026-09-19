@@ -2351,8 +2351,9 @@ func stopHotspotBrowse() {
 func startHotspot(_ device: NSObject) {
     let name = device.value(forKey: "deviceName") as? String ?? "phone"
     typealias Done = @convention(block) (AnyObject?, NSError?) -> Void
-    let done: Done = { info, error in
-        let ssid = info?.value(forKey: "name") as? String ?? ""
+    let done: Done = { reply, error in
+        // the reply is the network name itself, so KVC on it throws
+        let ssid = reply as? String ?? ""
         tlog("hotspot \(name): \(error?.localizedDescription ?? "on \(ssid)")")
     }
     closePopup()
