@@ -30,6 +30,7 @@ import CoreAudio
 import CoreBluetooth
 import CoreLocation
 import CoreWLAN
+import EventKit
 import IOBluetooth
 import IOKit.ps
 import SystemConfiguration
@@ -669,7 +670,8 @@ func requestPermissions() -> Never {
     // AEDeterminePermissionToAutomateTarget blocks until the person answers
     for (name, bundleID) in [("automation-system-events", "com.apple.systemevents"),
                              ("automation-ghostty", "com.mitchellh.ghostty"),
-                             ("automation-music", musicBundleID)] {
+                             ("automation-music", musicBundleID),
+                             ("automation-calendar", "com.apple.iCal")] {
         let target = NSAppleEventDescriptor(bundleIdentifier: bundleID)
         switch AEDeterminePermissionToAutomateTarget(target.aeDesc, typeWildCard, typeWildCard, true) {
         case noErr: report(name, "granted")
@@ -707,6 +709,20 @@ func requestPermissions() -> Never {
         case .authorizedAlways, .authorized: report("location", "granted")
         case .notDetermined: report("location", "unknown")
         default: report("location", "denied")
+        }
+    }
+
+    // The clock popup lists what is left of today.
+    if pillModes["clock"] != "hide" {
+        let answer = PermissionAnswer()
+        if EKEventStore.authorizationStatus(for: .event) == .notDetermined {
+            EKEventStore().requestFullAccessToEvents { _, _ in answer.answered = true }
+            answer.wait()
+        }
+        switch EKEventStore.authorizationStatus(for: .event) {
+        case .fullAccess: report("calendar", "granted")
+        case .notDetermined: report("calendar", "unknown")
+        default: report("calendar", "denied")
         }
     }
 
@@ -2006,6 +2022,88 @@ func showPopup(_ name: String, under anchor: NSRect, on surface: BarSurface, ali
 
 // --- popup content ---------------------------------------------------------
 
+// --- calendar --------------------------------------------------------------
+// Calendar takes a date through AppleScript, and a date STRING parses in
+// the app's locale. A whole-day offset does not, and midday keeps the
+// offset on the right day across a change of daylight saving.
+func openCalendarWeek(of date: Date) {
+    var cal = Calendar(identifier: .gregorian)
+    cal.firstWeekday = 2
+    let days = cal.dateComponents([.day], from: cal.startOfDay(for: Date()),
+                                  to: cal.startOfDay(for: date)).day ?? 0
+    let script = """
+    tell application "Calendar"
+        activate
+        switch view to week view
+        view calendar at ((current date) - (time of (current date)) + 12 * hours + \(days) * days)
+    end tell
+    """
+    closePopup()
+    DispatchQueue.global(qos: .userInitiated).async { _ = shell("/usr/bin/osascript", ["-e", script]) }
+}
+
+var eventStore: EKEventStore?
+var todayEvents: [EKEvent] = []
+var eventsDay: Date?
+var eventsAt: TimeInterval = 0
+var eventsLoading = false
+
+// Never touch EventKit before the grant is there: a launchd agent would
+// raise the dialog with nothing on screen to explain it. The fetch costs
+// enough to keep off the main thread, and one answer serves for a minute.
+func loadTodayEvents() {
+    guard EKEventStore.authorizationStatus(for: .event) == .fullAccess, !eventsLoading else { return }
+    let cal = Calendar.current
+    let start = cal.startOfDay(for: Date())
+    if eventsDay == start, Date.timeIntervalSinceReferenceDate - eventsAt < 60 { return }
+    eventsLoading = true
+    let store = eventStore ?? EKEventStore()
+    eventStore = store
+    DispatchQueue.global(qos: .userInitiated).async {
+        let end = cal.date(byAdding: .day, value: 1, to: start) ?? start
+        let found = store.events(matching: store.predicateForEvents(withStart: start, end: end,
+                                                                    calendars: nil))
+            .sorted { $0.startDate < $1.startDate }
+        DispatchQueue.main.async {
+            todayEvents = found
+            eventsDay = start
+            eventsAt = Date.timeIntervalSinceReferenceDate
+            eventsLoading = false
+            if openPopup == "clock" { refreshPopup() }
+        }
+    }
+}
+
+func eventRows() -> [PopupRow] {
+    guard EKEventStore.authorizationStatus(for: .event) == .fullAccess else {
+        return [PopupRow(separator: true),
+                PopupRow(text: "allow calendar access…", dim: true, action: {
+                    NSWorkspace.shared.open(URL(
+                        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars")!)
+                    closePopup()
+                })]
+    }
+    loadTodayEvents()
+    let now = Date()
+    let left = todayEvents.filter { $0.endDate > now }
+    guard !left.isEmpty else {
+        return [PopupRow(separator: true), PopupRow(text: "nothing left today", dim: true)]
+    }
+    let time = DateFormatter()
+    time.dateFormat = "HH:mm"
+    var rows = [PopupRow(separator: true)]
+    // a long title would widen the whole popup: measure() takes the
+    // widest row, and the month grid below it holds the useful width
+    for event in left.prefix(6) {
+        let title = event.title ?? "event"
+        rows.append(PopupRow(icon: "\u{F111}",
+                             text: title.count > 24 ? String(title.prefix(23)) + "…" : title,
+                             detail: event.isAllDay ? "all day" : time.string(from: event.startDate),
+                             iconTint: event.calendar.cgColor.flatMap { NSColor(cgColor: $0) }))
+    }
+    return rows
+}
+
 func calendarRows() -> [PopupRow] {
     var rows: [PopupRow] = []
     let now = Date()
@@ -2033,12 +2131,14 @@ func calendarRows() -> [PopupRow] {
     for week in stride(from: 0, to: cells.count, by: 7) {
         let slice = cells[week..<min(week + 7, cells.count)]
         let hasToday = slice.contains { $0.0 == today && $0.1 }
+        let monday = cal.date(byAdding: .day, value: week - leading, to: monthStart) ?? monthStart
         rows.append(PopupRow(highlight: hasToday,
+                              action: { openCalendarWeek(of: monday) },
                               columns: [hasToday ? "▸" : ""] + slice.map { String($0.0) }))
     }
     let week = cal.component(.weekOfYear, from: now)
     rows.append(PopupRow(text: "week \(week)", dim: true))
-    return rows
+    return rows + eventRows()
 }
 
 func brightnessRows() -> [PopupRow] {

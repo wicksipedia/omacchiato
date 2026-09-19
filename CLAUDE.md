@@ -108,6 +108,14 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   system keychain. Any output from it means the join failed, and the
   popup then opens the macOS wi-fi panel. A failed join leaves the
   current network up.
+- The clock popup reads today's events with EventKit. It calls nothing
+  in EventKit until the grant is `.fullAccess`, or a launchd agent
+  raises the dialog with nothing on screen to explain it. The fetch runs
+  off the main thread and calls `refreshPopup`, and one answer serves
+  for 60 s. A week row opens Calendar over AppleScript, with a
+  whole-day offset from today rather than a date string, because a date
+  string parses in Calendar's locale. Midday holds the offset on the
+  right day across a change of daylight saving.
 - Plugin pills come from `~/.config/omacchiato/bar-plugins.conf`. A command
   prints a label, or JSON with `label`, `color`, `icon` and `rows`. Row
   keys: `text`, `detail`, `hero`, `dim`, `separator`, `slider`,

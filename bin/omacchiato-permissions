@@ -26,6 +26,7 @@ label() {
     screen-recording) echo "Screen Recording" ;;
     bluetooth) echo "Bluetooth" ;;
     location) echo "Location Services" ;;
+    calendar) echo "Calendar" ;;
     automation-*) echo "Automation: $(target "$1")" ;;
     *) echo "$1" ;;
   esac
@@ -35,6 +36,7 @@ pane() {
   case "$1" in
     screen-recording) echo ScreenCapture ;;
     location) echo LocationServices ;;
+    calendar) echo Calendars ;;
     automation-*) echo Automation ;;
     *) label "$1" ;;
   esac
@@ -45,6 +47,7 @@ target() {
     automation-system-events) echo "System Events" ;;
     automation-ghostty) echo "Ghostty" ;;
     automation-music) echo "Music" ;;
+    automation-calendar) echo "Calendar" ;;
   esac
 }
 

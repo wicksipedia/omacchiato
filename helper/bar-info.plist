@@ -16,6 +16,8 @@
   <string>omacchiato-bar sends commands to Music for the media pill, and asks Ghostty to reload its colours after a theme change.</string>
   <key>NSBluetoothAlwaysUsageDescription</key>
   <string>omacchiato-bar shows how many bluetooth devices are connected in the status bar.</string>
+  <key>NSCalendarsFullAccessUsageDescription</key>
+  <string>omacchiato-bar lists what is left of today in the clock popup. It reads your events and never changes them.</string>
   <key>NSLocationWhenInUseUsageDescription</key>
   <string>macOS treats the name of the wi-fi network you are on as location data. omacchiato-bar shows that name in the status bar; it never reads your position.</string>
 </dict>
