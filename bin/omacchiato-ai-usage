@@ -397,10 +397,11 @@ def provider_rows(pid, outputs, state, first=False):
             if left is not None and left > 0:
                 summary += " · " + countdown(left)
         rows += [{"separator": True}] if n else []
-        rows.append({"text": output["provider"], "detail": summary or plan, "hero": True,
+        # the plan rides with the name it belongs to, so the numbers keep
+        # the right-hand column and no row is spent on it
+        head = " · ".join(filter(None, [output["provider"], plan]))
+        rows.append({"text": head, "detail": summary or plan, "hero": True,
                      "section": "open" if first and not n else "closed", **logo(pid)})
-        if summary and plan and len(outputs) > 1:
-            rows.append({"text": plan, "dim": True})
         if not n:
             rows += health_rows(pid, state)
         for metric in metrics:
