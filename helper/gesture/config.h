@@ -173,8 +173,8 @@ static Config load_config()
 
 	// Optional overrides. next and prev cycle workspaces, a string with
 	// a '/' runs as a command, and anything else is a no-op. omacchiato
-	// sets both to "", so the daemon serves only the vertical gestures
-	// while OmniWM owns the horizontal ones.
+	// keeps the natural_swipe defaults, because this daemon commits
+	// earlier than the swipe of OmniWM and can be tuned.
 	item = yyjson_obj_get(root, "swipe_left");
 	if (item && yyjson_is_str(item))
 		config.swipe_left = strdup(yyjson_get_str(item));

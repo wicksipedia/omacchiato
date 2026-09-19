@@ -282,13 +282,14 @@ workspace there.
 
 ### Gestures
 
-OmniWM's own swipes do the horizontal work: a 4-finger swipe left or
-right switches workspaces, and in a niri workspace a 3-finger swipe
-scrolls the columns and focuses the column it stops on. A fast flick
-can pass more than one column. `omacchiato-gesture` keeps the 4-finger
-swipe up for the overview and swipe down to close it, reading raw
-trackpad contacts because macOS 26 stopped carrying touch data in
-normal events. The trackpad taps once when a swipe fires; set
+`omacchiato-gesture` serves the 4-finger swipes: up opens the overview,
+down closes it, and left or right steps through the workspaces. It
+reads raw trackpad contacts, because macOS 26 stopped carrying touch
+data in normal events, and it commits earlier than the swipe of OmniWM
+does. So `workspaceSwipeEnabled` is `false` in `settings.toml`, and
+OmniWM keeps the 3-finger swipe that scrolls the niri columns and
+focuses the column it stops on. A fast flick can pass more than one
+column. The trackpad taps once when a swipe fires; set
 `"haptic": false` in `~/.config/omacchiato/gesture.json` to stop it. `macos-defaults.sh` turns off the system's 4-finger
 gestures and its 3-finger swipe between full-screen apps, so Mission
 Control never fights them, and `uninstall.sh` restores them.
@@ -465,7 +466,7 @@ windows, which macOS's own switcher does not.
 
 | Gesture | Action |
 |---|---|
-| 4-finger swipe left / right | switch workspace (OmniWM) |
+| 4-finger swipe left / right | switch workspace (`omacchiato-gesture`) |
 | 3-finger swipe left / right | scroll the niri columns; focus lands on the column it stops on (OmniWM) |
 | 4-finger swipe up / down | open / close the overview (`omacchiato-gesture`) |
 | Click a workspace chip | jump to it |

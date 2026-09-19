@@ -457,8 +457,10 @@ fi
 # --- 4. Trackpad gestures (omacchiato-gesture) ---------------------------------
 # The gesture engine — absorbed from aerospace-swipe (MIT, notice kept in
 # helper/gesture/LICENSE.aerospace-swipe) with every omacchiato fix folded
-# in — runs as a user launch agent. OmniWM owns the horizontal swipes,
-# so this daemon keeps the vertical ones for the overview. Config is
+# in — runs as a user launch agent. It serves all four directions: the
+# vertical swipes open and close the overview, and the horizontal ones
+# step through the workspaces over OmniWM IPC, with
+# workspaceSwipeEnabled = false in settings.toml. Config is
 # COPIED (launch agents can't read ~/Documents — TCC).
 GESTURE_APP="$HOME/.local/share/omacchiato/omacchiato-gesture.app"
 GESTURE_BIN="$GESTURE_APP/Contents/MacOS/omacchiato-gesture"

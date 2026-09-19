@@ -202,9 +202,8 @@ The design and the test results are in
 - Nine workspaces in total, all Niri: 1–5 on the main display and 6–9 on
   the secondary display.
 - Gestures: `fingerCount = 3` is the Niri column scroll, which focuses
-  the column where it stops. `workspaceSwipeFingerCount = 4` switches
-  workspaces. `omacchiato-gesture` keeps only the 4-finger vertical swipe
-  for the overview. `macos-defaults.sh` turns off the system's 3- and
+  the column where it stops. `workspaceSwipeEnabled = false`, because
+  `omacchiato-gesture` serves all four 4-finger swipes. `macos-defaults.sh` turns off the system's 3- and
   4-finger horizontal swipes.
 - The trackpad taps on each fired swipe, under `haptic` in
   `gesture.json`. The tap comes at the commit, before the switch
@@ -248,9 +247,10 @@ The design and the test results are in
 ## install.sh
 
 - It copies `config/gesture/config.json` to
-  `~/.config/omacchiato/gesture.json` on every run. The gesture daemon
-  keeps only the vertical swipes, because OmniWM owns the horizontal
-  ones.
+  `~/.config/omacchiato/gesture.json` on every run. The daemon serves
+  all four directions. The horizontal ones need
+  `workspaceSwipeEnabled = false` in `settings.toml`, or both engines
+  answer the same swipe.
 - It retires what older installs left behind. `migrate-omacosy.sh`
   stops the dwindle, borders and ffm agents and removes their binaries
   and links. The blocks after the bar build remove their config files
