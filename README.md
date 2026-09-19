@@ -765,8 +765,8 @@ With one provider, the label shows the percent used and the time until
 that window resets, such as `23% · 2:25`. With more, it shows each
 provider's logo in its brand colour and its percent, in `--pill` order.
 A provider that rounds to 0% in its window leaves the label, so the
-pill names only what you use. The popup still lists every `--panel`
-provider.
+pill names only what you use. When every provider sits at 0%, the pill
+is one robot face. The popup still lists every `--panel` provider.
 The `icon` setting then does not show, because one icon cannot name
 more than one provider. The Claude logo is `#D97757`. The OpenAI and
 Copilot logos are black or white, so they take the theme's label

@@ -87,6 +87,7 @@ def seconds_until(value):
 
 # thin spaces: a normal space is a whole cell in the bar's monospace font
 LABEL_DOT = " · "
+IDLE_ICON = "\U0001f916"  # every provider at 0%: one glyph, no numbers
 
 
 def clock(left):
@@ -441,6 +442,8 @@ mark = health_mark([states[pid] for pid, _ in PILL])
 if parts:
     payload["parts"] = parts
     payload["icon"] = mark
+elif not text:
+    payload["icon"] = IDLE_ICON + mark
 elif mark:
     payload["icon"] = os.environ.get("OMACCHIATO_PILL_ICON", "") + mark
 if tokscale:
