@@ -181,7 +181,9 @@ Left to right:
 - **Weather**: wttr.in, with a details popup.
 - **Wi-fi**: the pill is the icon alone. The popup names the network
   and adds the IP and router, signal with a verdict, link rate and
-  security generation, and the channel with its band and width.
+  security generation, and the channel with its band and width. Under
+  those, it lists the networks in range, strongest first. Click one to
+  join it.
 - **Bluetooth**: a device menu (click to connect or disconnect) and a
   power toggle.
 - **Brightness**: scroll adjusts, click opens a slider. Scrolling past
@@ -524,7 +526,7 @@ Recording grant, and `Super+O` opens it with Karabiner's.
 | **Input Monitoring** | Karabiner-Elements and OmniWM; `omacchiato-gesture` on macOS 26 | Karabiner reads keys to remap Caps Lock; `omacchiato-gesture` reads raw trackpad contacts, because macOS 26 stopped carrying touch data in normal events. On macOS 27 it reads them without this grant. | No Super key, no swipe gestures. |
 | **Screen Recording** | `omacchiato-gesture` for a swipe, Karabiner-Elements for `Super+O`; OmniWM (optional) | Captures a thumbnail per window for the overview cards, including windows the window manager has stashed offscreen. OmniWM uses it for its own overview thumbnails, the image of a window you drag, and Hidden Bar icons. | Cards fall back to app icons and titles. OmniWM starts without it. |
 | **Bluetooth** | `omacchiato-bar` | Reads adapter power and the paired-device list for the bluetooth pill and its menu. A plugin pill runs as a child of the bar, so it reads Bluetooth with this grant: the AirPods pill needs it. | The bluetooth pill hides itself, and the AirPods pill shows no battery. |
-| **Location** | `omacchiato-bar` | Reads **only** the wi-fi network's name, which macOS classes as location data. No coordinate is requested; the authorisation itself is what unlocks `CWInterface.ssid()`. | The wi-fi popup's title row reads "wi-fi" instead of your network's name. |
+| **Location** | `omacchiato-bar` | Reads **only** the wi-fi network's name and the names of the networks in range, which macOS classes as location data. No coordinate is requested; the authorisation itself is what unlocks `CWInterface.ssid()` and the scan. | The wi-fi popup's title row reads "wi-fi" instead of your network's name, and it lists no networks to join. |
 | **Automation** | `omacchiato-bar`, `theme-set`, and the terminal that runs `install.sh` | Apple Events to **Music** (the current track and its artwork), to **Ghostty** (reloading its colours after a theme change) and to **System Events** (sleep, lock and restart from the Apple menu; setting the wallpaper; adding OmniWM as a login item). | The media pill has no artwork; those menu rows do nothing; OmniWM does not start at login until you add it under System Settings > General > Login Items. |
 | **Files and Folders** | `omacchiato-bar` | Only if your clone lives in `~/Documents`, `~/Desktop` or `~/Downloads`. The bar reads its palette from the theme directory inside the repo, and macOS walls launchd agents off from those folders. | The bar **hangs at startup** waiting on the prompt. Clone to `~/.local/share/omacchiato` and this never comes up. |
 | **Keychain** | tokscale, when the AI usage pill shows Claude | Reads the Claude Code sign-in token from your login keychain with `security`, to ask Anthropic for your usage. It never writes to the keychain and never refreshes the token. | The Claude section has no usage windows. |

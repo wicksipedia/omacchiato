@@ -100,6 +100,14 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   transparency turns the mode off.
 - `dur()` in `bar.swift` and `overview.swift` returns 0 while Reduce
   motion is on. Pass every animation duration through it.
+- The wi-fi popup lists the networks in range. A scan blocks for
+  seconds, so it runs off the main thread and calls `refreshPopup`, and
+  one answer serves for 20 s, because macOS throttles scans. The scan
+  needs the same Location grant as the SSID. A click runs
+  `networksetup -setairportnetwork`, which takes the password from the
+  system keychain. Any output from it means the join failed, and the
+  popup then opens the macOS wi-fi panel. A failed join leaves the
+  current network up.
 - Plugin pills come from `~/.config/omacchiato/bar-plugins.conf`. A command
   prints a label, or JSON with `label`, `color`, `icon` and `rows`. Row
   keys: `text`, `detail`, `hero`, `dim`, `separator`, `slider`,

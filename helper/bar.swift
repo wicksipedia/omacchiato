@@ -2208,6 +2208,61 @@ func batteryRows() -> [PopupRow] {
     return rows
 }
 
+// --- wifi networks in range ------------------------------------------------
+// A scan blocks for seconds, so it runs off the main thread and the
+// popup redraws when the answer lands. macOS also throttles scans, and
+// the popup opens often, so one answer serves for 20 s.
+var wifiNetworks: [CWNetwork] = []
+var wifiScanAt: TimeInterval = 0
+var wifiScanning = false
+
+func scanWifi() {
+    guard !wifiScanning, Date.timeIntervalSinceReferenceDate - wifiScanAt > 20,
+          let interface = CWWiFiClient.shared().interface(), interface.powerOn() else { return }
+    wifiScanning = true
+    DispatchQueue.global(qos: .userInitiated).async {
+        let found = (try? interface.scanForNetworks(withSSID: nil)) ?? []
+        // one row per name: a network on two radios answers twice
+        var best: [String: CWNetwork] = [:]
+        for network in found {
+            guard let ssid = network.ssid, !ssid.isEmpty else { continue }
+            if let seen = best[ssid], seen.rssiValue >= network.rssiValue { continue }
+            best[ssid] = network
+        }
+        let list = best.values.sorted { $0.rssiValue > $1.rssiValue }
+        DispatchQueue.main.async {
+            wifiNetworks = list
+            wifiScanAt = Date.timeIntervalSinceReferenceDate
+            wifiScanning = false
+            if openPopup == "wifi" { refreshPopup() }
+        }
+    }
+}
+
+func wifiStrengthGlyph(_ rssi: Int) -> String {
+    if rssi >= -60 { return "\u{F0928}" }
+    if rssi >= -70 { return "\u{F0925}" }
+    if rssi >= -80 { return "\u{F0922}" }
+    return "\u{F091F}"
+}
+
+// networksetup takes the password from the system keychain, so a network
+// this Mac knows joins in one click. It prints a line for every other
+// case, and macOS asks for the password better than a popup row can.
+func joinWifi(_ ssid: String) {
+    closePopup()
+    DispatchQueue.global(qos: .userInitiated).async {
+        let out = shell("/usr/sbin/networksetup", ["-setairportnetwork", wifiDevice, ssid])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        tlog("wifi join \(ssid): \(out.isEmpty ? "joined" : out)")
+        guard !out.isEmpty else { return }
+        DispatchQueue.main.async {
+            NSWorkspace.shared.open(
+                URL(string: "x-apple.systempreferences:com.apple.wifi-settings-extension")!)
+        }
+    }
+}
+
 func wifiRows() -> [PopupRow] {
     let interface = CWWiFiClient.shared().interface()
     var rows: [PopupRow] = [
@@ -2247,6 +2302,21 @@ func wifiRows() -> [PopupRow] {
         default: break
         }
         rows.append(PopupRow(text: parts.joined(separator: "  ")))
+    }
+    scanWifi()
+    let current = interface?.ssid()
+    let others = wifiNetworks.filter { $0.ssid != current }.prefix(8)
+    if !others.isEmpty {
+        rows.append(PopupRow(separator: true))
+        for network in others {
+            guard let ssid = network.ssid else { continue }
+            rows.append(PopupRow(icon: wifiStrengthGlyph(network.rssiValue), text: ssid,
+                                 detail: network.supportsSecurity(.none) ? "" : "\u{F033E}",
+                                 action: { joinWifi(ssid) }))
+        }
+    } else if wifiScanning {
+        rows.append(PopupRow(separator: true))
+        rows.append(PopupRow(text: "looking for networks…", dim: true))
     }
     rows.append(PopupRow(text: "network settings…", dim: true, action: {
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.wifi-settings-extension")!)
