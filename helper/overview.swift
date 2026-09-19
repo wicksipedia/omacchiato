@@ -49,6 +49,11 @@ func slpsFocus(pid: pid_t, wid: UInt32) {
     bytes.withUnsafeMutableBufferPointer { _ = SLPSPostEvent(&psn, $0.baseAddress!) }
 }
 
+// Accessibility > Display > Reduce motion: the overlay must appear at once.
+func dur(_ seconds: Double) -> Double {
+    NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : seconds
+}
+
 var previousFront: (pid: pid_t, wid: UInt32)? = nil
 
 func rememberFront() {
@@ -491,14 +496,14 @@ func revealCards(_ content: ContentView) {
         l.setAffineTransform(CGAffineTransform(scaleX: 1.04, y: 1.04))
         CATransaction.commit()
         CATransaction.begin()
-        CATransaction.setAnimationDuration(0.32)
+        CATransaction.setAnimationDuration(dur(0.32))
         CATransaction.setAnimationTimingFunction(
             CAMediaTimingFunction(controlPoints: 0.19, 1.0, 0.22, 1.0))
         l.setAffineTransform(.identity)
         CATransaction.commit()
     }
     NSAnimationContext.runAnimationGroup { ctx in
-        ctx.duration = 0.3
+        ctx.duration = dur(0.3)
         content.cards.animator().alphaValue = 1
     }
 }
@@ -525,7 +530,7 @@ func hideOverlay(animated: Bool = true) {
     // mirror of the open: dim lifts, wallpaper drifts out and fades,
     // cards recede
     CATransaction.begin()
-    CATransaction.setAnimationDuration(0.22)
+    CATransaction.setAnimationDuration(dur(0.22))
     CATransaction.setAnimationTimingFunction(
         CAMediaTimingFunction(controlPoints: 0.4, 0.0, 0.6, 1.0))
     CATransaction.setCompletionBlock(finish)
@@ -535,7 +540,7 @@ func hideOverlay(animated: Bool = true) {
     content.cards.layer?.setAffineTransform(CGAffineTransform(scaleX: 1.04, y: 1.04))
     CATransaction.commit()
     NSAnimationContext.runAnimationGroup { ctx in
-        ctx.duration = 0.16
+        ctx.duration = dur(0.16)
         content.cards.animator().alphaValue = 0
     }
 }
@@ -769,7 +774,7 @@ final class ContentView: NSView {
             // the rest of the row makes room, so the drop is visible
             // before it commits
             NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = 0.16
+                ctx.duration = dur(0.16)
                 ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 1.0, 0.3, 1.0)
                 for (i, ws) in order.enumerated() where ws != d.ws {
                     cardViews[ws]?.animator().frame = cardSlots[i]
@@ -791,7 +796,7 @@ final class ContentView: NSView {
         d.view.layer?.shadowOpacity = 0
         if d.ws != focusedWs { d.view.layer?.borderWidth = 0 }
         NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.18
+            ctx.duration = dur(0.18)
             ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 1.0, 0.3, 1.0)
             d.view.animator().frame = landing
         }
@@ -1161,7 +1166,7 @@ func showOverlay() {
                 // drifts in behind the dim — deterministic, no display
                 // capture, no race, no rare glitch backdrop
                 CATransaction.begin()
-                CATransaction.setAnimationDuration(0.34)
+                CATransaction.setAnimationDuration(dur(0.34))
                 CATransaction.setAnimationTimingFunction(
                     CAMediaTimingFunction(controlPoints: 0.19, 1.0, 0.22, 1.0))
                 placeholder.dimLayer.opacity = 0.62
