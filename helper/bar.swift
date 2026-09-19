@@ -1873,6 +1873,14 @@ final class PopupView: NSView {
                                                      width: track.width * CGFloat(max(0, min(1, share))),
                                                      height: track.height),
                                  xRadius: 3, yRadius: 3).fill()
+                    // the same pace tick the slider rows carry
+                    if let marker = row.marker {
+                        let tickX = track.minX + track.width * CGFloat(max(0, min(1, marker)))
+                        palette.label.setFill()
+                        NSBezierPath(roundedRect: NSRect(x: tickX - 1, y: track.midY - 5,
+                                                         width: 2, height: 10),
+                                     xRadius: 1, yRadius: 1).fill()
+                    }
                 }
             }
             rowRects.append((index, rect))

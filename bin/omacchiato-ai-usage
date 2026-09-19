@@ -240,11 +240,13 @@ def incident_rows(incident):
 
 def health_rows(pid, state):
     status = (state or {}).get("status") or {}
-    if not status.get("description"):
-        return []
-    colour = {"none": "green", "minor": "yellow"}.get(status.get("indicator"), "red")
-    rows = [{"text": status["description"], "detail": "status", "color": colour,
-             "url": PROVIDERS[pid]["page"]}]
+    rows = []
+    # an operational provider is the ordinary state; an incident under it
+    # still belongs on screen
+    if status.get("description") and status.get("indicator") != "none":
+        colour = {"minor": "yellow"}.get(status.get("indicator"), "red")
+        rows.append({"text": status["description"], "color": colour,
+                     "url": PROVIDERS[pid]["page"]})
     for n, incident in enumerate(state.get("incidents") or []):
         rows += ([{"separator": True}] if n else []) + incident_rows(incident)
     return rows
@@ -353,23 +355,23 @@ def span_of(pid, label):
 
 
 def metric_rows(rows, pid, metric):
+    # a plan the account does not carry reports a limit of zero
+    if str(metric.get("remaining_label") or "").startswith("0/0"):
+        return
     pct = metric.get("used_percent") or 0
     span = span_of(pid, metric.get("label", ""))
     left = seconds_until(metric.get("resets_at"))
-    rows.append({"text": metric.get("label", ""), "detail": "%d%%" % round(pct)})
-    slider = {"text": "", "slider": max(0.0, min(1.0, pct / 100.0))}
     # the tick marks how far through the window the clock is, so the fill
     # reads as ahead of or behind an even pace
     elapsed = 1 - left / span if left is not None and span and 0 < left <= span else None
-    if elapsed is not None:
-        slider["marker"] = elapsed
-    slider["color"] = pace_colour(pct, elapsed)
-    rows.append(slider)
-    below = [metric.get("remaining_label")]
+    detail = ["%d%%" % round(pct)]
     if left is not None and left > 0:
-        below.append("Resets in " + countdown(left))
-    if any(below):
-        rows.append({"text": " · ".join(filter(None, below)), "dim": True})
+        detail.append(countdown(left))
+    row = {"text": metric.get("label", ""), "bar": max(0.0, min(1.0, pct / 100.0)),
+           "detail": " · ".join(detail), "color": pace_colour(pct, elapsed)}
+    if elapsed is not None:
+        row["marker"] = elapsed
+    rows.append(row)
 
 
 def logo(pid):
@@ -378,7 +380,7 @@ def logo(pid):
     return {"icon": brand["glyph"], "icon_color": brand["colour"]} if brand else {}
 
 
-def provider_rows(pid, outputs, state):
+def provider_rows(pid, outputs, state, first=False):
     if not outputs:
         return ([{"text": pid.capitalize(), "hero": True, "section": "closed", **logo(pid)}]
                 + health_rows(pid, state)
@@ -386,13 +388,22 @@ def provider_rows(pid, outputs, state):
     rows = []
     for n, output in enumerate(outputs):
         plan = " · ".join(filter(None, [output.get("plan"), (output.get("account") or {}).get("label")]))
+        metrics = output.get("metrics") or []
+        head = pick(metrics, "5h")
+        summary = ""
+        if head:
+            left = seconds_until(head.get("resets_at"))
+            summary = "%d%%" % round(head.get("used_percent") or 0)
+            if left is not None and left > 0:
+                summary += " · " + countdown(left)
         rows += [{"separator": True}] if n else []
-        rows.append({"text": output["provider"], "detail": plan, "hero": True, "section": "closed",
-                     **logo(pid)})
+        rows.append({"text": output["provider"], "detail": summary or plan, "hero": True,
+                     "section": "open" if first and not n else "closed", **logo(pid)})
+        if summary and plan:
+            rows.append({"text": plan, "dim": True})
         if not n:
             rows += health_rows(pid, state)
-        for metric in output.get("metrics") or []:
-            rows.append({"separator": True})
+        for metric in metrics:
             metric_rows(rows, pid, metric)
     return rows
 
@@ -434,7 +445,8 @@ if not any(quotas.get(pid) or health_rows(pid, state) for pid, state in states.i
 
 rows = []
 for pid in PANEL:
-    rows += ([{"separator": True}] if rows else []) + provider_rows(pid, quotas.get(pid), states[pid])
+    rows += ([{"separator": True}] if rows else []) + provider_rows(
+        pid, quotas.get(pid), states[pid], first=pid == PANEL[0])
 
 text, colour, parts = label(quotas)
 payload = {"label": text, "color": colour, "rows": rows}
