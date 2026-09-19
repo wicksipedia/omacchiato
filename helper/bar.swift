@@ -773,6 +773,11 @@ let barPlugins: [BarPlugin] = {
 // wttr.in fetches and hiding bluetooth never touches the Bluetooth grant.
 let rightOrder = (["menubar"] + barPlugins.map(\.name) + rightOrderAll).filter { pillModes[$0] != "hide" }
 let iconOnly = Set(pillModes.filter { $0.value == "icon" }.keys)
+
+// Accessibility > Display > Reduce motion: the popup must appear at once.
+func dur(_ seconds: Double) -> Double {
+    NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : seconds
+}
 var rightItems: [String: BarItem] = [:]
 // popup rows a plugin last returned, keyed by pill name
 var pluginRows: [String: [PopupRow]] = [:]
@@ -1969,7 +1974,12 @@ func showPopup(_ name: String, under anchor: NSRect, on surface: BarSurface, ali
     scroll.layer?.borderColor = palette.accent.cgColor
     window.contentView = scroll
     view.scroll(NSPoint(x: 0, y: max(0, size.height - winH))) // start at the top
+    window.alphaValue = 0
     window.orderFrontRegardless()
+    NSAnimationContext.runAnimationGroup { ctx in
+        ctx.duration = dur(0.12)
+        window.animator().alphaValue = 1
+    }
     popupWindow = window
     popupView = view
     openPopup = name
