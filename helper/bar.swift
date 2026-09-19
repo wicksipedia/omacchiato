@@ -1823,9 +1823,6 @@ final class PopupView: NSView {
                 // digits vs. letters, so every row lines up on the same grid.
                 // A wide row elsewhere in the popup, such as an event title,
                 // would leave the grid on the left of an empty half.
-                // measure() leaves 20pt of slack on the right, so the row
-                // rect is wider than the content the rest of the popup draws
-                x = max(x, rect.minX + (rect.width - 20 - CGFloat(cells.count) * colW) / 2)
                 for (i, cell) in cells.enumerated() {
                     let box = NSRect(x: x, y: rect.minY, width: colW, height: rect.height)
                     if i == row.columnAccent {
@@ -2122,10 +2119,11 @@ func eventRows() -> [PopupRow] {
     // widest row, and the month grid below it holds the useful width
     for (index, event) in left.prefix(6).enumerated() {
         let title = event.title ?? "event"
-        let when = event.isAllDay ? "all day" : time.string(from: event.startDate)
+        let cut = title.count > 20 ? String(title.prefix(19)) + "…" : title
         rows.append(PopupRow(icon: "\u{F111}",
-                             text: when + "  " + (title.count > 20 ? String(title.prefix(19)) + "…" : title),
-                             detail: index == 0 ? countdown(to: event, now: now) : "",
+                             text: event.isAllDay ? cut : time.string(from: event.startDate) + "  " + cut,
+                             detail: event.isAllDay ? "all day" : countdown(to: event, now: now),
+                             highlight: index == 0,
                              iconTint: event.calendar.cgColor.flatMap { NSColor(cgColor: $0) }))
     }
     return rows
@@ -2138,7 +2136,8 @@ func calendarRows() -> [PopupRow] {
     cal.firstWeekday = 2 // Monday, like the shell version
     let title = DateFormatter()
     title.dateFormat = "MMMM yyyy"
-    rows.append(PopupRow(text: title.string(from: now).lowercased(), hero: true))
+    rows.append(PopupRow(text: title.string(from: now).lowercased(),
+                         detail: "week \(cal.component(.weekOfYear, from: now))", hero: true))
     rows.append(PopupRow(dim: true, columns: ["mo", "tu", "we", "th", "fr", "sa", "su"]))
 
     guard let monthStart = cal.date(from: cal.dateComponents([.year, .month], from: now)),
@@ -2159,12 +2158,10 @@ func calendarRows() -> [PopupRow] {
         let slice = cells[week..<min(week + 7, cells.count)]
         let monday = cal.date(byAdding: .day, value: week - leading, to: monthStart) ?? monthStart
         rows.append(PopupRow(action: { openCalendarWeek(of: monday) },
-                             columns: slice.map { String($0.0) },
+                             columns: slice.map { $0.1 ? String($0.0) : "" },
                              columnAccent: slice.firstIndex { $0.0 == today && $0.1 }
                                  .map { $0 - slice.startIndex }))
     }
-    let week = cal.component(.weekOfYear, from: now)
-    rows.append(PopupRow(text: "week \(week)", dim: true))
     return rows + eventRows()
 }
 
