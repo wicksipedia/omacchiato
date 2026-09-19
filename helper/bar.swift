@@ -1753,7 +1753,7 @@ final class PopupView: NSView {
             let f = font(row)
             for cell in cells { w = max(w, advance(cell, f)) }
         }
-        return w + 4
+        return w + 10
     }
 
     func measure() -> NSSize {
@@ -1823,11 +1823,13 @@ final class PopupView: NSView {
                 // digits vs. letters, so every row lines up on the same grid.
                 // A wide row elsewhere in the popup, such as an event title,
                 // would leave the grid on the left of an empty half.
-                x = max(x, rect.minX + (rect.width - CGFloat(cells.count) * colW) / 2)
+                // measure() leaves 20pt of slack on the right, so the row
+                // rect is wider than the content the rest of the popup draws
+                x = max(x, rect.minX + (rect.width - 20 - CGFloat(cells.count) * colW) / 2)
                 for (i, cell) in cells.enumerated() {
                     let box = NSRect(x: x, y: rect.minY, width: colW, height: rect.height)
                     if i == row.columnAccent {
-                        let d = min(colW, rect.height) - 3
+                        let d = min(colW, rect.height) - 2
                         palette.accent.setFill()
                         NSBezierPath(ovalIn: NSRect(x: box.midX - d / 2, y: box.midY - d / 2,
                                                     width: d, height: d)).fill()
