@@ -67,6 +67,22 @@ def holders():
     return found
 
 
+def duration(age):
+    """pmset prints the age as [days:]hours:minutes:seconds, which reads as
+    a time of day. Say how long it has been held instead."""
+    try:
+        parts = [int(p) for p in age.split(":")]
+    except ValueError:
+        return age
+    while len(parts) < 4:
+        parts.insert(0, 0)
+    days, hours, minutes, _ = parts[-4:]
+    hours += days * 24
+    if hours:
+        return f"{hours}h {minutes}m"
+    return f"{minutes}m" if minutes else "<1m"
+
+
 # nothing holding it is the ordinary state, and a pill for the ordinary
 # state is one more thing to read past
 awake = holders()
@@ -74,7 +90,7 @@ if not awake:
     print(json.dumps({"label": "", "icon": ""}))
     raise SystemExit
 
-rows = [{"text": "Keeping the Mac awake", "hero": True}, {"separator": True}]
-rows += [{"text": name, "detail": held} for name, held in awake]
+rows = [{"text": "keeping awake", "hero": True}]
+rows += [{"text": name, "detail": duration(held)} for name, held in awake]
 print(json.dumps({"label": "", "icon": AWAKE_ICON, "color": "accent",
                   "rows": rows}, ensure_ascii=False))

@@ -2271,19 +2271,18 @@ func batteryRows() -> [PopupRow] {
         // reads every charging battery as charged
         let charging = (d[kIOPSIsChargingKey] as? Bool)
             ?? ((d[kIOPSIsChargingKey] as? Int) == 1)
-        rows.append(PopupRow(text: "battery", detail: "\(pct)%", hero: true))
-        rows.append(PopupRow(text: "", slider: Double(pct) / 100))
-        let state = charging ? "charging" : (onAC ? "charged, on AC" : "on battery")
-        rows.append(PopupRow(text: state, dim: true))
-
+        rows.append(PopupRow(text: "battery", detail: "\(pct)%", hero: true,
+                             inlineBar: Double(pct) / 100,
+                             tint: pct <= 20 && !onAC ? .systemRed : nil))
         // 65535 is the "not known yet" answer, which arrives whenever the
         // rate has just changed
         let minutes = onAC ? (d[kIOPSTimeToFullChargeKey] as? Int ?? -1)
                            : (d[kIOPSTimeToEmptyKey] as? Int ?? -1)
-        if minutes > 0, minutes < 65535 {
-            rows.append(PopupRow(text: onAC ? "time to full" : "time left",
-                                 detail: "\(minutes / 60)h \(minutes % 60)m"))
-        }
+        let left = minutes > 0 && minutes < 65535
+            ? "\(minutes / 60)h \(minutes % 60)m " + (onAC ? "to full" : "left") : ""
+        rows.append(PopupRow(text: charging ? "charging"
+                                            : (onAC ? "charged, on AC" : "on battery"),
+                             detail: left))
     }
 
     rows.append(PopupRow(separator: true))
@@ -2316,8 +2315,8 @@ func batteryRows() -> [PopupRow] {
         // Apple rounds this to a whole 100% for a long while; the ratio is
         // the number that actually moves
         let health = Int((Double(full) / Double(design) * 100).rounded())
-        let verdict = health >= 90 ? "good" : (health >= 80 ? "fair" : "worn")
-        rows.append(PopupRow(text: "health", detail: "\(health)%  \(verdict)"))
+        let verdict = health >= 90 ? "" : (health >= 80 ? "  fair" : "  worn")
+        rows.append(PopupRow(text: "health", detail: "\(health)%\(verdict)"))
     }
     if let cycles = raw["CycleCount"] as? Int {
         rows.append(PopupRow(text: "cycles", detail: "\(cycles)"))
@@ -2608,7 +2607,7 @@ func appleRows() -> [PopupRow] {
         PopupRow(text: "Sleep", action: run("/usr/bin/pmset", ["sleepnow"])),
         PopupRow(text: "Restart…", action: systemEvents("restart")),
         PopupRow(text: "Shut Down…", action: systemEvents("shut down")),
-        PopupRow(text: "Next Theme", dim: true,
+        PopupRow(text: "theme", detail: currentThemeName(), dim: true,
                  action: run("\(NSHomeDirectory())/.local/bin/theme-next", [])),
     ]
 }
@@ -2980,7 +2979,7 @@ func appleMenuRows() -> [PopupRow] {
     var rows = rowsForMenu(apple, collapseAlternates: true)
     guard !rows.isEmpty else { return appleRows() }
     if rows.last?.separator != true { rows.append(PopupRow(separator: true)) }
-    rows.append(PopupRow(text: "Next Theme", dim: true, action: {
+    rows.append(PopupRow(text: "theme", detail: currentThemeName(), dim: true, action: {
         closePopup()
         DispatchQueue.global(qos: .userInitiated).async {
             _ = shell("\(NSHomeDirectory())/.local/bin/theme-next", [])
@@ -4578,6 +4577,21 @@ watch(FileManager.default.homeDirectoryForCurrentUser
     if cheatWindow != nil { hideCheatsheet(); toggleCheatsheet() } // repaint in the new palette
     let ms = Double(DispatchTime.now().uptimeNanoseconds - t0) / 1_000_000
     tlog(String(format: "theme %.2f ms", ms))
+}
+
+// theme.conf holds one name, or a light:<name>,dark:<name> pair.
+func currentThemeName() -> String {
+    guard let spec = readConf("theme.conf")["theme"] else { return "" }
+    guard spec.contains(":") else { return spec }
+    let want = app.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        ? "dark" : "light"
+    for half in spec.split(separator: ",") {
+        let pair = half.split(separator: ":", maxSplits: 1)
+        if pair.count == 2, pair[0].trimmingCharacters(in: .whitespaces) == want {
+            return pair[1].trimmingCharacters(in: .whitespaces)
+        }
+    }
+    return spec
 }
 
 // Follow the macOS light/dark switch when theme.conf holds a Ghostty-style
