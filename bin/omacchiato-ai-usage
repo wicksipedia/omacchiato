@@ -405,13 +405,17 @@ def label(quotas):
     found = [m for m in picked if m]
     if not found:
         return "--", "muted", []
-    percents = ["%d%%" % round(m.get("used_percent") or 0) if m else "--" for m in picked]
-    worst = colour_for(max(m.get("used_percent") or 0 for m in found))
+    # a provider the user has not touched in this window says nothing
+    shown = [(pid, m, round(m.get("used_percent") or 0))
+             for (pid, _), m in zip(PILL, picked) if m and round(m.get("used_percent") or 0)]
+    if not shown:
+        return "", "muted", []
+    worst = colour_for(max(m.get("used_percent") or 0 for _, m, _ in shown))
     if len(PILL) > 1:
         # one icon cannot name several providers, so each percent gets its logo
-        return "", worst, [{"label": pct, **logo(pid)} for (pid, _), pct in zip(PILL, percents)]
-    text = percents[0]
-    left = seconds_until(found[0].get("resets_at"))
+        return "", worst, [{"label": "%d%%" % pct, **logo(pid)} for pid, _, pct in shown]
+    text = "%d%%" % shown[0][2]
+    left = seconds_until(shown[0][1].get("resets_at"))
     if left is not None and left > 0:
         text += LABEL_DOT + clock(left)
     return text, worst, []
