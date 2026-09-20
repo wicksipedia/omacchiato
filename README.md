@@ -147,7 +147,8 @@ Left to right:
 - **Apple menu**: the real one, read over Accessibility. About This
   Mac, System Settings, Recent Items (with app and file-type icons
   resolved locally, because AX exposes none), Force Quit and the power
-  verbs, plus Omacchiato's Next Theme at the bottom.
+  verbs, plus Omacchiato's theme row at the bottom, which names the
+  theme you are on and moves to the next one.
 - **Workspaces**: one capsule per display, showing only that display's
   workspaces. A chip shows the icons of up to three apps on the
   workspace, fanned like a hand of cards, or the workspace's digit when
@@ -164,9 +165,9 @@ Left to right:
   left cluster on a notched one, and hides when Music is not running.
   Click the title to open Music.
 
-![The Apple menu popup: About This Mac, System Information, System Settings, App Store, Recent Items, Force Quit, Sleep, Restart, Shut Down, Lock Screen, Log Out and Omacchiato's Next Theme at the bottom](docs/screenshots/popup-apple.png)
+![The Apple menu popup under its pill: About This Mac, System Information, System Settings, App Store, Recent Items, Force Quit, Sleep, Restart, Shut Down, Lock Screen, Log Out, and Omacchiato's theme row naming the current theme at the bottom](docs/screenshots/popup-apple.png)
 
-![Right end of the bar: the menu bar apps grid, the Claude and GitHub plugin pills, wi-fi, battery, the clock and the activity pill](docs/screenshots/bar-right.png)
+![Right end of the bar: the menu bar apps grid, the Claude usage pill at 5%, the keep-awake cup, the GitHub pill with two open pull requests, wi-fi, battery with three hours left, the date and time, and the activity pill](docs/screenshots/bar-right.png)
 
 - **Menu bar apps**: the grid pill lists the third-party apps that have
   an icon in the hidden macOS menu bar. Clicking a row gives that icon
@@ -210,12 +211,12 @@ Left to right:
 
 <table>
   <tr>
-    <td valign="top"><img src="docs/screenshots/popup-menubar.png" alt="The menu bar apps popup: one row per third-party app that has an icon in the hidden menu bar, an opens app note on the rows whose icon the notch hides, and a Show menu bar row with the ⌃F8 shortcut"></td>
-    <td valign="top"><img src="docs/screenshots/popup-wifi.png" alt="The wi-fi popup: the network name, the IP and the router (blacked out here), signal -57 dBm rated good, link 360 Mbps on WPA3, channel 44 on 5 GHz at 40 MHz, and a network settings row"></td>
+    <td valign="top"><img src="docs/screenshots/popup-menubar.png" alt="The menu bar apps popup: one row per third-party icon in the hidden menu bar, sorted by app name, two OneDrive icons told apart by their own labels, an opens app note on the rows whose icon the notch hides, and a Show menu bar row with the ⌃F8 shortcut"></td>
+    <td valign="top"><img src="docs/screenshots/popup-wifi.png" alt="The wi-fi popup: the network name, the IP and the router (blacked out here), signal -43 dBm rated excellent, link 2401 Mbps on WPA2, channel 48 on 5 GHz at 160 MHz, then the networks in range with a tick on the one in use, then the iPhones that can share a hotspot with their battery (names blacked out here), and a network settings row"></td>
   </tr>
   <tr>
-    <td valign="top"><img src="docs/screenshots/popup-battery.png" alt="The battery popup: a full charge bar, charged on AC, a 60 W adapter, health 98% rated good, 49 cycles, and a Battery Settings row"></td>
-    <td valign="top"><img src="docs/screenshots/popup-clock.png" alt="The clock popup: a month calendar with the current week highlighted and today marked, and the week number below it"></td>
+    <td valign="top"><img src="docs/screenshots/popup-battery.png" alt="The battery popup: the title row carrying a charge bar and 63%, on battery with 4h 25m left, low power mode, 9.5 W draw, health 99%, 50 cycles, and a Battery Settings row"></td>
+    <td valign="top"><img src="docs/screenshots/popup-clock.png" alt="The clock popup: the month and its week number, a grid of days with today in a filled circle, and today's remaining events under it, each with the colour of the calendar it belongs to"></td>
   </tr>
 </table>
 
@@ -244,11 +245,13 @@ popup rows, and the bar draws the result. The format is under
   days and active hours.
 - **GitHub pull requests** (`omacchiato-github-prs`): the pill counts your
   open PRs and adds `!` when one has an unread notification. The popup
-  groups them by repository, marks each with what it needs next
-  (📝 draft, 💥 CI failed or conflicts, 🏗️ CI running, 💬 feedback to
-  resolve, ✅ ready to merge, ⏳ waiting for a review) and says what it
-  waits for. A PR based on another PR in the list sits under it,
-  indented and marked `↳`.
+  groups them by repository and marks each with what it needs next: a
+  pencil for a draft, a red warning for a failed check or a merge
+  conflict, a yellow clock for a running check, a yellow comment for
+  feedback to resolve, a green check for approved, and a muted clock
+  for waiting. A sentence follows only where it says more than the
+  mark. A PR based on another PR in the list sits under it, indented
+  and marked `↳`.
 - **Keep awake** (`omacchiato-keep-awake`): a cup while something holds
   the Mac awake, nothing otherwise. It reads the power assertions
   rather than any app's saved setting, ignores the ones the system
@@ -262,8 +265,8 @@ popup rows, and the bar draws the result. The format is under
 
 <table>
   <tr>
-    <td valign="top"><img src="docs/screenshots/popup-claude.png" alt="The AI usage popup, from before it read other providers: the Claude Code status row, the five-hour session window at 43% with a tick at the time elapsed, the weekly window for all models and for one model, extra usage credits, and the last seven days from tokscale as tokens and cost per day and per model"></td>
-    <td valign="top"><img src="docs/screenshots/popup-github.png" width="540" alt="The GitHub pull requests popup: open PRs grouped by repository with a count per group, an hourglass mark and a Waiting for a first review line under each, and stacked PRs indented under their base. Repository names and titles are blacked out here"></td>
+    <td valign="top"><img src="docs/screenshots/popup-claude.png" alt="The AI usage popup: a header per provider with its logo, its plan in small quiet type, and its usage and reset time; the Claude section open with one row per window, each a bar with a tick at the time elapsed; Codex and Copilot closed; and a closed section for the last seven days at API prices"></td>
+    <td valign="top"><img src="docs/screenshots/popup-github.png" width="540" alt="The GitHub pull requests popup: open PRs grouped by repository with a count per group, one row each with a clock mark for waiting, and a row that opens all pull requests on GitHub"></td>
   </tr>
 </table>
 
@@ -682,11 +685,10 @@ pill's colour and give it a popup:
   "label": "10% - 2h 6m",
   "color": "green",
   "rows": [
-    {"text": "Claude", "hero": true},
+    {"text": "Claude", "subtitle": "Max 5x", "detail": "10% · 2h 6m", "hero": true},
     {"separator": true},
-    {"text": "Session", "detail": "10%"},
-    {"text": "5-hour window", "slider": 0.1, "marker": 0.58},
-    {"text": "Resets in 2h 6m", "dim": true}
+    {"text": "Session", "bar": 0.1, "marker": 0.58, "bar_color": "green",
+     "detail": "10% · 2h 6m"}
   ]
 }
 ```
@@ -783,16 +785,22 @@ Copilot logos are black or white, so they take the theme's label
 colour. The percents are green under 50%, yellow under 80% and red
 above.
 
-The popup has one section for each `--panel` provider, and all sections
-start closed. Click a header to open its section. If tokscale reports
-more than one Codex account, each account gets a section. The header
-shows the provider's logo, its name and the plan. The section shows the service status and each usage window. Each
-window has a bar with a tick at the share of the window that has
-passed, and its colour compares the two: green at or near an even
-pace, yellow more than 5 points ahead, and red more than 20 points
-ahead or at 90% used.
+The popup has one section for each `--panel` provider. The first opens
+with the popup and the rest start closed; click a header to open one.
+If tokscale reports more than one Codex account, each account gets a
+section. A header carries the provider's logo, its name, the plan in
+small quiet type, and the usage and reset of the five-hour window, so a
+closed section still answers the question you opened the popup for.
 
-The status row reads the provider's components on its status page:
+Inside, each usage window takes one row: its name, a bar, and the
+percent with the time until it resets. The bar has a tick at the share
+of the window that has passed, and the bar's colour compares the two:
+green at or near an even pace, yellow more than 5 points ahead, and red
+more than 20 points ahead or at 90% used. A window whose plan carries
+no limit is left out.
+
+A status row appears only while a provider is not operational. It reads
+the provider's components on its status page:
 Claude Code on status.claude.com, the Codex components on
 status.openai.com, and Copilot on githubstatus.com. It ignores the
 page's overall rating, which also drops when another product of that
@@ -837,8 +845,10 @@ last row opens Sound settings. With two devices connected, each device
 is a section that starts closed.
 
 Nothing on the Mac reports whether AirPods charge. A cable to this Mac
-is the closest fact, so the script marks the battery row with 🔌 while
-`ioreg` lists the AirPods as a USB device with the same serial number.
+is the closest fact, so a row under the batteries says the AirPods are
+plugged into this Mac while `ioreg` lists them as a USB device with the
+same serial number. It is a row of its own, because a mark on one
+battery read as that side charging.
 A wall charger stays invisible. While the cable carries the audio, the
 noise control rows drop out: airpods-control controls a device only
 over Bluetooth.
@@ -885,13 +895,19 @@ U+F407.
 Each PR gets one mark, for what it needs next. If more than one
 applies, the first in this list wins:
 
-- 📝 a draft
-- 💥 CI failed, or the branch has merge conflicts
-- 🏗️ CI is running
-- 💬 feedback to resolve: changes requested, or a review thread from
-  someone else that nobody has resolved
-- ✅ ready to merge: approved, with passing checks and no conflicts
-- ⏳ waiting for a review
+- a pencil: a draft
+- a red warning: CI failed, or the branch has merge conflicts
+- a yellow clock: CI is running
+- a yellow comment: feedback to resolve, which is changes requested or
+  a review thread from someone else that nobody has resolved
+- a green check: ready to merge, approved with passing checks and no
+  conflicts
+- a muted clock: waiting for a review
+
+Under the mark, a sentence appears only where it says more than the
+mark does: a merge conflict, a failed check, changes requested, or the
+number of threads left to resolve. A pull request that is only waiting
+takes one row.
 
 The pill turns red while CI fails on any open PR. Clicking a PR row or
 the line under it opens the PR. To drop a PR from the list,
@@ -900,7 +916,8 @@ unsubscribe from its notifications on GitHub.
 An update is an unread GitHub notification on the PR. GitHub marks the
 notification read when you open the PR, so the `!` goes at the next
 run after you look. A PR merged (🟣) or closed (⚫) in the last week
-stays in the list while its notification is unread. To find those
+stays in the list, with a merge glyph or an x, while its notification
+is unread. To find those
 notifications the script reads every page of your unread inbox, about
 half a second per 50, while the search runs. If GitHub is out of
 reach, the popup keeps the last list and says when it was fetched.
