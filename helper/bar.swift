@@ -2833,15 +2833,31 @@ func menuBarAppRows() -> [PopupRow] {
     }
     var rows: [PopupRow] = []
     if let items = menuBarCache {
-        let perApp = Dictionary(grouping: items, by: { $0.app.processIdentifier }).mapValues(\.count)
-        for item in items {
-            let name = item.app.localizedName ?? item.app.bundleIdentifier ?? "?"
+        // by name, not by process: an app can run two of them, and two rows
+        // of one name still choose nothing
+        let appName = { (item: MenuBarItem) in
+            item.app.localizedName ?? item.app.bundleIdentifier ?? "?"
+        }
+        let perApp = Dictionary(grouping: items, by: appName).mapValues(\.count)
+        // The scan follows the running-application order, which is launch
+        // order, so the rows moved between openings. Sort by name, and keep
+        // one app's own icons in the order the menu bar holds them.
+        let sorted = items.enumerated().sorted { a, b in
+            let an = a.element.app.localizedName ?? "", bn = b.element.app.localizedName ?? ""
+            let order = an.localizedCaseInsensitiveCompare(bn)
+            return order == .orderedSame ? a.offset < b.offset : order == .orderedAscending
+        }.map(\.element)
+        var nth: [String: Int] = [:]
+        for item in sorted {
+            let name = appName(item)
             var text = name
             // alone, most labels are empty or a symbol name, so a label only
-            // tells two icons from the same app apart
-            if perApp[item.app.processIdentifier, default: 0] > 1 {
+            // tells two icons from the same app apart. Some apps label
+            // neither, and two rows of one name choose nothing.
+            if perApp[name, default: 0] > 1 {
+                nth[name, default: 0] += 1
                 let label = menuBarLabel(item.label, app: name)
-                if !label.isEmpty { text += " · " + label }
+                text += label.isEmpty ? " \(nth[name]!)" : " · " + label
             }
             rows.append(PopupRow(image: item.app.icon, text: text, detail: item.parked ? "opens app" : "", action: {
                 closePopup()
