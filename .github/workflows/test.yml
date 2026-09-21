@@ -1,0 +1,8 @@
+name: test
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+      - run: bin/omacchiato-test

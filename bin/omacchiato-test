@@ -1,0 +1,16 @@
+#!/bin/bash
+# Runs every check that needs no screen: shell syntax, the Python tests
+# (unittest) and the bar's tests (Swift Testing).
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+while IFS= read -r -d '' f; do
+  case "$(head -1 "$f")" in
+    *zsh*) zsh -n "$f" ;;
+    *bash* | */sh*) bash -n "$f" ;;
+  esac
+done < <(git ls-files -z 'bin/*' '*.sh')
+echo "shell syntax: ok"
+
+python3 -m unittest discover -s tests
+swift test

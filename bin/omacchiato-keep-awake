@@ -83,14 +83,19 @@ def duration(age):
     return f"{minutes}m" if minutes else "<1m"
 
 
-# nothing holding it is the ordinary state, and a pill for the ordinary
-# state is one more thing to read past
-awake = holders()
-if not awake:
-    print(json.dumps({"label": "", "icon": ""}))
-    raise SystemExit
+def main():
+    # nothing holding it is the ordinary state, and a pill for the ordinary
+    # state is one more thing to read past
+    awake = holders()
+    if not awake:
+        print(json.dumps({"label": "", "icon": ""}))
+        return
 
-rows = [{"text": "keeping awake", "hero": True}]
-rows += [{"text": name, "detail": duration(held)} for name, held in awake]
-print(json.dumps({"label": "", "icon": AWAKE_ICON, "color": "accent",
-                  "rows": rows}, ensure_ascii=False))
+    rows = [{"text": "keeping awake", "hero": True}]
+    rows += [{"text": name, "detail": duration(held)} for name, held in awake]
+    print(json.dumps({"label": "", "icon": AWAKE_ICON, "color": "accent",
+                      "rows": rows}, ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    main()

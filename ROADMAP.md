@@ -20,7 +20,7 @@ Direction, not promises. Ordered roughly by pull.
 
 ## The bar (was: a measured experiment)
 
-`helper/bar.swift` IS the bar now — sketchybar is gone, and with it the
+`helper/bar/` IS the bar now — sketchybar is gone, and with it the
 sixteen shell plugins, the popup guard that polled the cursor, and the
 watcher daemon whose only job was triggering it. It started as a slice
 built alongside sketchybar to answer one question with numbers. Run a
@@ -32,7 +32,7 @@ swiftc -O -F /System/Library/PrivateFrameworks -framework SkyLight \
   -framework DisplayServices \
   -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist \
   -Xlinker helper/bar-info.plist \
-  -o /tmp/omacchiato-bar helper/bar.swift &&
+  -o /tmp/omacchiato-bar helper/bar/*.swift &&
 codesign -f -s "Apple Development" --identifier com.omacchiato.bar /tmp/omacchiato-bar &&
 /tmp/omacchiato-bar &
 ```

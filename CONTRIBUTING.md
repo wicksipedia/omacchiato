@@ -16,7 +16,7 @@ Small repo, strong opinions. PRs are welcome when they keep these.
   change needs a hardcoded name list, find the derived form instead.
   Hardcoded lists in this repo have rotted before.
 - **The bar is one process.** Bar, popups and OSDs are surfaces of
-  `helper/bar.swift`. They draw from a model that the bar holds in
+  `helper/bar/`. They draw from a model that the bar holds in
   memory and feeds from publishers (SkyLight, OmniWM's `watch` stream,
   CoreAudio, IOPS, DisplayServices, SCDynamicStore, IOBluetooth).
   Nothing on a render path may fork. A workspace switch repaints the
@@ -65,6 +65,8 @@ Small repo, strong opinions. PRs are welcome when they keep these.
 
 ## Practical notes
 
+- Run `bin/omacchiato-test` before a PR. A fix to logic adds a test in
+  `tests/`, so the bug stays fixed.
 - Test on stock bash: `bash -n` is the floor, `/bin/bash script.sh`
   is the truth.
 - The debug story is `/tmp/omacchiato-*.log`. The bar and the overview

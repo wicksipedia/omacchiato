@@ -54,7 +54,7 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   ```sh
   swiftc -O -F /System/Library/PrivateFrameworks -framework SkyLight -framework DisplayServices \
     -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker helper/bar-info.plist \
-    -o "$TMPDIR/omacchiato-bar" helper/bar.swift
+    -o "$TMPDIR/omacchiato-bar" helper/bar/*.swift
   cp "$TMPDIR/omacchiato-bar" omacchiato-bar.app/Contents/MacOS/omacchiato-bar
   codesign -f -s "Apple Development" --identifier com.omacchiato.bar omacchiato-bar.app
   launchctl kickstart -k "gui/$(id -u)/com.omacchiato.bar"
@@ -66,10 +66,22 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
 - `omacchiato-gesture` is the exception. TCC pins its grant to the exact
   build, so every rebuild needs a new Accessibility grant. `install.sh`
   rebuilds it only when a file in `helper/gesture/` changed.
-- There is no test framework. Check shell scripts with `bash -n`.
-  `bin/omacchiato-github-prs --self-test` runs that script's asserts. For
-  the bar, rebuild, restart and look at it, for example with
-  `screencapture -x -R0,0,3000,40 bar.png`.
+- `bin/omacchiato-test` runs every check that needs no screen: `bash -n`
+  on the shell scripts, `python3 -m unittest discover -s tests`, and
+  `swift test`. A GitHub Action runs it on every push. When you fix a
+  logic bug, add a test for it.
+- The bar's tests use Swift Testing, in `tests/bar/`. `Package.swift`
+  exists only for them, and `install.sh` still builds the bar with
+  `swiftc`. The tests `@testable import omacchiato_bar`, which holds
+  `helper/bar/bar.swift`. A test calls a function that takes plain
+  values, so move the logic out of the AX, AppKit or subprocess code
+  first, as `layoutOrder` and `shortcutText` do. The suite runs serially,
+  because some tests set globals.
+- The Python tests use `unittest`, in `tests/test_*.py`. `tests/loader.py`
+  imports a script from `bin/`, so each script keeps its run code in
+  `main()` behind `if __name__ == "__main__"`.
+- For the look of the bar, rebuild, restart and look at it, for example
+  with `screencapture -x -R0,0,3000,40 bar.png`.
 - Logs: `/tmp/omacchiato-bar.log` (timings and `tlog` lines),
   `/tmp/omacchiato-bar.err`, `/tmp/omacchiato-gesture.log`,
   `/tmp/omacchiato-overview.log`, `/tmp/omacchiato-ws.log`.
@@ -85,7 +97,7 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   menu bar icon was last pressed through Accessibility. A restart of
   SystemUIServer, the Dock or the bar does not release it.
 
-## The bar (`helper/bar.swift`)
+## The bar (`helper/bar/`)
 
 - The bar, its popups and its OSDs are one process. `rightOrder` sets
   the pill order: `menubar`, then the plugin pills in file order, then
@@ -150,9 +162,12 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
 - AppKit hit-tests a non-opaque window by alpha, so a pill background
   with zero alpha takes no clicks. `NSColor.clickable` raises zero alpha
   to 0.01.
-- Swift initialises top-level globals in order, and a global that reads
-  a later global reads zero. Use a computed property instead, as
-  `mediaArtSide` does.
+- `main.swift` holds the code that runs at startup, in order, and
+  `bar.swift` holds the declarations. Put a new global in `bar.swift`,
+  where it starts when code first reads it. A global in `main.swift`
+  starts when its line runs, and one that reads a later global there
+  reads zero. `swiftc` accepts startup code only in a file named
+  `main.swift`.
 - The media pill reads Apple Music only (`com.apple.Music`, notification
   `com.apple.iTunes.playerInfo`). The artwork comes from osascript as
   `«data ...»` hex.
@@ -310,8 +325,8 @@ The design and the test results are in
   `open -n -W --stdout <file> <app> --args --request-permissions`.
   LaunchServices makes that copy responsible for itself. If you run the
   binary directly, it reports the terminal's grants.
-- The switch runs before other startup code. In the bar it comes right
-  after `pillModes`, so it can read only the globals above it. It always
+- The switch runs before other startup code. In the bar it is the first
+  line of `main.swift`. It always
   asks for Bluetooth, because a plugin command runs as a child of the bar
   and reads Bluetooth with the bar's grant, whatever `bar-pills.conf` says. In the
   gesture daemon it comes before the lock file, which the running daemon

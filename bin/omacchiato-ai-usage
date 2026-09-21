@@ -66,14 +66,6 @@ def ids(value):
     return [v.strip().lower() for v in value.split(",") if v.strip()]
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--pill", type=ids, default=["claude"])
-parser.add_argument("--panel", type=ids)
-args = parser.parse_args()
-PILL = [(pid, want or "5h") for pid, _, want in (p.partition(":") for p in args.pill)]
-PANEL = args.panel or [pid for pid, _ in PILL]
-
-
 def seconds_until(value):
     try:
         when = datetime.fromisoformat(value)
@@ -434,35 +426,49 @@ def label(quotas):
     return text, worst, []
 
 
-entry = read_cache() or {}
-tokscale = find_tokscale()
-quotas = usage(entry, tokscale)
-states = {pid: health(entry, pid) for pid in dict.fromkeys(PANEL + [pid for pid, _ in PILL])}
+def main():
+    # label() and the rows read these two
+    global PILL, PANEL
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--pill", type=ids, default=["claude"])
+    parser.add_argument("--panel", type=ids)
+    args = parser.parse_args()
+    PILL = [(pid, want or "5h") for pid, _, want in (p.partition(":") for p in args.pill)]
+    PANEL = args.panel or [pid for pid, _ in PILL]
 
-# nothing to report: the pill takes no space
-if not any(quotas.get(pid) or health_rows(pid, state) for pid, state in states.items()):
-    print(json.dumps({"label": ""}))
-    raise SystemExit
+    entry = read_cache() or {}
+    tokscale = find_tokscale()
+    quotas = usage(entry, tokscale)
+    states = {pid: health(entry, pid) for pid in dict.fromkeys(PANEL + [pid for pid, _ in PILL])}
 
-rows = []
-for pid in PANEL:
-    rows += ([{"separator": True}] if rows else []) + provider_rows(
-        pid, quotas.get(pid), states[pid], first=pid == PANEL[0])
+    # nothing to report: the pill takes no space
+    if not any(quotas.get(pid) or health_rows(pid, state) for pid, state in states.items()):
+        print(json.dumps({"label": ""}))
+        return
 
-text, colour, parts = label(quotas)
-payload = {"label": text, "color": colour, "rows": rows}
-mark = health_mark([states[pid] for pid, _ in PILL])
-if parts:
-    payload["parts"] = parts
-    payload["icon"] = mark
-elif not text:
-    payload["icon"] = IDLE_ICON + mark
-elif mark:
-    payload["icon"] = os.environ.get("OMACCHIATO_PILL_ICON", "") + mark
-if tokscale:
-    clients = [pid for pid in PANEL if pid in PROVIDERS]
-    stats = week_stats(entry, tokscale, clients) if clients else None
-    if stats:
-        payload["rows"] += stats_rows(stats)
-    payload["rows"] += [{"separator": True, "section": "end"}, tokens_row(tokscale)]
-print(json.dumps(payload))
+    rows = []
+    for pid in PANEL:
+        rows += ([{"separator": True}] if rows else []) + provider_rows(
+            pid, quotas.get(pid), states[pid], first=pid == PANEL[0])
+
+    text, colour, parts = label(quotas)
+    payload = {"label": text, "color": colour, "rows": rows}
+    mark = health_mark([states[pid] for pid, _ in PILL])
+    if parts:
+        payload["parts"] = parts
+        payload["icon"] = mark
+    elif not text:
+        payload["icon"] = IDLE_ICON + mark
+    elif mark:
+        payload["icon"] = os.environ.get("OMACCHIATO_PILL_ICON", "") + mark
+    if tokscale:
+        clients = [pid for pid in PANEL if pid in PROVIDERS]
+        stats = week_stats(entry, tokscale, clients) if clients else None
+        if stats:
+            payload["rows"] += stats_rows(stats)
+        payload["rows"] += [{"separator": True, "section": "end"}, tokens_row(tokscale)]
+    print(json.dumps(payload))
+
+
+if __name__ == "__main__":
+    main()

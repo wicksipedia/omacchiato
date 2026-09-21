@@ -130,7 +130,7 @@ from the live config.
 ### The bar
 
 One process draws all of it: the bar, its popups, the sliders and the
-gamma shade are surfaces of `helper/bar.swift`. The bar is
+gamma shade are surfaces of `helper/bar/`. The bar is
 transparent, and each item is a flat radius-4 pill. It subscribes to
 the system's own publishers (SkyLight for window churn, CoreAudio for
 volume, IOPS for battery, DisplayServices for brightness,

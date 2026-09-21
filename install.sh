@@ -258,13 +258,13 @@ fi
 BAR_APP="$HOME/.local/share/omacchiato/omacchiato-bar.app"
 BAR_BIN="$BAR_APP/Contents/MacOS/omacchiato-bar"
 if [ ! -x "$BAR_BIN" ] \
-  || [ "$REPO_DIR/helper/bar.swift" -nt "$BAR_BIN" ] \
+  || [ -n "$(find "$REPO_DIR/helper/bar" -name '*.swift' -newer "$BAR_BIN")" ] \
   || [ "$REPO_DIR/helper/bar-info.plist" -nt "$BAR_BIN" ]; then
   log "Building omacchiato-bar"
   mkdir -p "$BAR_APP/Contents/MacOS"
   swiftc -O -F /System/Library/PrivateFrameworks -framework SkyLight -framework DisplayServices \
     -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker "$REPO_DIR/helper/bar-info.plist" \
-    -o "$BAR_BIN" "$REPO_DIR/helper/bar.swift"
+    -o "$BAR_BIN" "$REPO_DIR"/helper/bar/*.swift
 fi
 cp "$REPO_DIR/helper/bar-info.plist" "$BAR_APP/Contents/Info.plist"
 mark "built-bar-app"
