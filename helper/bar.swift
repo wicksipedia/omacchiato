@@ -3687,7 +3687,8 @@ final class BarView: NSView {
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
     var chipRects: [(String, NSRect)] = []
-    var itemRects: [(String, NSRect)] = []
+    // the pill a popup hangs under, and the larger area that takes its clicks
+    var itemRects: [(String, pill: NSRect, hit: NSRect)] = []
     var mediaRects: [(String, NSRect)] = []
     var appleRect: NSRect = .zero
 
@@ -3860,6 +3861,15 @@ final class BarView: NSView {
                 + sizes.reduce(0) { $0 + $1.icon + $1.gap + $1.label }
             let pill = NSRect(x: cursor - width, y: (barHeight - pillHeight) / 2,
                               width: width, height: pillHeight)
+            // The window takes a click only where it has ink, so a near-miss
+            // in a gap or above a pill went to the window below. The hit
+            // area runs from the screen's top edge to the bar's bottom, takes
+            // half of each gap, and the last pill runs to the screen edge.
+            let hitMaxX = cursor == bounds.maxX - padLeft ? bounds.maxX : pill.maxX + gap / 2
+            let hitArea = NSRect(x: pill.minX - gap / 2, y: 0,
+                                 width: hitMaxX - pill.minX + gap / 2, height: bounds.height)
+            NSColor.clear.clickable.setFill()
+            hitArea.fill()
             palette.itemBG.setFill()
             NSBezierPath(roundedRect: pill, xRadius: radius, yRadius: radius).fill()
             var x = pill.minX + pillPad
@@ -3874,7 +3884,7 @@ final class BarView: NSView {
                 }
                 x += size.icon + size.gap + size.label + partGap
             }
-            itemRects.append((name, NSRect(x: pill.minX, y: 0, width: width, height: barHeight)))
+            itemRects.append((name, pill, hitArea))
             cursor = pill.minX - gap
         }
     }
@@ -3895,7 +3905,7 @@ final class BarView: NSView {
 
     private func hit(_ event: NSEvent) -> String? {
         let p = convert(event.locationInWindow, from: nil)
-        return itemRects.first(where: { $0.1.contains(p) })?.0
+        return itemRects.first(where: { $0.hit.contains(p) })?.0
     }
 
     var appPillRect = NSRect.zero
@@ -3918,7 +3928,7 @@ final class BarView: NSView {
             showPopup(name, under: window?.convertToScreen(convert(rect, to: nil)) ?? rect,
                       on: surface, alignLeft: true)
         default:
-            guard let rect = itemRects.first(where: { $0.0 == name })?.1 else { return }
+            guard let rect = itemRects.first(where: { $0.0 == name })?.pill else { return }
             showPopup(name, under: window?.convertToScreen(convert(rect, to: nil)) ?? rect, on: surface)
         }
     }
