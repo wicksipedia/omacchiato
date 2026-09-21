@@ -1722,6 +1722,8 @@ struct PopupRow {
 
 let rowHeight: CGFloat = 26
 let popupPad: CGFloat = 8
+// A long row ends in "…" rather than widen the popup past this.
+let popupMaxWidth: CGFloat = 520
 let popupRadius: CGFloat = 8
 
 final class PopupView: NSView {
@@ -1795,7 +1797,7 @@ final class PopupView: NSView {
             width = max(width, w)
             height += rowH(row)
         }
-        return NSSize(width: width + popupPad * 2 + 20, height: height)
+        return NSSize(width: min(width + popupPad * 2 + 20, popupMaxWidth), height: height)
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -1879,11 +1881,16 @@ final class PopupView: NSView {
                          leftAt: rect.maxX - advance(row.text, font(row)) - 4, midY: rect.midY)
             } else {
                 let tint = index == hoveredRow && row.action != nil ? palette.accent : color(row)
-                drawText(row.text, font(row), tint, leftAt: x, midY: rect.midY)
+                var room = rect.maxX - 4 - x
+                if !row.detail.isEmpty { room -= advance(row.detail, nerdFont("Regular", 11)) + 24 }
+                if !row.subtitle.isEmpty { room -= advance(row.subtitle, nerdFont("Regular", 11)) + 8 }
+                // a bar row's label has its own column, which measure() keeps
+                let text = row.inlineBar == nil ? fit(row.text, font(row), room) : row.text
+                drawText(text, font(row), tint, leftAt: x, midY: rect.midY)
                 if !row.subtitle.isEmpty {
                     drawText(row.subtitle, nerdFont("Regular", 11),
                              palette.label.withAlphaComponent(0.5),
-                             leftAt: x + advance(row.text, font(row)) + 8, midY: rect.midY)
+                             leftAt: x + advance(text, font(row)) + 8, midY: rect.midY)
                 }
                 if !row.detail.isEmpty {
                     let df = nerdFont("Regular", 11)
@@ -3483,6 +3490,13 @@ func advance(_ s: String, _ font: NSFont) -> CGFloat {
     let line = CTLineCreateWithAttributedString(
         NSAttributedString(string: s, attributes: [.font: font]))
     return CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
+}
+
+func fit(_ s: String, _ font: NSFont, _ width: CGFloat) -> String {
+    guard advance(s, font) > width else { return s }
+    var cut = s
+    while !cut.isEmpty, advance(cut + "…", font) > width { cut.removeLast() }
+    return cut.trimmingCharacters(in: .whitespaces) + "…"
 }
 
 // draws with `origin` as the BASELINE origin, which is the only anchor
