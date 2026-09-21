@@ -433,8 +433,10 @@ func omniwmSnapshot() -> Snapshot {
     }
 
     // Leftmost window first, to match the workspace-bar stream: it lists a
-    // niri workspace's apps in layout order.
-    var placed: [String: [(Double, Double, String)]] = [:]
+    // niri workspace's apps in layout order. OmniWM parks the windows of a
+    // hidden workspace on one frame, so a tie keeps the query order, which
+    // is the layout order. A tie on the app name flipped the icons.
+    var placed: [String: [(Double, Double, Int, String)]] = [:]
     if let list = omniQuery("windows", ["--fields", "workspace,app,mode,frame,is-focused"])?["windows"]
         as? [[String: Any]] {
         for w in list {
@@ -445,11 +447,12 @@ func omniwmSnapshot() -> Snapshot {
             if (w["isFocused"] as? Bool) == true { s.focusedApp = app }
             let frame = w["frame"] as? [String: Any]
             placed[ws, default: []].append((frame?["x"] as? Double ?? .infinity,
-                                           frame?["y"] as? Double ?? .infinity, app))
+                                           frame?["y"] as? Double ?? .infinity,
+                                           placed[ws]?.count ?? 0, app))
         }
     }
     for (ws, wins) in placed {
-        s.wsApps[ws] = handOf(wins.sorted { $0 < $1 }.map { $0.2 })
+        s.wsApps[ws] = handOf(wins.sorted { ($0.0, $0.1, $0.2) < ($1.0, $1.1, $1.2) }.map { $0.3 })
     }
     return s
 }
