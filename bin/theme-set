@@ -117,15 +117,22 @@ fi
 OMNIWM_SETTINGS="$HOME/.config/omniwm/settings.toml"
 if [ -f "$OMNIWM_SETTINGS" ]; then
   python3 - "$OMNIWM_SETTINGS" "$THEMES_DIR" "$NAME" "$SPEC" <<'PY'
-import os, re, sys, tempfile, tomllib
+import os, re, sys, tempfile
 path, themes, name, spec = sys.argv[1:]
 t = open(path).read()
+
+
+# No tomllib: the bar and Karabiner start theme-set with launchd's PATH,
+# where python3 is the system's 3.9, and tomllib needs 3.11.
+def setting(table, key, default):
+    body = re.search(r'^\[%s\]\n((?:(?!\[).*\n?)*)' % re.escape(table), t, re.M)
+    m = body and re.search(r'^%s\s*=\s*"?([^"\n]*?)"?\s*$' % key, body.group(1), re.M)
+    return m.group(1) if m else default
+
+
 # glow strength and gradient direction are the user's taste, not the theme's
-try:
-    mine = tomllib.loads(t).get("borders", {})
-except tomllib.TOMLDecodeError:
-    mine = {}
-glow, gradient = mine.get("glow", {}), mine.get("gradient", {})
+glow = {"opacity": setting("borders.glow", "opacity", 0.6), "radius": setting("borders.glow", "radius", 8.0)}
+gradient = {"direction": setting("borders.gradient", "direction", "topLeftToBottomRight")}
 halves = {k.strip(): v.strip() for k, v in (part.split(":", 1) for part in spec.split(",") if ":" in part)}
 light, dark = halves.get("light", name), halves.get("dark", name)
 

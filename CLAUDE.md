@@ -240,6 +240,11 @@ The design and the test results are in
   overview reads its accent from the same file.
 - `theme-next` (`Super+Shift+T`) calls theme-set with one name, so it
   ends a light/dark pair.
+- The bar and Karabiner start theme-set with launchd's PATH, where
+  `python3` is the system's 3.9. Keep its Python to 3.9: `tomllib` (3.11)
+  once stopped it before the `settings.toml` write, so OmniWM never
+  reloaded and the quake terminal kept the old palette.
+  `tests/test_theme_set.py` runs that step with `/usr/bin/python3`.
 
 ## OmniWM
 
