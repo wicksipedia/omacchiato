@@ -105,7 +105,8 @@ for app in omacchiato-bar omacchiato-gesture; do
       *)
         unanswered=$((unanswered + 1))
         case "$key" in
-          automation-*) echo "    ❔ $(label "$key"): open $(target "$key"), then run omacchiato-permissions again" ;;
+          # macOS answers an Automation check only while the target app runs
+          automation-*) echo "    ❔ $(label "$key"): macOS checks this only while $(target "$key") runs. If it worked before, it is still on" ;;
           *) echo "    ❔ $(label "$key"): no answer, run omacchiato-permissions again" ;;
         esac
         ;;
