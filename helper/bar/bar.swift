@@ -307,11 +307,10 @@ func color(fromARGB v: UInt64) -> NSColor {
             alpha: CGFloat((v >> 24) & 0xff) / 255)
 }
 
-func loadPalette() -> Palette {
+func loadPalette(_ file: URL = FileManager.default.homeDirectoryForCurrentUser
+    .appendingPathComponent(".config/omarchy/current/theme/sketchybar.sh")) -> Palette {
     var p = Palette()
     var sawRowBG = false
-    let file = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".config/omarchy/current/theme/sketchybar.sh")
     guard let text = try? String(contentsOf: file, encoding: .utf8) else { return p }
     for line in text.split(separator: "\n") {
         let parts = line.replacingOccurrences(of: "export ", with: "").split(separator: "=")
@@ -1728,6 +1727,11 @@ let popupPad: CGFloat = 8
 // A long row ends in "…" rather than widen the popup past this.
 let popupMaxWidth: CGFloat = 520
 let popupRadius: CGFloat = 8
+// How much of the theme background the popup lays over its glass. The
+// glass adapts system colours to the window behind it, not theme colours,
+// and its tint only shades it. With no fill, a bright window behind a dark
+// theme's popup took the text to 2:1.
+let popupGlassFill: CGFloat = 0.85
 
 final class PopupView: NSView {
     var rows: [PopupRow] = []
@@ -1807,10 +1811,8 @@ final class PopupView: NSView {
         rowRects.removeAll()
         // plain fill: the scroll CONTAINER carries the rounded clip and
         // border, so corners stay put while tall content scrolls
-        if !popupGlass {
-            palette.barBG.setFill()
-            bounds.fill()
-        }
+        palette.barBG.withAlphaComponent(popupGlass ? popupGlassFill : 1).setFill()
+        bounds.fill()
 
         let colW = columnWidth()
         // inline bars share one column, so every bar starts and ends together

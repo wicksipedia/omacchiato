@@ -111,6 +111,30 @@ struct BarTests {
         #expect(!isOmniWM(nil))
     }
 
+    @Test("popup text on glass stays legible over white or black, on every theme")
+    func glassContrast() throws {
+        func luminance(_ c: NSColor) -> CGFloat {
+            let c = c.usingColorSpace(.sRGB)!
+            func channel(_ v: CGFloat) -> CGFloat { v <= 0.03928 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4) }
+            return 0.2126 * channel(c.redComponent) + 0.7152 * channel(c.greenComponent)
+                + 0.0722 * channel(c.blueComponent)
+        }
+        let themes = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .appendingPathComponent("../../themes").standardized
+        let names = try FileManager.default.contentsOfDirectory(atPath: themes.path)
+            .filter { FileManager.default.fileExists(atPath: themes.appendingPathComponent("\($0)/sketchybar.sh").path) }
+        #expect(!names.isEmpty)
+        for name in names {
+            let palette = loadPalette(themes.appendingPathComponent("\(name)/sketchybar.sh"))
+            for backdrop in [NSColor.white, NSColor.black] {
+                let glass = backdrop.blended(withFraction: popupGlassFill, of: palette.barBG)!
+                let (a, b) = (luminance(palette.label), luminance(glass))
+                let contrast = (max(a, b) + 0.05) / (min(a, b) + 0.05)
+                #expect(contrast >= 4.5, "\(name) over \(backdrop == .white ? "white" : "black"): \(contrast)")
+            }
+        }
+    }
+
     @Test("a clear pill still takes clicks")
     func clickable() {
         #expect(NSColor.clear.clickable.alphaComponent > 0)

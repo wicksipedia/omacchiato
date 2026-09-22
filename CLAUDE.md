@@ -108,8 +108,11 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
 - `popup = glass` puts the popup on an `NSGlassEffectView`, which then
   holds the scroll view, so `refreshPopup` resizes the window's content
   view and the glass content view, not a cast to `NSScrollView`.
-  `PopupView.draw` skips its background fill in that mode, and Reduce
-  transparency turns the mode off.
+  In that mode `PopupView.draw` fills the theme background at
+  `popupGlassFill`, because the glass adapts only system colours to the
+  window behind it, and its `tintColor` shades the glass without making
+  text legible. A test checks the text contrast of every theme at that
+  fill over white and black. Reduce transparency turns the mode off.
 - `dur()` in `bar.swift` and `overview.swift` returns 0 while Reduce
   motion is on. Pass every animation duration through it.
 - The wi-fi popup lists the networks in range. A scan blocks for
