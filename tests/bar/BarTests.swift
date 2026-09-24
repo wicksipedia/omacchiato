@@ -152,6 +152,27 @@ struct BarTests {
         #expect(steps == [true, false, false, true, true, true, false, false])
     }
 
+    @Test("the clock names an event from 10 minutes before until 5 minutes after it starts")
+    func soonEvent() {
+        let now = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        let labels = [11, 10, 4.5, 0, -4, -6].map { minutes in
+            soonLabel(start: now.addingTimeInterval(minutes * 60), allDay: false, now: now)
+        }
+        #expect(labels == [nil, "in 10m", "in 5m", "now", "now", nil])
+        #expect(soonLabel(start: now.addingTimeInterval(60), allDay: true, now: now) == nil)
+    }
+
+    @Test("a meeting link comes from the event URL, else a call link in the location or notes")
+    func meetingLinks() {
+        let own = URL(string: "https://example.com/event")!
+        #expect(meetingLink(url: own, location: nil, notes: nil) == own)
+        #expect(meetingLink(url: nil, location: "Room 4", notes: "Join: <https://acme.zoom.us/j/123?pwd=x> thanks")
+                == URL(string: "https://acme.zoom.us/j/123?pwd=x"))
+        #expect(meetingLink(url: nil, location: "https://teams.microsoft.com/l/meetup-join/abc", notes: nil)?.host
+                == "teams.microsoft.com")
+        #expect(meetingLink(url: nil, location: "https://evil.com/zoom.us", notes: "http://zoom.us/j/1") == nil)
+    }
+
     @Test("a clear pill still takes clicks")
     func clickable() {
         #expect(NSColor.clear.clickable.alphaComponent > 0)

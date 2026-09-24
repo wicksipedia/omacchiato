@@ -1044,7 +1044,44 @@ func startPlugins() {
 func updateClock() {
     let f = DateFormatter()
     f.dateFormat = "EEE dd MMM  HH:mm"
-    set("clock") { $0.icon = "󰃰"; $0.label = f.string(from: Date()) }
+    loadTodayEvents()
+    let now = Date()
+    let next = todayEvents.first { soonLabel(start: $0.startDate, allDay: $0.isAllDay, now: now) != nil }
+    soonMeetingLink = next.flatMap { meetingLink(url: $0.url, location: $0.location, notes: $0.notes) }
+    let parts = next.map { event -> [BarPart] in
+        let title = event.title ?? "event"
+        let cut = title.count > 16 ? String(title.prefix(15)) + "…" : title
+        let when = soonLabel(start: event.startDate, allDay: event.isAllDay, now: now) ?? ""
+        return [BarPart(icon: "\u{F03D}", iconColor: palette.yellow, label: "\(cut) \(when)")]
+    } ?? []
+    set("clock") { $0.icon = "󰃰"; $0.label = f.string(from: now); $0.parts = parts }
+}
+
+// The clock names the next event from 10 minutes before it until
+// 5 minutes after it starts. A click then opens its meeting link.
+var soonMeetingLink: URL?
+
+func soonLabel(start: Date, allDay: Bool, now: Date) -> String? {
+    guard !allDay else { return nil }
+    let left = start.timeIntervalSince(now)
+    guard left > -5 * 60, left <= 10 * 60 else { return nil }
+    return left <= 0 ? "now" : "in \(Int((left / 60).rounded(.up)))m"
+}
+
+// The event URL if it has one, else the first video call link in the
+// location or the notes.
+func meetingLink(url: URL?, location: String?, notes: String?) -> URL? {
+    if let url, url.scheme == "https" { return url }
+    let hosts = ["teams.microsoft.com", "teams.live.com", "zoom.us", "meet.google.com", "webex.com", "whereby.com"]
+    for text in [location, notes].compactMap({ $0 }) {
+        for word in text.split(whereSeparator: { $0.isWhitespace || "<>\"()".contains($0) }) {
+            guard let link = URL(string: String(word)), link.scheme == "https",
+                  let host = link.host?.lowercased(),
+                  hosts.contains(where: { host == $0 || host.hasSuffix("." + $0) }) else { continue }
+            return link
+        }
+    }
+    return nil
 }
 
 // --- battery (IOPS publishes, capacity ticks included)
@@ -2190,6 +2227,7 @@ func loadTodayEvents() {
             eventsDay = start
             eventsAt = Date.timeIntervalSinceReferenceDate
             eventsLoading = false
+            updateClock()
             if openPopup == "clock" { refreshPopup() }
         }
     }
@@ -2233,6 +2271,8 @@ func eventRows() -> [PopupRow] {
                              text: event.isAllDay ? cut : time.string(from: event.startDate) + "  " + cut,
                              detail: event.isAllDay ? "all day" : countdown(to: event, now: now),
                              highlight: index == 0,
+                             action: meetingLink(url: event.url, location: event.location, notes: event.notes)
+                                 .map { link in { closePopup(); NSWorkspace.shared.open(link) } },
                              iconTint: event.calendar.cgColor.flatMap { NSColor(cgColor: $0) }))
     }
     return rows
@@ -4036,6 +4076,11 @@ final class BarView: NSView {
         }
         guard let name = hit(event) else {
             closePopup()
+            return
+        }
+        if name == "clock", let link = soonMeetingLink {
+            closePopup()
+            NSWorkspace.shared.open(link)
             return
         }
         // an item with a popup toggles it; the rest still act directly

@@ -208,7 +208,11 @@ Left to right:
   speedometer joins the cell in low or high power mode, and a thermal
   row appears when the system reports anything above nominal.
 - **Clock**: a calendar popup. Click a week to open it in Calendar,
-  and read what is left of today under the grid.
+  and read what is left of today under the grid. Click an event with a
+  Teams, Zoom, Meet or Webex link to join it. From 10 minutes before an
+  event until 5 minutes after it starts, the pill names it in yellow,
+  such as "Standup in 5m". If the event has a call link, a click on the
+  pill then joins the call and does not open the popup.
 - **Activity**: btop in a floating terminal.
 
 <table>
