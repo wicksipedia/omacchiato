@@ -3820,17 +3820,19 @@ func drawHand(_ icons: [NSImage], ring: Int?, centeredIn box: NSRect) {
         if ring == 0 { drawRing(only) }
         return
     }
-    // Smaller cards keep the fan clear of the next chip's icon.
-    let card = NSRect(x: box.midX - 7.5, y: barHeight / 2 - 7.5, width: 15, height: 15)
+    // chipWidth widens the chip by handStep per extra card, so the fan keeps full-size cards.
+    let card = NSRect(x: box.midX - 9, y: barHeight / 2 - 9, width: 18, height: 18)
     let fan: [(shift: CGFloat, tilt: CGFloat)] = icons.count == 2
-        ? [(-3.5, 10), (3.5, -10)]
-        : [(-5, 12), (0, 0), (5, -12)]
+        ? [(-handStep / 2, 8), (handStep / 2, -8)]
+        : [(-handStep, 10), (0, 0), (handStep, -10)]
 
-    func posed(_ pose: (shift: CGFloat, tilt: CGFloat), _ paint: () -> Void) {
+    // The focused app's card pokes up out of the hand.
+    func posed(_ i: Int, _ paint: () -> Void) {
+        let pose = fan[i]
         NSGraphicsContext.saveGraphicsState()
         // tilt about the card's own bottom centre, then slide it by the shift
         let turn = NSAffineTransform()
-        turn.translateX(by: card.midX + pose.shift, yBy: card.minY)
+        turn.translateX(by: card.midX + pose.shift, yBy: card.minY + (i == ring ? 3 : 0))
         turn.rotate(byDegrees: pose.tilt)
         turn.translateX(by: -card.midX, yBy: -card.minY)
         turn.concat()
@@ -3838,9 +3840,9 @@ func drawHand(_ icons: [NSImage], ring: Int?, centeredIn box: NSRect) {
         NSGraphicsContext.restoreGraphicsState()
     }
 
-    for (icon, pose) in zip(icons, fan).reversed() { posed(pose) { icon.draw(in: card) } }
+    for (i, icon) in icons.prefix(fan.count).enumerated().reversed() { posed(i) { icon.draw(in: card) } }
     // the ring goes on last: the cards in front cover most of its own card
-    if let ring, ring < min(icons.count, fan.count) { posed(fan[ring]) { drawRing(card) } }
+    if let ring, ring < min(icons.count, fan.count) { posed(ring) { drawRing(card) } }
 }
 
 // The ring around the focused app's icon. It hugs the icon art, which sits
@@ -3857,9 +3859,16 @@ let barHeight: CGFloat = 34
 let padLeft: CGFloat = 10
 let chipBox: CGFloat = 20
 let chipPad: CGFloat = 2
+let handStep: CGFloat = 12
+// A workspace chip with a hand of app icons grows by handStep per extra card.
+func chipWidth(cards: Int) -> CGFloat {
+    chipBox + chipPad * 2 + handStep * CGFloat(min(max(cards, 1), 3) - 1)
+}
 let pillHeight: CGFloat = 26
 let radius: CGFloat = 4
-let gap: CGFloat = 10
+// `left_gap` and `right_gap` in bar-pills.conf set the space between pills
+let leftGap = max(0, CGFloat(Double(pillModes["left_gap"] ?? "") ?? 6))
+let rightGap = max(0, CGFloat(Double(pillModes["right_gap"] ?? "") ?? 6))
 // horizontal breathing room inside a pill, each side
 let pillPad: CGFloat = 6
 
@@ -4100,22 +4109,30 @@ final class BarView: NSView {
         // apple pill: the system menu the hidden native menu bar carried
         let appleGlyph = "\u{f179}"
         let appleFont = nerdFont("Bold", 15)
-        let appleW = inkBox(appleGlyph, appleFont).width + 20
+        let appleW = inkBox(appleGlyph, appleFont).width + pillPad * 2
         let apple = NSRect(x: padLeft, y: (barHeight - pillHeight) / 2, width: appleW, height: pillHeight)
         palette.itemBG.setFill()
         NSBezierPath(roundedRect: apple, xRadius: radius, yRadius: radius).fill()
         drawIcon(appleGlyph, appleFont, palette.accent, centeredIn: apple)
         appleRect = NSRect(x: apple.minX, y: 0, width: appleW, height: barHeight)
 
-        let bracketW = CGFloat(shown.count) * (chipBox + chipPad * 2)
-        let bracket = NSRect(x: apple.maxX + 10, y: (barHeight - pillHeight) / 2,
+        let hands = shown.map { ws -> [(String, NSImage)] in
+            switch workspaceIconConfig.icon(for: ws) {
+            case .some(.glyph), .some(.image): return []
+            default: break
+            }
+            return (model.wsApps[ws] ?? []).compactMap { name in appIcon(name).map { (name, $0) } }
+        }
+        let widths = hands.map { chipWidth(cards: $0.count) }
+        let bracketW = widths.reduce(0, +)
+        let bracket = NSRect(x: apple.maxX + leftGap, y: (barHeight - pillHeight) / 2,
                              width: bracketW, height: pillHeight)
         palette.itemBG.setFill()
         NSBezierPath(roundedRect: bracket, xRadius: radius, yRadius: radius).fill()
 
         var x = bracket.minX
-        for ws in shown {
-            let slot = NSRect(x: x, y: 0, width: chipBox + chipPad * 2, height: barHeight)
+        for (i, ws) in shown.enumerated() {
+            let slot = NSRect(x: x, y: 0, width: widths[i], height: barHeight)
             let box = slot.insetBy(dx: chipPad, dy: 0)
             // each display marks the workspace IT is showing. The
             // globally focused workspace is not a useful answer on the
@@ -4133,7 +4150,7 @@ final class BarView: NSView {
             case .some(.image(let icon)):
                 icon.draw(in: NSRect(x: box.midX - 9, y: barHeight / 2 - 9, width: 18, height: 18))
             case .some(.unavailable), .none:
-                let cards = (model.wsApps[ws] ?? []).compactMap { name in appIcon(name).map { (name, $0) } }
+                let cards = hands[i]
                 if cards.isEmpty {
                     draw(String(ws.suffix(1)), chipFont, tint, centeredIn: box)
                 } else {
@@ -4143,7 +4160,7 @@ final class BarView: NSView {
                 }
             }
             chipRects.append((ws, slot))
-            x += chipBox + chipPad * 2
+            x += widths[i]
         }
 
         // front-app pill — clickable: it drops the app's real menus
@@ -4151,8 +4168,8 @@ final class BarView: NSView {
         appPillRect = .zero
         if !model.frontApp.isEmpty {
             let textW = advance(model.frontApp, appFont)
-            let pill = NSRect(x: bracket.maxX + gap, y: (barHeight - pillHeight) / 2,
-                              width: textW + 20, height: pillHeight)
+            let pill = NSRect(x: bracket.maxX + leftGap, y: (barHeight - pillHeight) / 2,
+                              width: textW + pillPad * 2, height: pillHeight)
             palette.itemBG.setFill()
             NSBezierPath(roundedRect: pill, xRadius: radius, yRadius: radius).fill()
             draw(model.frontApp, appFont, palette.accent, centeredIn: pill)
@@ -4164,7 +4181,7 @@ final class BarView: NSView {
         // notch owns the middle
         let mediaW = mediaSize(chipFont)
         if mediaW > 0 {
-            drawMedia(at: surface.notched ? leftEdge + gap : (bounds.width - mediaW) / 2, chipFont)
+            drawMedia(at: surface.notched ? leftEdge + leftGap : (bounds.width - mediaW) / 2, chipFont)
         } else {
             marquee.hide()
         }
@@ -4203,9 +4220,9 @@ final class BarView: NSView {
             // in a gap or above a pill went to the window below. The hit
             // area runs from the screen's top edge to the bar's bottom, takes
             // half of each gap, and the last pill runs to the screen edge.
-            let hitMaxX = cursor == bounds.maxX - padLeft ? bounds.maxX : pill.maxX + gap / 2
-            let hitArea = NSRect(x: pill.minX - gap / 2, y: 0,
-                                 width: hitMaxX - pill.minX + gap / 2, height: bounds.height)
+            let hitMaxX = cursor == bounds.maxX - padLeft ? bounds.maxX : pill.maxX + rightGap / 2
+            let hitArea = NSRect(x: pill.minX - rightGap / 2, y: 0,
+                                 width: hitMaxX - pill.minX + rightGap / 2, height: bounds.height)
             NSColor.clear.clickable.setFill()
             hitArea.fill()
             palette.itemBG.setFill()
@@ -4229,7 +4246,7 @@ final class BarView: NSView {
                 x += size.icon + size.gap + size.label + partGap
             }
             itemRects.append((name, pill, hitArea))
-            cursor = pill.minX - gap
+            cursor = pill.minX - rightGap
         }
         if !tickerShown { ticker.hide() }
     }

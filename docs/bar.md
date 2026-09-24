@@ -36,6 +36,10 @@ again.
 shows before the title scrolls. The default is 28. A display with a
 notch uses five sevenths of the number, so 20 by default.
 
+`left_gap = <points>` and `right_gap = <points>` set the space between
+the pills on each side of the bar. The defaults are 6 on the left and
+6 on the right.
+
 The bar reads the file once at startup, so restart it to apply an
 edit:
 

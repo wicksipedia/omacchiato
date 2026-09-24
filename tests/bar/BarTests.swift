@@ -15,6 +15,13 @@ struct BarTests {
         #expect(layoutOrder([(900, 12, "Notes"), (6, 12, "Voice Memos")]) == ["Voice Memos", "Notes"])
     }
 
+    @Test("a workspace chip widens by one step per extra card, up to three")
+    func chipWidths() {
+        #expect(chipWidth(cards: 0) == chipWidth(cards: 1))
+        #expect(chipWidth(cards: 2) == chipWidth(cards: 1) + handStep)
+        #expect(chipWidth(cards: 5) == chipWidth(cards: 3))
+    }
+
     @Test("a hand holds three apps, each once")
     func hand() {
         #expect(handOf(["a", "b", "a", "c", "d"]) == ["a", "b", "c"])
