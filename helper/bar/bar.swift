@@ -624,6 +624,10 @@ struct BarItem: Equatable {
     // more icon and label pairs after the first, so one plugin pill can
     // show several icons in their own colours
     var parts: [BarPart] = []
+    // A second line that slides up in turn with the label, in the label's
+    // width: tickerText is cut to fit, and tickerTail always shows.
+    var tickerText = ""
+    var tickerTail = ""
 }
 
 // screen order, left to right
@@ -1113,13 +1117,12 @@ func updateClock() {
     let now = Date()
     let next = todayEvents.first { soonLabel(start: $0.startDate, allDay: $0.isAllDay, now: now) != nil }
     soonMeetingLink = next.flatMap { meetingLink(url: $0.url, location: $0.location, notes: $0.notes) }
-    let parts = next.map { event -> [BarPart] in
-        let title = event.title ?? "event"
-        let cut = title.count > 16 ? String(title.prefix(15)) + "…" : title
-        let when = soonLabel(start: event.startDate, allDay: event.isAllDay, now: now) ?? ""
-        return [BarPart(icon: "\u{F03D}", iconColor: palette.yellow, label: "\(cut) \(when)")]
-    } ?? []
-    set("clock") { $0.icon = "󰃰"; $0.label = f.string(from: now); $0.parts = parts }
+    set("clock") {
+        $0.icon = "󰃰"
+        $0.label = f.string(from: now)
+        $0.tickerText = next.map { $0.title ?? "event" } ?? ""
+        $0.tickerTail = next.flatMap { soonLabel(start: $0.startDate, allDay: $0.isAllDay, now: now) } ?? ""
+    }
 }
 
 // The clock names the next event from 10 minutes before it until
@@ -3870,6 +3873,72 @@ let terminalApp: String = {
 // The media title, drawn once into a layer with the bar's own text routine.
 // A title wider than its box scrolls: Core Animation moves the layer in the
 // render server, so the bar redraws nothing while it scrolls.
+// Slides a pill's label up to a second line and back, holding each for
+// 4 s. The pill keeps the label's width, so the second line is cut to fit.
+final class Ticker: NSView {
+    private let strip = CALayer()
+    private var content = ""
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        clipsToBounds = true
+        strip.anchorPoint = .zero
+        layer?.addSublayer(strip)
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    // clicks belong to the bar underneath
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    func hide() {
+        isHidden = true
+        content = ""
+    }
+
+    func show(_ label: String, _ text: String, _ tail: String, font: NSFont,
+              colors: (NSColor, NSColor), in box: NSRect) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
+        isHidden = false
+        frame = box
+        let second = fit(text, font, box.width - advance(" " + tail, font)) + " " + tail
+        let key = "\(label)|\(second)|\(font)|\(colors)|\(box.size)"
+        guard key != content else { return }
+        content = key
+        // three lines from the top: label, second, label again, so the loop
+        // ends where it starts
+        let h = box.height
+        let size = NSSize(width: box.width, height: h * 3)
+        strip.contents = NSImage(size: size, flipped: false) { _ in
+            for (index, (line, color)) in [(label, colors.0), (second, colors.1), (label, colors.0)].enumerated() {
+                let midY = h * CGFloat(2 - index) + h / 2
+                drawLine(line, font, color, baseline: CGPoint(x: 0, y: midY - font.capHeight / 2))
+            }
+            return true
+        }
+        strip.contentsScale = window?.backingScaleFactor ?? 2
+        strip.frame = NSRect(x: 0, y: -2 * h, width: size.width, height: size.height)
+        strip.removeAllAnimations()
+        let hold: CFTimeInterval = 4
+        let slide = CFTimeInterval(dur(0.4))
+        let total = 2 * (hold + slide)
+        let cycle = CAKeyframeAnimation(keyPath: "transform.translation.y")
+        cycle.values = [0, 0, h, h, 2 * h]
+        cycle.keyTimes = [0, hold, hold + slide, 2 * hold + slide, total].map { NSNumber(value: $0 / total) }
+        if slide == 0 {
+            // Reduce motion: swap the lines with no slide. Discrete takes one more key time than values.
+            cycle.calculationMode = .discrete
+            cycle.values = [0, h]
+            cycle.keyTimes = [0, 0.5, 1]
+        }
+        cycle.duration = total
+        cycle.repeatCount = .infinity
+        strip.add(cycle, forKey: "tick")
+    }
+}
+
 final class Marquee: NSView {
     private let strip = CALayer()
     private var content = ""
@@ -3928,10 +3997,12 @@ final class Marquee: NSView {
 final class BarView: NSView {
     weak var surface: BarSurface?
     let marquee = Marquee()
+    let ticker = Ticker()
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         addSubview(marquee)
+        addSubview(ticker)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
     var chipRects: [(String, NSRect)] = []
@@ -4085,6 +4156,7 @@ final class BarView: NSView {
         // right cluster: laid out from the right edge inwards, so a pill
         // changing width never shifts the ones outside it
         var cursor = bounds.maxX - padLeft
+        var tickerShown = false
         for name in rightOrder.reversed() {
             guard let item = rightItems[name], item.drawing else { continue }
             let parts = ([BarPart(icon: item.icon, iconColor: item.iconColor, label: item.label)] + item.parts)
@@ -4128,15 +4200,22 @@ final class BarView: NSView {
                     drawIcon(part.icon, iconFont, part.iconColor ?? palette.label,
                              centeredIn: NSRect(x: x, y: pill.minY, width: size.icon, height: pill.height))
                 }
-                if size.label > 0 {
+                let labelX = x + size.icon + size.gap
+                if size.label > 0, part.label == item.label, !item.tickerText.isEmpty, !tickerShown {
+                    ticker.show(item.label, item.tickerText, item.tickerTail, font: labelFont,
+                                colors: (item.labelColor ?? palette.label, palette.yellow),
+                                in: NSRect(x: labelX, y: pill.minY, width: size.label, height: pill.height))
+                    tickerShown = true
+                } else if size.label > 0 {
                     drawText(part.label, labelFont, item.labelColor ?? palette.label,
-                             leftAt: x + size.icon + size.gap, midY: pill.midY)
+                             leftAt: labelX, midY: pill.midY)
                 }
                 x += size.icon + size.gap + size.label + partGap
             }
             itemRects.append((name, pill, hitArea))
             cursor = pill.minX - gap
         }
+        if !tickerShown { ticker.hide() }
     }
 
 
