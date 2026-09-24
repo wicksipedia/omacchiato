@@ -827,7 +827,7 @@ func shell(_ launch: String, _ args: [String], env: [String: String]? = nil,
     p.standardOutput = pipe
     p.standardError = FileHandle.nullDevice
     guard (try? p.run()) != nil else { return "" }
-    let kill = DispatchWorkItem {
+    let stop = DispatchWorkItem {
         guard p.isRunning else { return }
         tlog("shell timeout \(launch) \(args.prefix(2).joined(separator: " "))")
         var tree = [p.processIdentifier]
@@ -839,9 +839,9 @@ func shell(_ launch: String, _ args: [String], env: [String: String]? = nil,
         }
         for pid in tree { kill(pid, SIGTERM) }
     }
-    if let timeout { DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: kill) }
+    if let timeout { DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: stop) }
     let out = pipe.fileHandleForReading.readDataToEndOfFile()
-    kill.cancel()
+    stop.cancel()
     p.waitUntilExit()
     return String(data: out, encoding: .utf8) ?? ""
 }
