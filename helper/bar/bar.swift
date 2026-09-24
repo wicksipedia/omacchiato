@@ -3755,16 +3755,13 @@ final class BarView: NSView {
     override var isFlipped: Bool { false }
 
     // the media capsule: artwork, then the title. The title box keeps the
-    // old character cap, and a longer title scrolls inside it.
-    private func mediaLayout(_ titleFont: NSFont) -> (width: CGFloat, art: NSRect?, title: NSRect) {
-        var x: CGFloat = 10
-        var art: NSRect?
-        if mediaArt != nil {
-            // 8 pt makes the gap before the art match the gap before the app name
-            let inset = (pillHeight - mediaArtSide) / 2
-            art = NSRect(x: 8, y: inset, width: mediaArtSide, height: mediaArtSide)
-            x = 8 + mediaArtSide + 8
-        }
+    // old character cap, and a longer title scrolls inside it. The art slot
+    // is always there, so the title does not move while the art loads.
+    private func mediaLayout(_ titleFont: NSFont) -> (width: CGFloat, art: NSRect, title: NSRect) {
+        // 8 pt makes the gap before the art match the gap before the app name
+        let inset = (pillHeight - mediaArtSide) / 2
+        let art = NSRect(x: 8, y: inset, width: mediaArtSide, height: mediaArtSide)
+        let x = 8 + mediaArtSide + 8
         // `media = <characters>` in bar-pills.conf; a notch leaves the left
         // cluster less room, so a notched display takes five sevenths of it
         let chars = Int(pillModes["media"] ?? "") ?? 28
@@ -3784,12 +3781,17 @@ final class BarView: NSView {
         let pill = NSRect(x: origin, y: (barHeight - pillHeight) / 2, width: layout.width, height: pillHeight)
         palette.itemBG.setFill()
         NSBezierPath(roundedRect: pill, xRadius: radius, yRadius: radius).fill()
-        if let art = layout.art, let image = mediaArt {
-            let r = art.offsetBy(dx: pill.minX, dy: pill.minY)
+        let r = layout.art.offsetBy(dx: pill.minX, dy: pill.minY)
+        if let image = mediaArt {
             NSGraphicsContext.saveGraphicsState()
             NSBezierPath(roundedRect: r, xRadius: 3, yRadius: 3).addClip()
             image.draw(in: r)
             NSGraphicsContext.restoreGraphicsState()
+        } else {
+            // placeholder while the art loads, or for a track with no art
+            palette.muted.withAlphaComponent(0.2).setFill()
+            NSBezierPath(roundedRect: r, xRadius: 3, yRadius: 3).fill()
+            draw("\u{F075A}", nerdFont("Bold", 12), palette.muted, centeredIn: r)
         }
         marquee.show(model.media.title, font: titleFont, color: palette.label,
                      in: layout.title.offsetBy(dx: pill.minX, dy: pill.minY))
