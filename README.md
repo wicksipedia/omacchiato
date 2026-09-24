@@ -491,6 +491,9 @@ windows, which macOS's own switcher does not.
 | Scroll on the volume or brightness pill | adjust in 5% steps; brightness keeps going past zero into the shade |
 | Scroll on the workspace chips | step to the next or previous workspace, the way the volume goes up or down |
 | Scroll on the media title | next or previous track |
+| Middle-click the volume pill | mute or unmute |
+| Middle-click the wi-fi pill | turn wi-fi off or on |
+| Middle-click the media title | play or pause |
 | Click the activity pill | btop in a floating terminal |
 | Click the media title | open Music |
 

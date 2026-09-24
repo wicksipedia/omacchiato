@@ -1228,6 +1228,16 @@ func readVolume() -> (percent: Int, muted: Bool)? {
     return (Int((level * 100).rounded()), muted != 0)
 }
 
+func toggleMute() {
+    let dev = defaultOutputDevice()
+    guard dev != 0, let now = readVolume() else { return }
+    var value: UInt32 = now.muted ? 0 : 1
+    var addr = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyMute,
+                                          mScope: kAudioDevicePropertyScopeOutput,
+                                          mElement: kAudioObjectPropertyElementMain)
+    AudioObjectSetPropertyData(dev, &addr, 0, nil, UInt32(MemoryLayout<UInt32>.size), &value)
+}
+
 func writeVolume(_ percent: Int) {
     let dev = defaultOutputDevice()
     guard dev != 0 else { return }
@@ -4042,6 +4052,25 @@ final class BarView: NSView {
         default:
             // a plugin pill: clicking asks for a fresh value now
             if let plugin = barPlugins.first(where: { $0.name == name }) { runPlugin(plugin) }
+        }
+    }
+
+    // Middle click: the quick toggle of a pill, with no popup.
+    override func otherMouseDown(with event: NSEvent) {
+        guard event.buttonNumber == 2 else { return }
+        let p = convert(event.locationInWindow, from: nil)
+        if mediaRects.contains(where: { $0.1.contains(p) }) {
+            musicCommand("playpause")
+            return
+        }
+        switch hit(event) {
+        case "volume":
+            toggleMute() // the CoreAudio listener repaints
+        case "wifi":
+            guard let interface = CWWiFiClient.shared().interface() else { return }
+            try? interface.setPower(!interface.powerOn())
+            updateWifi()
+        default: break
         }
     }
 
