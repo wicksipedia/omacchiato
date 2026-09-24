@@ -185,6 +185,25 @@ struct BarTests {
         #expect(nextSelection([], from: nil, by: 1) == nil)
     }
 
+    @Test("execute returns stderr and the exit status, and marks a timeout")
+    func executeResult() {
+        let failed = execute("/bin/sh", ["-c", "echo oops >&2; exit 3"])
+        #expect(failed.err == "oops\n")
+        #expect(failed.status == 3)
+        #expect(!failed.timedOut)
+        #expect(execute("/bin/sh", ["-c", "sleep 5"], timeout: 0.2).timedOut)
+    }
+
+    @Test("a plugin run fails on a timeout, or on a non-zero exit with no output")
+    func pluginProblems() {
+        #expect(pluginProblem(ShellResult(out: "3", status: 0), limit: 30) == nil)
+        #expect(pluginProblem(ShellResult(out: "{\"label\":\"x\"}", status: 1), limit: 30) == nil)
+        let exit = pluginProblem(ShellResult(err: "sh: gh: command not found\nmore", status: 127), limit: 30)
+        #expect(exit?.what == "failed with exit 127")
+        #expect(exit?.detail == "sh: gh: command not found")
+        #expect(pluginProblem(ShellResult(timedOut: true), limit: 120)?.what == "no answer in 120 s")
+    }
+
     @Test("a clear pill still takes clicks")
     func clickable() {
         #expect(NSColor.clear.clickable.alphaComponent > 0)

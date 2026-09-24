@@ -65,6 +65,14 @@ command = ps -A -o %cpu | awk '{s+=$1} END {printf "%.0f%%", s/8}'
 interval = 5
 ```
 
+If a run fails, the pill keeps its last label in the muted colour, and
+its popup starts with the error: "no answer in 120 s" when the run took
+longer than its interval (or 30 s), or "failed with exit 1" when the
+command exits non-zero and prints nothing. The first line of stderr and
+a "run again" row follow, then the rows of the last run that worked. A
+pill that hides when all is well shows a warning icon instead. The next
+run that works clears the error.
+
 Plugin pills sit at the left of the right cluster, in file order.
 Clicking one runs its command again at once. A name that matches a
 built-in pill is ignored, and so is a section with no `command`.

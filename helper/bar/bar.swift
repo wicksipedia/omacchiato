@@ -823,18 +823,40 @@ func set(_ name: String, _ mutate: (inout BarItem) -> Void) {
     tlog(String(format: "item %@ %.2f ms", name, Double(DispatchTime.now().uptimeNanoseconds - t0) / 1_000_000))
 }
 
-// After `timeout` seconds, stop the command and every process under it, and
-// return what it printed. A child of sh -c can hold the pipe open.
 func shell(_ launch: String, _ args: [String], env: [String: String]? = nil,
            timeout: TimeInterval? = nil) -> String {
+    execute(launch, args, env: env, timeout: timeout).out
+}
+
+struct ShellResult {
+    var out = ""
+    var err = ""
+    var status: Int32 = -1 // -1 when the command did not start
+    var timedOut = false
+}
+
+// After `timeout` seconds, stop the command and every process under it, and
+// return what it printed. A child of sh -c can hold the pipe open.
+func execute(_ launch: String, _ args: [String], env: [String: String]? = nil,
+             timeout: TimeInterval? = nil) -> ShellResult {
     let p = Process()
     p.executableURL = URL(fileURLWithPath: launch)
     p.arguments = args
     if let env { p.environment = env }
     let pipe = Pipe()
+    let errPipe = Pipe()
     p.standardOutput = pipe
-    p.standardError = FileHandle.nullDevice
-    guard (try? p.run()) != nil else { return "" }
+    p.standardError = errPipe
+    let started = Date()
+    guard (try? p.run()) != nil else { return ShellResult(err: "cannot start \(launch)") }
+    // read stderr at the same time, or a full stderr pipe blocks the command
+    var errData = Data()
+    let errRead = DispatchGroup()
+    errRead.enter()
+    DispatchQueue.global().async {
+        errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+        errRead.leave()
+    }
     let stop = DispatchWorkItem {
         guard p.isRunning else { return }
         tlog("shell timeout \(launch) \(args.prefix(2).joined(separator: " "))")
@@ -851,7 +873,11 @@ func shell(_ launch: String, _ args: [String], env: [String: String]? = nil,
     let out = pipe.fileHandleForReading.readDataToEndOfFile()
     stop.cancel()
     p.waitUntilExit()
-    return String(data: out, encoding: .utf8) ?? ""
+    errRead.wait()
+    let stopped = p.terminationReason == .uncaughtSignal && Date().timeIntervalSince(started) >= (timeout ?? .infinity)
+    return ShellResult(out: String(data: out, encoding: .utf8) ?? "",
+                       err: String(data: errData, encoding: .utf8) ?? "",
+                       status: p.terminationStatus, timedOut: stopped)
 }
 
 // The command is argv to sh, never spliced into a shell string: the
@@ -991,12 +1017,50 @@ struct RunGate {
 }
 var pluginGate = RunGate() // main thread only
 
+// A run failed if it timed out, or if it exited non-zero and printed
+// nothing. The answer is the problem and stderr's first line, for the popup.
+func pluginProblem(_ result: ShellResult, limit: TimeInterval) -> (what: String, detail: String)? {
+    let firstErr = result.err.split(separator: "\n").first.map { String($0.prefix(60)) } ?? ""
+    if result.timedOut { return ("no answer in \(Int(limit)) s", firstErr) }
+    guard result.status != 0, result.out.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+    return ("failed with exit \(result.status)", firstErr)
+}
+
+// the rows of the last run that worked, shown under an error
+var pluginGoodRows: [String: [PopupRow]] = [:]
+
+// Keep the last label but dim it, and put the error at the top of the
+// popup. A pill that hides when all is well shows a warning icon instead.
+func showPluginProblem(_ plugin: BarPlugin, _ problem: (what: String, detail: String)) {
+    tlog("plugin \(plugin.name): \(problem.what) \(problem.detail)")
+    var rows = [PopupRow(icon: "\u{F071}", text: problem.what, tint: palette.red, iconTint: palette.red)]
+    if !problem.detail.isEmpty { rows.append(PopupRow(text: problem.detail, dim: true)) }
+    rows.append(PopupRow(text: "run again", dim: true, action: { runPlugin(plugin) }))
+    let good = pluginGoodRows[plugin.name] ?? []
+    pluginRows[plugin.name] = rows + (good.isEmpty ? [] : [PopupRow(separator: true)] + good)
+    set(plugin.name) {
+        if $0.icon.isEmpty && $0.label.isEmpty { $0.icon = "\u{F071}" }
+        $0.iconColor = palette.muted
+        $0.labelColor = palette.muted
+    }
+    if openPopup == plugin.name { refreshPopup() }
+}
+
 func runPlugin(_ plugin: BarPlugin) {
     guard Thread.isMainThread else { DispatchQueue.main.async { runPlugin(plugin) }; return }
     guard pluginGate.start(plugin.name) else { return }
     DispatchQueue.global(qos: .utility).async {
         let env = pluginEnv(plugin)
-        let out = shell("/bin/sh", ["-c", plugin.command], env: env, timeout: max(plugin.interval, 30))
+        let limit = max(plugin.interval, 30)
+        let result = execute("/bin/sh", ["-c", plugin.command], env: env, timeout: limit)
+        if let problem = pluginProblem(result, limit: limit) {
+            DispatchQueue.main.async {
+                if pluginGate.finish(plugin.name) { runPlugin(plugin) }
+                showPluginProblem(plugin, problem)
+            }
+            return
+        }
+        let out = result.out
         // A command may answer with a JSON object to set a colour and
         // popup rows. Anything else is a plain label, which stays the
         // common case and needs no quoting.
@@ -1010,7 +1074,8 @@ func runPlugin(_ plugin: BarPlugin) {
         let rawParts = obj?["parts"] as? [[String: Any]] ?? []
         DispatchQueue.main.async {
             if pluginGate.finish(plugin.name) { runPlugin(plugin) }
-            pluginRows[plugin.name] = pluginPopupRows(obj?["rows"] as? [[String: Any]] ?? [], of: plugin)
+            pluginGoodRows[plugin.name] = pluginPopupRows(obj?["rows"] as? [[String: Any]] ?? [], of: plugin)
+            pluginRows[plugin.name] = pluginGoodRows[plugin.name]
             let color = pluginColor(obj?["color"] as? String)
             let icon = obj?["icon"] as? String ?? plugin.icon
             let parts = rawParts.map {
