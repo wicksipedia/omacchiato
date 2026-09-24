@@ -60,11 +60,23 @@ bundle() { echo "com.omacchiato.${1#omacchiato-}"; }
 request() {
   local out
   out="$(mktemp -t omacchiato-permissions)"
-  open -n -W --stdout "$out" "$APPS/$1.app" --args --request-permissions 2>/dev/null
-  # `open -W` returns at once if the app exits before `open` finds it
-  while ! grep -q '^done' "$out" && pgrep -qf -- "$1 --request-permissions"; do
+  open -n -W --stdout "$out" "$APPS/$1.app" --args --request-permissions 2>/dev/null &
+  local opener=$! ticks=0
+  # `open -W` returns at once if the app exits before `open` finds it.
+  # The limit leaves time to answer a dialog, and stops a hung app.
+  while ! grep -q '^done' "$out"; do
+    if ! kill -0 "$opener" 2>/dev/null && ! pgrep -qf -- "$1 --request-permissions"; then
+      break
+    fi
+    ticks=$((ticks + 1))
+    if [ "$ticks" -ge 600 ]; then
+      echo "  $1 gave no answer in 120 s" >&2
+      pkill -f -- "$1 --request-permissions"
+      break
+    fi
     sleep 0.2
   done
+  wait "$opener" 2>/dev/null
   grep -v '^done' "$out"
   rm -f "$out"
 }
