@@ -22,6 +22,15 @@ struct BarTests {
         #expect(chipWidth(cards: 5) == chipWidth(cards: 3))
     }
 
+    @Test("a click lands on the card under it, left to right")
+    func handClick() {
+        let slot = NSRect(x: 100, y: 0, width: 48, height: 34)
+        #expect(handIndex(at: 100, in: slot, count: 3) == 0)
+        #expect(handIndex(at: 124, in: slot, count: 3) == 1)
+        #expect(handIndex(at: 148, in: slot, count: 3) == 2)
+        #expect(handIndex(at: 130, in: slot, count: 1) == 0)
+    }
+
     @Test("a hand holds three apps, each once")
     func hand() {
         #expect(handOf(["a", "b", "a", "c", "d"]) == ["a", "b", "c"])

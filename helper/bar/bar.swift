@@ -138,6 +138,23 @@ func focusWorkspace(_ ws: String) {
     omniwmctl(["workspace", "focus-name", ws])
 }
 
+// A click on one card of a chip's hand focuses that app's window.
+func focusApp(_ app: String, on ws: String) {
+    let wins = omniQuery("windows", ["--fields", "id,workspace,app"])?["windows"] as? [[String: Any]] ?? []
+    // ponytail: the first window of the app wins; a hand shows each app once
+    guard let id = wins.first(where: {
+        ($0["workspace"] as? [String: Any])?["rawName"] as? String == ws
+            && ($0["app"] as? [String: Any])?["name"] as? String == app
+    })?["id"] as? String else { return focusWorkspace(ws) }
+    omniwmctl(["window", "navigate", id])
+}
+
+// The card under x in a chip whose hand holds `count` cards, left to right.
+func handIndex(at x: CGFloat, in slot: NSRect, count: Int) -> Int {
+    let n = min(count, 3)
+    return min(n - 1, max(0, Int((x - slot.minX) / slot.width * CGFloat(n))))
+}
+
 let logURL = URL(fileURLWithPath: "/tmp/omacchiato-bar.log")
 func tlog(_ m: String) {
     let line = "\(Date()) \(m)\n"
@@ -4014,7 +4031,7 @@ final class BarView: NSView {
         addSubview(ticker)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
-    var chipRects: [(String, NSRect)] = []
+    var chipRects: [(String, NSRect, [String])] = []
     // the pill a popup hangs under, and the larger area that takes its clicks
     var itemRects: [(String, pill: NSRect, hit: NSRect)] = []
     var mediaRects: [(String, NSRect)] = []
@@ -4143,7 +4160,7 @@ final class BarView: NSView {
                     drawHand(cards.map { $0.1 }, ring: ring, centeredIn: box)
                 }
             }
-            chipRects.append((ws, slot))
+            chipRects.append((ws, slot, hands[i].map(\.0)))
             x += widths[i]
         }
 
@@ -4289,8 +4306,11 @@ final class BarView: NSView {
             showItemPopup("apple")
             return
         }
-        if let ws = chipRects.first(where: { $0.1.contains(p) })?.0 {
-            DispatchQueue.global(qos: .userInitiated).async { focusWorkspace(ws) }
+        if let (ws, slot, apps) = chipRects.first(where: { $0.1.contains(p) }) {
+            DispatchQueue.global(qos: .userInitiated).async {
+                if apps.isEmpty { focusWorkspace(ws) }
+                else { focusApp(apps[handIndex(at: p.x, in: slot, count: apps.count)], on: ws) }
+            }
             return
         }
         if let part = mediaRects.first(where: { $0.1.contains(p) })?.0 {
