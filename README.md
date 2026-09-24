@@ -153,7 +153,8 @@ Left to right:
   workspaces. A chip shows the icons of up to three apps on the
   workspace, fanned like a hand of cards, or the workspace's digit when
   it is empty. A dot marks the workspace on show, and on it the focused
-  app wears a ring in the theme accent. Click a chip to jump.
+  app wears a ring in the theme accent. Click a chip to jump. Scroll on
+  the chips to step to the next or previous workspace.
 - **App menus**: click the front app's name and its menu bar drops into
   a popup. File, Edit and the rest drill into their real items, nested
   submenus included, and clicking a leaf performs it over AX without a
@@ -163,7 +164,8 @@ Left to right:
   too long for the pill scrolls, moved by Core Animation so the bar
   redraws nothing. It sits in the centre on a flat display, joins the
   left cluster on a notched one, and hides when Music is not running.
-  Click the title to open Music.
+  Click the title to open Music. Scroll on it to skip to the next or
+  previous track.
 
 ![The Apple menu popup under its pill: About This Mac, System Information, System Settings, App Store, Recent Items, Force Quit, Sleep, Restart, Shut Down, Lock Screen, Log Out, and Omacchiato's theme row naming the current theme at the bottom](docs/screenshots/popup-apple.png)
 
@@ -487,6 +489,8 @@ windows, which macOS's own switcher does not.
 | Click a workspace chip | jump to it |
 | Click a pill | open its popup; click a plugin pill without rows to re-run it |
 | Scroll on the volume or brightness pill | adjust in 5% steps; brightness keeps going past zero into the shade |
+| Scroll on the workspace chips | step to the next or previous workspace, the way the volume goes up or down |
+| Scroll on the media title | next or previous track |
 | Click the activity pill | btop in a floating terminal |
 | Click the media title | open Music |
 

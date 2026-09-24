@@ -514,6 +514,14 @@ func updateMedia(from info: [AnyHashable: Any]? = nil) {
                 Double(DispatchTime.now().uptimeNanoseconds - t0) / 1_000_000))
 }
 
+// "playpause", "next track" or "previous track". The Music notification repaints the pill.
+func musicCommand(_ verb: String) {
+    guard musicRunning() else { return }
+    mediaQueue.async {
+        _ = shell("/usr/bin/osascript", ["-e", "tell application \"Music\" to \(verb)"], timeout: 5)
+    }
+}
+
 // startup only: the notification fires on change, so the current track
 // has to be asked for once
 func primeMedia() {
@@ -4044,7 +4052,10 @@ final class BarView: NSView {
     private var scrollAccum: CGFloat = 0
 
     override func scrollWheel(with event: NSEvent) {
-        guard let name = hit(event) else { return }
+        let p = convert(event.locationInWindow, from: nil)
+        let onChips = chipRects.contains { $0.1.contains(p) }
+        let onMedia = mediaRects.contains { $0.1.contains(p) }
+        guard let name = onChips ? "workspaces" : onMedia ? "media" : hit(event) else { return }
         if !event.momentumPhase.isEmpty { return }
         if event.phase == .began { scrollAccum = 0 }
         scrollAccum += event.scrollingDeltaY
@@ -4053,6 +4064,13 @@ final class BarView: NSView {
         let step = scrollAccum > 0 ? 5 : -5
         scrollAccum = 0
         switch name {
+        case "workspaces":
+            let op = step > 0 ? "next" : "prev"
+            DispatchQueue.global(qos: .userInitiated).async {
+                _ = shell("\(NSHomeDirectory())/.local/bin/omacchiato-ws", [op], timeout: omniTimeout)
+            }
+        case "media":
+            musicCommand(step > 0 ? "next track" : "previous track")
         case "volume":
             guard let v = readVolume() else { return }
             writeVolume(v.percent + step) // the CoreAudio listener repaints
