@@ -89,9 +89,10 @@ void omniwm_close(omniwm* c)
 }
 
 // read one NUL-terminated line (malloc'd, newline stripped) or NULL
-static char* read_line(int fd, char* rbuf, size_t* rlen, size_t* rcap)
+static char* read_line(int fd, char** rbufp, size_t* rlen, size_t* rcap)
 {
 	for (;;) {
+		char* rbuf = *rbufp;
 		char* nl = memchr(rbuf, '\n', *rlen);
 		if (nl) {
 			size_t n = (size_t)(nl - rbuf);
@@ -102,7 +103,12 @@ static char* read_line(int fd, char* rbuf, size_t* rlen, size_t* rcap)
 			*rlen -= n + 1;
 			return line;
 		}
-		if (*rlen == *rcap) { *rcap *= 2; rbuf = realloc(rbuf, *rcap); }
+		if (*rlen == *rcap) {
+			char* grown = realloc(rbuf, *rcap * 2);
+			if (!grown) return NULL;
+			*rbufp = rbuf = grown;
+			*rcap *= 2;
+		}
 		ssize_t r = recv(fd, rbuf + *rlen, *rcap - *rlen, 0);
 		if (r <= 0) return NULL;
 		*rlen += (size_t)r;
@@ -129,7 +135,7 @@ static char* request_once(omniwm* c, const char* kind, const char* payload_json)
 			c->proto, ++c->seq, kind, c->token);
 	if (n <= 0 || (size_t)n >= sizeof req) return NULL;
 	if (!send_all(c->fd, req, (size_t)n)) return NULL;
-	return read_line(c->fd, c->rbuf, &c->rlen, &c->rcap);
+	return read_line(c->fd, &c->rbuf, &c->rlen, &c->rcap);
 }
 
 // version requests succeed regardless of protocol mismatch (their one
@@ -369,7 +375,7 @@ int omniwm_wait_window_count_above(int baseline, int timeout_ms)
 	setsockopt(s->fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);
 	int result = -1;
 	for (;;) {
-		char* line = read_line(s->fd, s->rbuf, &s->rlen, &s->rcap);
+		char* line = read_line(s->fd, &s->rbuf, &s->rlen, &s->rcap);
 		if (!line) break; // timeout or dead
 		yyjson_doc* d = yyjson_read(line, strlen(line), 0);
 		if (d) {
