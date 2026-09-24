@@ -169,20 +169,10 @@ func omniwmActive() -> Bool {
 let omniwmctlBin = NSHomeDirectory() + "/.local/bin/omacchiato-omniwmctl"
 
 @discardableResult
-func omniwmctl(_ args: [String]) -> String {
-    let p = Process()
-    p.executableURL = URL(fileURLWithPath: omniwmctlBin)
-    p.arguments = args
-    let pipe = Pipe()
-    p.standardOutput = pipe
-    p.standardError = FileHandle.nullDevice
-    guard (try? p.run()) != nil else { return "" }
-    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-    p.waitUntilExit()
-    return String(data: data, encoding: .utf8) ?? ""
-}
+func omniwmctl(_ args: [String]) -> String { shellOut(omniwmctlBin, args) }
 
-// exec a binary at an absolute path, stdout back (the omniQuery fast path)
+// Exec a binary at an absolute path and return stdout. After 2 s, stop it:
+// a hung OmniWM must not leave the overview waiting for good.
 func shellOut(_ bin: String, _ args: [String]) -> String {
     let p = Process()
     p.executableURL = URL(fileURLWithPath: bin)
@@ -191,7 +181,10 @@ func shellOut(_ bin: String, _ args: [String]) -> String {
     p.standardOutput = pipe
     p.standardError = FileHandle.nullDevice
     guard (try? p.run()) != nil else { return "" }
+    let kill = DispatchWorkItem { if p.isRunning { p.terminate() } }
+    DispatchQueue.global().asyncAfter(deadline: .now() + 2, execute: kill)
     let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    kill.cancel()
     p.waitUntilExit()
     return String(data: data, encoding: .utf8) ?? ""
 }
