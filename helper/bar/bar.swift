@@ -101,21 +101,10 @@ func omniwmActive() -> Bool {
 let omniwmctlBin = NSHomeDirectory() + "/.local/bin/omacchiato-omniwmctl"
 
 @discardableResult
-func omniwmctl(_ args: [String]) -> String { shell(omniwmctlBin, args) }
+func omniwmctl(_ args: [String]) -> String { shell(omniwmctlBin, args, timeout: omniTimeout) }
 
-// exec a binary at an absolute path, stdout back (the omniQuery fast path)
-func shellOut(_ bin: String, _ args: [String]) -> String {
-    let p = Process()
-    p.executableURL = URL(fileURLWithPath: bin)
-    p.arguments = args
-    let pipe = Pipe()
-    p.standardOutput = pipe
-    p.standardError = FileHandle.nullDevice
-    guard (try? p.run()) != nil else { return "" }
-    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-    p.waitUntilExit()
-    return String(data: data, encoding: .utf8) ?? ""
-}
+// Some callers run on the main thread, so a hung OmniWM must not hang the bar.
+let omniTimeout: TimeInterval = 2
 
 // One query, unwrapped to its payload. The CLI prints the whole
 // IPCResponse envelope; everything the bar wants lives two levels down
@@ -129,7 +118,7 @@ func omniQuery(_ name: String, _ args: [String] = []) -> [String: Any]? {
     var out = ""
     if FileManager.default.isExecutableFile(atPath: omni),
        args.isEmpty || (args.count == 2 && args[0] == "--fields") {
-        out = shellOut(omni, args.isEmpty ? ["query", name] : ["query", name, args[1]])
+        out = shell(omni, args.isEmpty ? ["query", name] : ["query", name, args[1]], timeout: omniTimeout)
     }
     if out.isEmpty {
         out = omniwmctl(["query", name] + args + ["--format", "json"])
@@ -391,6 +380,8 @@ struct Snapshot {
 }
 
 let rebuildQueue = DispatchQueue(label: "com.omacchiato.bar.rebuild")
+// Music can hang an Apple Event for 120 s. Keep that off the workspace queue.
+let mediaQueue = DispatchQueue(label: "com.omacchiato.bar.media")
 
 // with no window manager the snapshot is empty, and the bar draws no chips
 func fetchSnapshot() -> Snapshot {
@@ -527,12 +518,12 @@ func updateMedia(from info: [AnyHashable: Any]? = nil) {
 // has to be asked for once
 func primeMedia() {
     guard musicRunning() else { return }
-    rebuildQueue.async {
+    mediaQueue.async {
         let script = """
         tell application "Music" to if it is running then \
         return (player state as text) & "|" & artist of current track & "|" & name of current track
         """
-        let out = shell("/usr/bin/osascript", ["-e", script])
+        let out = shell("/usr/bin/osascript", ["-e", script], timeout: 5)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let parts = out.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
         guard parts.count == 3 else { return }
@@ -559,9 +550,10 @@ func fetchMediaArt() {
     mediaArtTitle = title
     mediaArt = nil
     guard !title.isEmpty else { return }
-    rebuildQueue.async {
+    mediaQueue.async {
         let out = shell("/usr/bin/osascript", ["-e",
-            "tell application \"Music\" to if it is running then return raw data of artwork 1 of current track"])
+            "tell application \"Music\" to if it is running then return raw data of artwork 1 of current track"],
+            timeout: 5)
         let image = imageFromAppleScriptData(out).map { thumbnail($0, side: mediaArtSide) }
         DispatchQueue.main.async {
             guard mediaArtTitle == title else { return }
@@ -823,7 +815,10 @@ func set(_ name: String, _ mutate: (inout BarItem) -> Void) {
     tlog(String(format: "item %@ %.2f ms", name, Double(DispatchTime.now().uptimeNanoseconds - t0) / 1_000_000))
 }
 
-func shell(_ launch: String, _ args: [String], env: [String: String]? = nil) -> String {
+// After `timeout` seconds, stop the command and every process under it, and
+// return what it printed. A child of sh -c can hold the pipe open.
+func shell(_ launch: String, _ args: [String], env: [String: String]? = nil,
+           timeout: TimeInterval? = nil) -> String {
     let p = Process()
     p.executableURL = URL(fileURLWithPath: launch)
     p.arguments = args
@@ -832,7 +827,21 @@ func shell(_ launch: String, _ args: [String], env: [String: String]? = nil) -> 
     p.standardOutput = pipe
     p.standardError = FileHandle.nullDevice
     guard (try? p.run()) != nil else { return "" }
+    let kill = DispatchWorkItem {
+        guard p.isRunning else { return }
+        tlog("shell timeout \(launch) \(args.prefix(2).joined(separator: " "))")
+        var tree = [p.processIdentifier]
+        var next = 0
+        while next < tree.count {
+            tree += shell("/usr/bin/pgrep", ["-P", String(tree[next])])
+                .split(separator: "\n").compactMap { pid_t($0) }
+            next += 1
+        }
+        for pid in tree { kill(pid, SIGTERM) }
+    }
+    if let timeout { DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: kill) }
     let out = pipe.fileHandleForReading.readDataToEndOfFile()
+    kill.cancel()
     p.waitUntilExit()
     return String(data: out, encoding: .utf8) ?? ""
 }
@@ -1557,6 +1566,11 @@ final class BluetoothWatcher: NSObject, CBCentralManagerDelegate {
 
     @objc func changed(_ note: IOBluetoothUserNotification, device: IOBluetoothDevice) {
         DispatchQueue.main.async { updateBluetooth() }
+    }
+
+    @objc func connectionComplete(_ device: IOBluetoothDevice, status: IOReturn) {
+        if status != kIOReturnSuccess { tlog("bluetooth: connect \(device.name ?? "?") failed \(status)") }
+        DispatchQueue.main.async { updateBluetooth(); refreshPopup() }
     }
 
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
@@ -2604,7 +2618,8 @@ func bluetoothRows() -> [PopupRow] {
         rows.append(PopupRow(icon: device.isConnected() ? "󰂱" : "󰂯", text: name,
                              highlight: device.isConnected(),
                              action: {
-                                 if device.isConnected() { device.closeConnection() } else { device.openConnection() }
+                                 // with a target, the connect runs async: a device out of range blocks for seconds
+                                 if device.isConnected() { device.closeConnection() } else { device.openConnection(bluetoothWatcher) }
                                  updateBluetooth()
                                  refreshPopup()
                              }))
@@ -2703,6 +2718,10 @@ struct MenuBarItem {
 }
 
 // Call off the main thread: each app costs an Accessibility round trip.
+// A hung app answers no AX call. The default wait is 6 s per call, and the
+// app menu reads the front app on the main thread.
+let axTimeout: Float = 0.25
+
 func menuBarItems() -> [MenuBarItem] {
     let own = ProcessInfo.processInfo.processIdentifier
     var items: [MenuBarItem] = []
@@ -2710,7 +2729,7 @@ func menuBarItems() -> [MenuBarItem] {
         guard app.processIdentifier != own,
               let id = app.bundleIdentifier, !id.hasPrefix("com.apple.") else { continue }
         let ax = AXUIElementCreateApplication(app.processIdentifier)
-        AXUIElementSetMessagingTimeout(ax, 0.25) // a hung app must not stall the scan
+        AXUIElementSetMessagingTimeout(ax, axTimeout)
         var ref: CFTypeRef?
         guard AXUIElementCopyAttributeValue(ax, "AXExtrasMenuBar" as CFString, &ref) == .success,
               let extras = ref, CFGetTypeID(extras) == AXUIElementGetTypeID() else { continue }
@@ -2911,6 +2930,8 @@ private func axChildren(_ element: AXUIElement) -> [AXUIElement] {
     var ref: CFTypeRef?
     guard AXUIElementCopyAttributeValue(element, "AXChildren" as CFString, &ref) == .success,
           let children = ref as? [AXUIElement] else { return [] }
+    // A timeout holds for one element only, so each child needs its own.
+    for child in children { AXUIElementSetMessagingTimeout(child, axTimeout) }
     return children
 }
 
@@ -3033,9 +3054,11 @@ func frontAppAXMenuBar() -> AXUIElement? {
           })
     else { return nil }
     let ax = AXUIElementCreateApplication(app.processIdentifier)
+    AXUIElementSetMessagingTimeout(ax, axTimeout)
     var ref: CFTypeRef?
     guard AXUIElementCopyAttributeValue(ax, "AXMenuBar" as CFString, &ref) == .success,
           let bar = ref, CFGetTypeID(bar) == AXUIElementGetTypeID() else { return nil }
+    AXUIElementSetMessagingTimeout(bar as! AXUIElement, axTimeout)
     return (bar as! AXUIElement)
 }
 

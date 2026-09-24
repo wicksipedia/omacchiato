@@ -135,6 +135,15 @@ struct BarTests {
         }
     }
 
+    @Test("a command that runs too long stops, and so does every process under it")
+    func shellTimeout() {
+        let start = Date()
+        #expect(shell("/bin/sh", ["-c", "echo early; sleep 10"], timeout: 0.3) == "early\n")
+        #expect(shell("/bin/sh", ["-c", "echo early; /bin/sh -c 'sleep 10; :'; :"], timeout: 0.3) == "early\n")
+        #expect(Date().timeIntervalSince(start) < 3)
+        #expect(shell("/bin/echo", ["fast"], timeout: 5) == "fast\n")
+    }
+
     @Test("a clear pill still takes clicks")
     func clickable() {
         #expect(NSColor.clear.clickable.alphaComponent > 0)
