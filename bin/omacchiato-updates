@@ -6,6 +6,7 @@ commits and has a row that runs omacchiato-update in a terminal.
 """
 
 import json
+import shlex
 import subprocess
 from pathlib import Path
 
@@ -14,6 +15,11 @@ SHOWN = 10
 
 # ~/.local/bin holds a link to this file, so resolve it to find the clone
 REPO = Path(__file__).resolve().parent.parent
+# The terminal starts with a bare PATH, so name the script by its path.
+# Wait for Return, or the window closes before you can read the result.
+UPDATE = "/bin/sh -c " + shlex.quote(
+    shlex.quote(str(REPO / "bin" / "omacchiato-update"))
+    + "; echo; printf 'Press Return to close. '; read _")
 
 
 def git(*args, timeout=10):
@@ -35,7 +41,7 @@ def pill(subjects):
     if len(subjects) > SHOWN:
         rows.append({"text": "and %d more" % (len(subjects) - SHOWN), "dim": True})
     rows += [{"separator": True},
-             {"text": "update now", "icon": UPDATE_ICON, "terminal": "omacchiato-update"}]
+             {"text": "update now", "icon": UPDATE_ICON, "terminal": UPDATE}]
     return {"icon": UPDATE_ICON, "label": str(len(subjects)), "color": "yellow", "rows": rows}
 
 

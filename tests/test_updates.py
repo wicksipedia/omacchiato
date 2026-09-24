@@ -13,7 +13,7 @@ class Pill(unittest.TestCase):
         out = updates.pill(["Fix a", "Add b"])
         self.assertEqual(out["label"], "2")
         self.assertEqual([r.get("text") for r in out["rows"][1:3]], ["Fix a", "Add b"])
-        self.assertEqual(out["rows"][-1]["terminal"], "omacchiato-update")
+        self.assertIn("/bin/omacchiato-update", out["rows"][-1]["terminal"])
 
     def test_a_long_list_is_cut(self):
         out = updates.pill(["c%d" % i for i in range(15)])
