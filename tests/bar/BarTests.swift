@@ -144,6 +144,14 @@ struct BarTests {
         #expect(shell("/bin/echo", ["fast"], timeout: 5) == "fast\n")
     }
 
+    @Test("a plugin runs once at a time, and requests during a run fold into one more run")
+    func pluginGate() {
+        var gate = RunGate()
+        let steps = [gate.start("prs"), gate.start("prs"), gate.start("prs"), gate.start("usage"),
+                     gate.finish("prs"), gate.start("prs"), gate.finish("prs"), gate.finish("usage")]
+        #expect(steps == [true, false, false, true, true, true, false, false])
+    }
+
     @Test("a clear pill still takes clicks")
     func clickable() {
         #expect(NSColor.clear.clickable.alphaComponent > 0)

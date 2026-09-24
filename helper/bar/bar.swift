@@ -962,10 +962,33 @@ func pluginEnv(_ plugin: BarPlugin) -> [String: String] {
     return env
 }
 
+// A plugin runs once at a time: a hung command must not pile up a new copy
+// on each tick, and an old answer must not overwrite a new one. Requests
+// during a run fold into one more run when it ends.
+struct RunGate {
+    var running: Set<String> = []
+    var again: Set<String> = []
+
+    mutating func start(_ name: String) -> Bool {
+        if running.insert(name).inserted { return true }
+        again.insert(name)
+        return false
+    }
+
+    // true when a request came during the run
+    mutating func finish(_ name: String) -> Bool {
+        running.remove(name)
+        return again.remove(name) != nil
+    }
+}
+var pluginGate = RunGate() // main thread only
+
 func runPlugin(_ plugin: BarPlugin) {
+    guard Thread.isMainThread else { DispatchQueue.main.async { runPlugin(plugin) }; return }
+    guard pluginGate.start(plugin.name) else { return }
     DispatchQueue.global(qos: .utility).async {
         let env = pluginEnv(plugin)
-        let out = shell("/bin/sh", ["-c", plugin.command], env: env)
+        let out = shell("/bin/sh", ["-c", plugin.command], env: env, timeout: max(plugin.interval, 30))
         // A command may answer with a JSON object to set a colour and
         // popup rows. Anything else is a plain label, which stays the
         // common case and needs no quoting.
@@ -978,6 +1001,7 @@ func runPlugin(_ plugin: BarPlugin) {
             .trimmingCharacters(in: .whitespaces).prefix(32))
         let rawParts = obj?["parts"] as? [[String: Any]] ?? []
         DispatchQueue.main.async {
+            if pluginGate.finish(plugin.name) { runPlugin(plugin) }
             pluginRows[plugin.name] = pluginPopupRows(obj?["rows"] as? [[String: Any]] ?? [], of: plugin)
             let color = pluginColor(obj?["color"] as? String)
             let icon = obj?["icon"] as? String ?? plugin.icon
