@@ -2055,6 +2055,28 @@ final class PopupView: NSView {
     override func mouseDown(with event: NSEvent) { slide(event) }
     override func mouseDragged(with event: NSEvent) { slide(event) }
 
+    // true when the key belongs to the popup
+    func key(_ code: Int) -> Bool {
+        switch code {
+        case 53: // Esc
+            closePopup()
+        case 125, 126: // ↓, ↑
+            let clickable = rowRects.map(\.0).filter { rows[$0].action != nil && rows[$0].slider == nil }
+            hoveredRow = nextSelection(clickable, from: hoveredRow, by: code == 125 ? 1 : -1)
+            if let row = hoveredRow, let rect = rowRects.first(where: { $0.0 == row })?.1 {
+                scrollToVisible(rect)
+            }
+            needsDisplay = true
+        case 36, 76: // Return, Enter
+            // with no row selected, Return still reaches the front app
+            guard let row = hoveredRow, rows.indices.contains(row), let action = rows[row].action else { return false }
+            action()
+        default:
+            return false
+        }
+        return true
+    }
+
     override func mouseUp(with event: NSEvent) {
         let p = convert(event.locationInWindow, from: nil)
         guard let (index, _) = rowRects.first(where: { $0.1.contains(p) }),
@@ -2073,6 +2095,7 @@ var openPopup: String? // which bar item owns it
 
 func closePopup() {
     if openPopup == "wifi" { stopHotspotBrowse() }
+    setPopupKeys(false)
     popupWindow?.orderOut(nil)
     popupWindow = nil
     popupView = nil
@@ -2171,6 +2194,48 @@ func showPopup(_ name: String, under anchor: NSRect, on surface: BarSurface, ali
     popupWindow = window
     popupView = view
     openPopup = name
+    setPopupKeys(true)
+}
+
+// ↑ and ↓ move through the rows of an open popup, Return clicks the row and
+// Esc closes the popup. A tap takes these keys only while a popup is open,
+// so the front app keeps its focus. A key with a modifier passes through.
+var popupKeyTap: CFMachPort?
+
+func setPopupKeys(_ on: Bool) {
+    if on, popupKeyTap == nil {
+        guard let tap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
+            eventsOfInterest: CGEventMask(1 << CGEventType.keyDown.rawValue),
+            callback: { _, type, event, _ in
+                if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+                    if let tap = popupKeyTap, popupView != nil { CGEvent.tapEnable(tap: tap, enable: true) }
+                    return Unmanaged.passUnretained(event)
+                }
+                let modifiers = event.flags.intersection([.maskCommand, .maskControl, .maskAlternate, .maskShift])
+                guard modifiers.isEmpty, let view = popupView,
+                      view.key(Int(event.getIntegerValueField(.keyboardEventKeycode))) else {
+                    return Unmanaged.passUnretained(event)
+                }
+                return nil
+            }, userInfo: nil)
+        else {
+            tlog("popup keys: no event tap, so no Accessibility grant")
+            return
+        }
+        popupKeyTap = tap
+        CFRunLoopAddSource(CFRunLoopGetMain(), CFMachPortCreateRunLoopSource(nil, tap, 0), .commonModes)
+    }
+    if let tap = popupKeyTap { CGEvent.tapEnable(tap: tap, enable: on) }
+}
+
+// The next row to select among the rows that take a click, wrapping at the ends.
+func nextSelection(_ rows: [Int], from current: Int?, by delta: Int) -> Int? {
+    guard !rows.isEmpty else { return nil }
+    guard let current, let at = rows.firstIndex(of: current) else {
+        return delta > 0 ? rows.first : rows.last
+    }
+    return rows[(at + delta + rows.count) % rows.count]
 }
 
 // --- popup content ---------------------------------------------------------

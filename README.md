@@ -498,6 +498,7 @@ windows, which macOS's own switcher does not.
 | Middle-click the volume pill | mute or unmute |
 | Middle-click the wi-fi pill | turn wi-fi off or on |
 | Middle-click the media title | play or pause |
+| ↑ / ↓, Return, Esc in an open popup | select a row, click it, close the popup |
 | Click the activity pill | btop in a floating terminal |
 | Click the media title | open Music |
 

@@ -173,6 +173,18 @@ struct BarTests {
         #expect(meetingLink(url: nil, location: "https://evil.com/zoom.us", notes: "http://zoom.us/j/1") == nil)
     }
 
+    @Test("arrow keys step through the clickable rows and wrap at the ends")
+    func popupSelection() {
+        let rows = [1, 3, 4]
+        #expect(nextSelection(rows, from: nil, by: 1) == 1)
+        #expect(nextSelection(rows, from: nil, by: -1) == 4)
+        #expect(nextSelection(rows, from: 3, by: 1) == 4)
+        #expect(nextSelection(rows, from: 4, by: 1) == 1)
+        #expect(nextSelection(rows, from: 1, by: -1) == 4)
+        #expect(nextSelection(rows, from: 2, by: 1) == 1)
+        #expect(nextSelection([], from: nil, by: 1) == nil)
+    }
+
     @Test("a clear pill still takes clicks")
     func clickable() {
         #expect(NSColor.clear.clickable.alphaComponent > 0)
