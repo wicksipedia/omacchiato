@@ -1136,6 +1136,21 @@ func soonLabel(start: Date, allDay: Bool, now: Date) -> String? {
     return left <= 0 ? "now" : "in \(Int((left / 60).rounded(.up)))m"
 }
 
+// A link that opens the event in Calendar. A repeating event shares one
+// identifier, so the link also names the start of this occurrence, in UTC.
+func calendarLink(id: String, start: Date, repeats: Bool) -> URL? {
+    guard let safe = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else { return nil }
+    var path = safe
+    if repeats {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
+        f.dateFormat = "yyyyMMdd'T'HHmmss'Z'"
+        path = f.string(from: start) + "/" + safe
+    }
+    return URL(string: "ical://ekevent/\(path)?method=show&options=more")
+}
+
 // The event URL if it has one, else the first video call link in the
 // location or the notes.
 func meetingLink(url: URL?, location: String?, notes: String?) -> URL? {
@@ -2404,7 +2419,8 @@ func eventRows() -> [PopupRow] {
                              text: event.isAllDay ? cut : time.string(from: event.startDate) + "  " + cut,
                              detail: event.isAllDay ? "all day" : countdown(to: event, now: now),
                              highlight: index == 0,
-                             action: meetingLink(url: event.url, location: event.location, notes: event.notes)
+                             action: calendarLink(id: event.calendarItemIdentifier, start: event.startDate,
+                                                  repeats: event.hasRecurrenceRules)
                                  .map { link in { closePopup(); NSWorkspace.shared.open(link) } },
                              iconTint: event.calendar.cgColor.flatMap { NSColor(cgColor: $0) }))
     }

@@ -204,6 +204,15 @@ struct BarTests {
         #expect(pluginProblem(ShellResult(timedOut: true), limit: 120)?.what == "no answer in 120 s")
     }
 
+    @Test("an event row links to the event in Calendar, with the occurrence for a repeating one")
+    func calendarLinks() {
+        let start = Date(timeIntervalSince1970: 1_790_000_000) // 2026-09-21 14:13:20 UTC
+        #expect(calendarLink(id: "ABC-1", start: start, repeats: false)?.absoluteString
+                == "ical://ekevent/ABC-1?method=show&options=more")
+        #expect(calendarLink(id: "ABC-1", start: start, repeats: true)?.absoluteString
+                == "ical://ekevent/20260921T141320Z/ABC-1?method=show&options=more")
+    }
+
     @Test("a clear pill still takes clicks")
     func clickable() {
         #expect(NSColor.clear.clickable.alphaComponent > 0)
