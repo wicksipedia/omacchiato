@@ -3069,17 +3069,6 @@ func menuBarLabel(_ raw: String, app: String) -> String {
     return label.trimmingCharacters(in: .whitespaces)
 }
 
-// macOS's "Move focus to status menus" shortcut, Ctrl+F8: it shows the
-// hidden menu bar with keyboard focus on its icons.
-func showMenuBar() {
-    let source = CGEventSource(stateID: .hidSystemState)
-    for down in [true, false] {
-        let key = CGEvent(keyboardEventSource: source, virtualKey: 100, keyDown: down)
-        key?.flags = [.maskControl, .maskSecondaryFn] // a function key carries Fn
-        key?.post(tap: .cghidEventTap)
-    }
-}
-
 func menuBarAppRows() -> [PopupRow] {
     let opts = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
     guard AXIsProcessTrustedWithOptions(opts) else {
@@ -3129,11 +3118,6 @@ func menuBarAppRows() -> [PopupRow] {
     } else {
         rows.append(PopupRow(text: "Looking…", dim: true))
     }
-    rows.append(PopupRow(separator: true))
-    rows.append(PopupRow(text: "Show menu bar", detail: "⌃F8", dim: true, action: {
-        closePopup()
-        showMenuBar()
-    }))
     return rows
 }
 

@@ -211,8 +211,6 @@ The design and the test results are in
   that app instead of a click.
 - On a notched display, a point is clickable only inside
   `NSScreen.auxiliaryTopLeftArea` or `auxiliaryTopRightArea`.
-- Ctrl+F8 (move focus to status menus) needs `.maskSecondaryFn` on the
-  event, because F8 is a function key.
 - CGWindowList layers: 24 is the menu bar window, 25 holds the status
   items, and 101 holds pop-up menus.
 

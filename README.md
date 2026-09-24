@@ -176,8 +176,7 @@ Left to right:
   a real click: the pointer moves to the top edge so the menu bar
   slides in (about 0.25 s), the bar clicks the icon, and the pointer
   moves back. An icon that the notch hides has nowhere to click, so its
-  row opens the app instead. `Show menu bar ⌃F8` reveals the menu bar
-  with keyboard focus on its icons.
+  row opens the app instead.
 - **Plugin pills**: anything you add in `bar-plugins.conf`. The
   repo ships an AI usage pill, a GitHub pull requests pill, a
   keep-awake pill and an AirPods pill; see [Plugin pills](#plugin-pills).
@@ -598,7 +597,7 @@ treats each rebuild as a new app and you re-grant after every install.
   `kCGEventTapOptionListenOnly`), so it cannot see or alter a
   keystroke. Debug logs (`/tmp/omacchiato-*.log`) carry window titles,
   app names and workspace numbers, never input. The menu bar apps pill
-  posts mouse clicks and one key chord (Ctrl+F8), and reads no keys.
+  posts mouse clicks and reads no keys.
 
 ## App choices and shell
 
