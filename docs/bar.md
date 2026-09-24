@@ -335,6 +335,30 @@ on. Reading the assertion rather than an app's saved setting means it
 still reports the truth after the app holding it quits. Clicking it
 lists what is holding the Mac awake and how long each has held it.
 
+## The CPU, memory and disk pills
+
+`omacchiato-stats cpu`, `omacchiato-stats ram` and `omacchiato-stats disk`
+each show the percentage in use. The pill turns yellow at 75 % and red
+at 90 %. The CPU popup shows the processes that use the most CPU, and
+the memory popup shows the app, wired and compressed memory and the
+processes that use the most memory. Memory counts as Activity Monitor
+counts it. The disk popup shows the free space of the startup disk and
+links to Storage settings.
+
+```
+[cpu]
+command = omacchiato-stats cpu
+interval = 5
+
+[ram]
+command = omacchiato-stats ram
+interval = 10
+
+[disk]
+command = omacchiato-stats disk
+interval = 300
+```
+
 ## The update pill
 
 `omacchiato-updates` shows the number of commits that your clone does

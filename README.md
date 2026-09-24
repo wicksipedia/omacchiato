@@ -257,6 +257,9 @@ popup rows, and the bar draws the result. The format is under
   rather than any app's saved setting, ignores the ones the system
   holds as a matter of course, and lists the holders and how long each
   has held on a click.
+- **CPU, memory and disk** (`omacchiato-stats`): the percentage in use,
+  in yellow from 75 % and red from 90 %. The popups list the processes
+  that use the most CPU or memory, and the free space on the disk.
 - **Updates** (`omacchiato-updates`): shows only when your clone has
   commits to pull, with their count. The popup lists them, and a row
   runs `omacchiato-update` in a terminal.
@@ -376,6 +379,7 @@ the code this repo absorbed, with what Omacchiato uses each for.
 | [`omacchiato-github-prs`](bin/omacchiato-github-prs) | The GitHub pull requests pill | `api.github.com` through `gh` |
 | [`omacchiato-keep-awake`](bin/omacchiato-keep-awake) | The keep-awake pill | `pmset` |
 | [`omacchiato-updates`](bin/omacchiato-updates) | The update pill | `git` |
+| [`omacchiato-stats`](bin/omacchiato-stats) | The CPU, memory and disk pills | `ps`, `vm_stat`, `sysctl` |
 | [`omacchiato-herdr-worktree`](bin/omacchiato-herdr-worktree) | herdr's `Ctrl+Alt+G` worktree picker | `git`, `herdr` |
 | [`theme-set`](bin/theme-set), [`theme-next`](bin/theme-next), [`theme-bg-next`](bin/theme-bg-next) | Themes and wallpapers | Ghostty, OmniWM, herdr |
 | [`omacchiato-ws`](bin/omacchiato-ws), [`omacchiato-ws-collapse`](bin/omacchiato-ws-collapse), [`omacchiato-spawn`](bin/omacchiato-spawn) | Workspace cycling, undocking, and spawning on the omarchy side | OmniWM over IPC |

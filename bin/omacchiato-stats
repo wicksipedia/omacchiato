@@ -1,0 +1,126 @@
+#!/usr/bin/env python3
+"""Print a bar pill for CPU, memory or disk use.
+
+omacchiato-stats cpu|ram|disk
+
+The label is the percentage in use. The popup shows the parts of the total
+and, for CPU and memory, the processes that use the most.
+"""
+
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+
+ICONS = {"cpu": "\U000f0ee0", "ram": "\U000f035b", "disk": "\U000f02ca"}
+TOP = 5
+
+
+def run(*argv):
+    try:
+        # C locale: a comma decimal in ps output would not parse
+        return subprocess.run(argv, capture_output=True, text=True, timeout=5,
+                              env=dict(os.environ, LC_ALL="C")).stdout
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def level(pct):
+    """The pill colour: yellow from 75 %, red from 90 %."""
+    return "red" if pct >= 90 else "yellow" if pct >= 75 else None
+
+
+def gb(n, unit=1e9):
+    return "%.1f GB" % (n / unit)
+
+
+def gib(n):
+    """Memory in GB as macOS counts it, which is 1024³ bytes."""
+    return gb(n, 1 << 30)
+
+
+def top_rows(ps_out, fmt):
+    """Rows for the first TOP lines of `ps -Aceo <value>=,comm=`."""
+    rows = []
+    for line in ps_out.splitlines()[:TOP]:
+        value, _, name = line.strip().partition(" ")
+        if name:
+            rows.append({"text": name.strip(), "detail": fmt(float(value)), "dim": True})
+    return rows
+
+
+def cpu_percent(ps_out, cores):
+    """ps gives each process a share of one core, so divide the sum by the cores."""
+    total = sum(float(line.split()[0]) for line in ps_out.splitlines() if line.strip())
+    return min(100.0, total / max(cores, 1))
+
+
+def cpu():
+    out = run("/bin/ps", "-Aceo", "pcpu=,comm=", "-r")
+    pct = cpu_percent(out, os.cpu_count() or 1)
+    rows = [{"text": "cpu", "hero": True, "detail": "%.0f%%" % pct},
+            {"text": "in use", "bar": pct / 100, "detail": "%d cores" % (os.cpu_count() or 1)},
+            {"separator": True}]
+    rows += top_rows(out, lambda v: "%.0f%%" % v)
+    return pct, rows
+
+
+def parse_vm_stat(text):
+    """Page counts from vm_stat by name, and the page size."""
+    size = re.search(r"page size of (\d+) bytes", text)
+    pages = {m.group(1): int(m.group(2)) for m in re.finditer(r'^"?([^":]+)"?:\s+(\d+)\.', text, re.M)}
+    return (int(size.group(1)) if size else 4096), pages
+
+
+def memory_parts(text):
+    """(app, wired, compressed) bytes, as Activity Monitor counts memory used."""
+    size, p = parse_vm_stat(text)
+    app = p.get("Anonymous pages", 0) - p.get("Pages purgeable", 0)
+    return app * size, p.get("Pages wired down", 0) * size, p.get("Pages occupied by compressor", 0) * size
+
+
+def ram():
+    total = int(run("/usr/sbin/sysctl", "-n", "hw.memsize").strip() or 0)
+    app, wired, compressed = memory_parts(run("/usr/bin/vm_stat"))
+    used = app + wired + compressed
+    pct = 100.0 * used / total if total else 0.0
+    rows = [{"text": "memory", "hero": True, "detail": "%s of %s" % (gib(used), gib(total))},
+            {"text": "in use", "bar": pct / 100, "detail": "%.0f%%" % pct},
+            {"text": "app", "detail": gib(app), "dim": True},
+            {"text": "wired", "detail": gib(wired), "dim": True},
+            {"text": "compressed", "detail": gib(compressed), "dim": True},
+            {"separator": True}]
+    # ps reports rss in KB
+    rows += top_rows(run("/bin/ps", "-Aceo", "rss=,comm=", "-m"), lambda v: gib(v * 1024))
+    return pct, rows
+
+
+def disk():
+    # APFS reports the free space of the whole container on /
+    usage = shutil.disk_usage("/")
+    used = usage.total - usage.free
+    pct = 100.0 * used / usage.total
+    rows = [{"text": "disk", "hero": True, "detail": "%s free" % gb(usage.free)},
+            {"text": "in use", "bar": pct / 100, "detail": "%s of %s" % (gb(used), gb(usage.total))},
+            {"separator": True},
+            {"text": "storage settings…", "dim": True,
+             "url": "x-apple.systempreferences:com.apple.settings.Storage"}]
+    return pct, rows
+
+
+def main():
+    kind = sys.argv[1] if len(sys.argv) > 1 else ""
+    source = {"cpu": cpu, "ram": ram, "disk": disk}.get(kind)
+    if not source:
+        sys.exit("usage: omacchiato-stats cpu|ram|disk")
+    pct, rows = source()
+    out = {"icon": ICONS[kind], "label": "%.0f%%" % pct, "rows": rows}
+    if level(pct):
+        out["color"] = level(pct)
+    print(json.dumps(out))
+
+
+if __name__ == "__main__":
+    main()
