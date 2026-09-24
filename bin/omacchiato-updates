@@ -1,0 +1,55 @@
+#!/usr/bin/env python3
+"""Print a bar pill when the omacchiato clone has commits to pull.
+
+The pill is hidden while the clone is up to date. Its popup lists the new
+commits and has a row that runs omacchiato-update in a terminal.
+"""
+
+import json
+import subprocess
+from pathlib import Path
+
+UPDATE_ICON = "\U000f06b0"
+SHOWN = 10
+
+# ~/.local/bin holds a link to this file, so resolve it to find the clone
+REPO = Path(__file__).resolve().parent.parent
+
+
+def git(*args, timeout=10):
+    """stdout of one git command in the clone, or None if it fails."""
+    try:
+        out = subprocess.run(["git", "-C", str(REPO), *args],
+                             capture_output=True, text=True, timeout=timeout)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return out.stdout if out.returncode == 0 else None
+
+
+def pill(subjects):
+    """The pill JSON for the commits that the clone does not have yet."""
+    if not subjects:
+        return {"icon": "", "label": ""}
+    rows = [{"text": "omacchiato update", "hero": True}]
+    rows += [{"text": s, "dim": True} for s in subjects[:SHOWN]]
+    if len(subjects) > SHOWN:
+        rows.append({"text": "and %d more" % (len(subjects) - SHOWN), "dim": True})
+    rows += [{"separator": True},
+             {"text": "update now", "icon": UPDATE_ICON, "terminal": "omacchiato-update"}]
+    return {"icon": UPDATE_ICON, "label": str(len(subjects)), "color": "yellow", "rows": rows}
+
+
+def main():
+    upstream = git("rev-parse", "--abbrev-ref", "@{upstream}")
+    subjects = []
+    if upstream:
+        # With no arguments, fetch uses the remote that the branch tracks.
+        # If the fetch fails, the last fetched state stays.
+        git("fetch", "--quiet", timeout=30)
+        log = git("log", "--no-merges", "--format=%s", "HEAD..@{upstream}")
+        subjects = log.splitlines() if log else []
+    print(json.dumps(pill(subjects)))
+
+
+if __name__ == "__main__":
+    main()

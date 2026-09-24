@@ -335,6 +335,20 @@ on. Reading the assertion rather than an app's saved setting means it
 still reports the truth after the app holding it quits. Clicking it
 lists what is holding the Mac awake and how long each has held it.
 
+## The update pill
+
+`omacchiato-updates` shows the number of commits that your clone does
+not have yet, and hides when there are none. It fetches the branch that
+your local branch tracks, as `omacchiato-update` does. The popup lists
+the new commits. Click "update now" to run `omacchiato-update` in a
+terminal. A fetch goes to the network, so set a long interval:
+
+```
+[updates]
+command = omacchiato-updates
+interval = 3600
+```
+
 The microphone pill is built in rather than a plugin, because
 CoreAudio costs about 65 ms to open in a fresh process and the bar
 already holds it open for the volume pill.

@@ -7,9 +7,9 @@
 # that has your own edits in it, shows what changed, and hands over to
 # install.sh.
 #
-# --check only reports whether an update exists and exits: nothing here
-# contacts the network unless you run it, which is why there is no
-# background update nag.
+# --check only reports whether an update exists and exits. Nothing here
+# contacts the network unless you run it. The omacchiato-updates pill is
+# the opt-in background check.
 set -euo pipefail
 export PATH="/opt/homebrew/bin:$PATH"
 
