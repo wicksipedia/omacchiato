@@ -4042,27 +4042,35 @@ final class BarView: NSView {
     // the media capsule: artwork, then the title. The title box keeps the
     // old character cap, and a longer title scrolls inside it. The art slot
     // is always there, so the title does not move while the art loads.
-    private func mediaLayout(_ titleFont: NSFont) -> (width: CGFloat, art: NSRect, title: NSRect) {
+    // maxWidth caps the whole pill.
+    private func mediaLayout(_ titleFont: NSFont, maxWidth: CGFloat) -> (width: CGFloat, art: NSRect, title: NSRect) {
         // 8 pt makes the gap before the art match the gap before the app name
         let inset = (pillHeight - mediaArtSide) / 2
         let art = NSRect(x: 8, y: inset, width: mediaArtSide, height: mediaArtSide)
         let x = 8 + mediaArtSide + 8
-        // `media = <characters>` in bar-pills.conf; a notch leaves the left
-        // cluster less room, so a notched display takes five sevenths of it
-        let chars = Int(pillModes["media"] ?? "") ?? 28
-        let limit = (surface?.notched ?? false) ? chars * 5 / 7 : chars
-        let cap = advance(String(repeating: "0", count: limit), titleFont)
+        let cap = max(0, maxWidth - x - 10)
         let w = min(ceil(advance(model.media.title, titleFont)), cap)
         return (x + w + 10, art, NSRect(x: x, y: 0, width: w, height: pillHeight))
     }
 
-    private func mediaSize(_ titleFont: NSFont) -> CGFloat {
-        guard model.media.running, !model.media.title.isEmpty else { return 0 }
-        return mediaLayout(titleFont).width
+    // bar-pills.conf: `media` and `media_notch` cap the title in characters,
+    // and `media_notch_fill = no` stops the pill growing up to the notch.
+    private func mediaMaxWidth(notchRoom: CGFloat?, _ titleFont: NSFont) -> CGFloat {
+        let chrome = 8 + mediaArtSide + 8 + 10
+        func chars(_ key: String, _ fallback: Int) -> CGFloat {
+            chrome + advance(String(repeating: "0", count: Int(pillModes[key] ?? "") ?? fallback), titleFont)
+        }
+        guard let room = notchRoom else { return chars("media", 28) }
+        return pillModes["media_notch_fill"] == "no" ? min(room, chars("media_notch", 20)) : room
     }
 
-    private func drawMedia(at origin: CGFloat, _ titleFont: NSFont) {
-        let layout = mediaLayout(titleFont)
+    private func mediaSize(_ titleFont: NSFont, maxWidth: CGFloat) -> CGFloat {
+        guard model.media.running, !model.media.title.isEmpty else { return 0 }
+        return mediaLayout(titleFont, maxWidth: maxWidth).width
+    }
+
+    private func drawMedia(at origin: CGFloat, _ titleFont: NSFont, maxWidth: CGFloat) {
+        let layout = mediaLayout(titleFont, maxWidth: maxWidth)
         let pill = NSRect(x: origin, y: (barHeight - pillHeight) / 2, width: layout.width, height: pillHeight)
         palette.itemBG.setFill()
         NSBezierPath(roundedRect: pill, xRadius: radius, yRadius: radius).fill()
@@ -4178,11 +4186,14 @@ final class BarView: NSView {
             leftEdge = pill.maxX
         }
 
-        // media: centred where there is room, in the left cluster where a
-        // notch owns the middle
-        let mediaW = mediaSize(chipFont)
+        // media: centred where there is room. Where a notch owns the middle,
+        // it joins the left cluster and runs up to the notch.
+        let notchX = surface.screen.auxiliaryTopLeftArea.map { $0.maxX - surface.screen.frame.minX }
+        let mediaX = leftEdge + leftGap
+        let mediaMax = mediaMaxWidth(notchRoom: notchX.map { $0 - leftGap - mediaX }, chipFont)
+        let mediaW = mediaSize(chipFont, maxWidth: mediaMax)
         if mediaW > 0 {
-            drawMedia(at: surface.notched ? leftEdge + leftGap : (bounds.width - mediaW) / 2, chipFont)
+            drawMedia(at: notchX != nil ? mediaX : (bounds.width - mediaW) / 2, chipFont, maxWidth: mediaMax)
         } else {
             marquee.hide()
         }

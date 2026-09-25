@@ -33,8 +33,13 @@ setting Accessibility > Display > Reduce transparency turns it off
 again.
 
 `media = <characters>` sets how much of the track title the music pill
-shows before the title scrolls. The default is 28. A display with a
-notch uses five sevenths of the number, so 20 by default.
+shows before the title scrolls on a display without a notch. The
+default is 28.
+
+On a display with a notch, the music pill joins the left side and
+grows up to the notch. `media_notch_fill = no` stops that, and then
+`media_notch = <characters>` sets the limit. The default is 20. The
+pill never runs under the notch.
 
 `left_gap = <points>` and `right_gap = <points>` set the space between
 the pills on each side of the bar. The defaults are 6 on the left and
