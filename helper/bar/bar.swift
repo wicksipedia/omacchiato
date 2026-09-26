@@ -732,8 +732,9 @@ func requestPermissions() -> Never {
     default: report("bluetooth", "denied")
     }
 
-    // Skip the grant of a hidden pill. Only the wi-fi rows read the location.
-    if pillModes["status"] != "hide" || (pillModes["wifi"] ?? "hide") != "hide" {
+    // Skip the grant of a hidden pill. The wi-fi rows and the weather read the location.
+    if pillModes["status"] != "hide" || (pillModes["wifi"] ?? "hide") != "hide"
+        || pillModes["weather"] != "hide" {
         let answer = PermissionAnswer()
         let manager = CLLocationManager()
         manager.delegate = answer
@@ -1585,6 +1586,33 @@ final class LocationGate: NSObject, CLLocationManagerDelegate {
     func locationManagerDidChangeAuthorization(_ m: CLLocationManager) {
         tlog("location: authorization now \(m.authorizationStatus.rawValue)")
         updateWifi()
+        if rightOrder.contains("weather") { updateWeather() }
+    }
+
+    private var located: [(CLLocationCoordinate2D?) -> Void] = []
+
+    // One position for the weather. Without the grant, or on a failure,
+    // the answer is nil and wttr.in guesses the place from the IP address.
+    func locate(_ done: @escaping (CLLocationCoordinate2D?) -> Void) {
+        guard [.authorizedAlways, .authorized].contains(manager.authorizationStatus) else { return done(nil) }
+        located.append(done)
+        manager.desiredAccuracy = kCLLocationAccuracyKilometer
+        manager.requestLocation()
+    }
+
+    private func answer(_ coordinate: CLLocationCoordinate2D?) {
+        let waiting = located
+        located = []
+        waiting.forEach { $0(coordinate) }
+    }
+
+    func locationManager(_ m: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        answer(locations.last?.coordinate)
+    }
+
+    func locationManager(_ m: CLLocationManager, didFailWithError error: Error) {
+        tlog("location: \(error.localizedDescription)")
+        answer(nil)
     }
 }
 let locationGate = LocationGate()
@@ -1815,9 +1843,19 @@ func weatherEmoji(_ code: Int, night: Bool) -> String {
     }
 }
 
+// Two decimals put the place within about a kilometre, which is all a
+// forecast needs, so the exact position never leaves the Mac.
+func weatherURL(_ coordinate: CLLocationCoordinate2D?) -> URL {
+    guard let c = coordinate else { return URL(string: "https://wttr.in/?format=j1")! }
+    return URL(string: String(format: "https://wttr.in/%.2f,%.2f?format=j1", c.latitude, c.longitude))!
+}
+
 func updateWeather() {
-    guard let url = URL(string: "https://wttr.in/?format=j1") else { return }
-    var request = URLRequest(url: url)
+    locationGate.locate(fetchWeather)
+}
+
+func fetchWeather(_ coordinate: CLLocationCoordinate2D?) {
+    var request = URLRequest(url: weatherURL(coordinate))
     request.timeoutInterval = 15
     URLSession.shared.dataTask(with: request) { data, _, _ in
         guard let data, let report = WeatherReport(j1: data) else { return }
@@ -2256,6 +2294,11 @@ func showPopup(_ name: String, under anchor: NSRect, on surface: BarSurface, ali
     popupView = view
     openPopup = name
     setPopupKeys(true)
+}
+
+// A click on a pill opens its popup only when the popup has something to show.
+func hasPopup(_ name: String) -> Bool {
+    name == "weather" ? weatherReport != nil : !popupRows(for: name).isEmpty
 }
 
 // The weather popup is a SwiftUI panel with its own sky, so it has no
@@ -4334,7 +4377,7 @@ final class BarView: NSView {
             return
         }
         // an item with a popup toggles it; the rest still act directly
-        if !popupRows(for: name).isEmpty, surface != nil {
+        if hasPopup(name), surface != nil {
             showItemPopup(name)
             return
         }

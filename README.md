@@ -557,17 +557,19 @@ Recording grant, and `Super+O` opens it with Karabiner's.
 | **Screen Recording** | `omacchiato-gesture` for a swipe, Karabiner-Elements for `Super+O`; OmniWM (optional) | Captures a thumbnail per window for the overview cards, including windows the window manager has stashed offscreen. OmniWM uses it for its own overview thumbnails, the image of a window you drag, and Hidden Bar icons. | Cards fall back to app icons and titles. OmniWM starts without it. |
 | **Bluetooth** | `omacchiato-bar` | Reads adapter power and the paired-device list for the bluetooth pill and its menu. A plugin pill runs as a child of the bar, so it reads Bluetooth with this grant: the AirPods pill needs it. | The bluetooth pill hides itself, and the AirPods pill shows no battery. |
 | **Calendar** | `omacchiato-bar` | Reads the events of the current day for the clock popup. It never writes to a calendar. | The clock popup shows a row that opens the setting instead of your day. |
-| **Location** | `omacchiato-bar` | Reads **only** the wi-fi network's name and the names of the networks in range, which macOS classes as location data. No coordinate is requested; the authorisation itself is what unlocks `CWInterface.ssid()` and the scan. | The wi-fi popup's title row reads "wi-fi" instead of your network's name, and it lists no networks to join. |
+| **Location** | `omacchiato-bar` | Reads the wi-fi network's name and the names of the networks in range, which macOS classes as location data. The weather pill also reads your position once per fetch, rounds it to about a kilometre, and sends that to wttr.in. | The wi-fi popup's title row reads "wi-fi" instead of your network's name, and it lists no networks to join. The weather comes from the place that wttr.in guesses from your IP address. |
 | **Automation** | `omacchiato-bar`, `theme-set`, and the terminal that runs `install.sh` | Apple Events to **Music** (the current track and its artwork), to **Ghostty** (reloading its colours after a theme change) to **Calendar** (opening the week you click in the clock popup) and to **System Events** (sleep, lock and restart from the Apple menu; setting the wallpaper; adding OmniWM as a login item). | The media pill has no artwork; a week click does nothing; those menu rows do nothing; OmniWM does not start at login until you add it under System Settings > General > Login Items. |
 | **Files and Folders** | `omacchiato-bar` | Only if your clone lives in `~/Documents`, `~/Desktop` or `~/Downloads`. The bar reads its palette from the theme directory inside the repo, and macOS walls launchd agents off from those folders. | The bar **hangs at startup** waiting on the prompt. Clone to `~/.local/share/omacchiato` and this never comes up. |
 | **Keychain** | tokscale, when the AI usage pill shows Claude | Reads the Claude Code sign-in token from your login keychain with `security`, to ask Anthropic for your usage. It never writes to the keychain and never refreshes the token. | The Claude section has no usage windows. |
 | **Allow in the Background** | `install.sh` (launch agents for the bar and the gesture daemon) | macOS lists the agents under System Settings > General > Login Items & Extensions. They start at login and restart if they quit. | The parts whose switch is off do not run. |
 
-On **Location**: it buys one string. The bar requests authorisation and
-then reads `ssid()`. It never asks for a position, holds no coordinate
-and starts no location updates. Measured on macOS 26.3, an unbundled
-binary reads `nil` however it is authorised, which is why the bar
-ships inside a minimal `.app`.
+On **Location**: the wi-fi rows read `ssid()`, which needs the grant
+but no position. The weather pill asks for one position at kilometre
+accuracy every 30 minutes, and starts no continuous updates. It rounds
+the position to two decimal places, about a kilometre, before it goes
+to wttr.in. `weather = hide` stops it. Measured on macOS 26.3, an
+unbundled binary reads `nil` however it is authorised, which is why
+the bar ships inside a minimal `.app`.
 
 Grants are tied to a binary's code signature. With an Apple
 Development identity present, `install.sh` signs every helper with a
@@ -578,11 +580,11 @@ treats each rebuild as a new app and you re-grant after every install.
 
 - **No telemetry, no analytics, no crash reporting.** Nothing is sent
   anywhere about you or this machine.
-- **One network call by default**: `https://wttr.in/?format=j1` on a
-  long timer, for the weather pill. wttr.in infers your city from the
-  IP the request arrives on; the bar sends no coordinates and holds no
-  location API. Delete the weather pill and nothing leaves the
-  machine. The plugin pills contact more hosts: the AI usage pill
+- **One network call by default**: `https://wttr.in/<lat>,<lon>?format=j1`
+  every 30 minutes, for the weather pill. The position is rounded to
+  about a kilometre. Without the Location grant, the request carries no
+  position and wttr.in guesses your city from your IP address. Hide the
+  weather pill and nothing leaves the machine. The plugin pills contact more hosts: the AI usage pill
   calls each provider's usage API through tokscale and each provider's
   status page, and the GitHub pill calls `api.github.com` through `gh`.
 - **Omacchiato's own binaries never run as root.** `install.sh` uses no

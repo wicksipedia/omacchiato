@@ -1,10 +1,29 @@
 import AppKit
+import CoreLocation
 import Testing
 @testable import omacchiato_bar
+import WeatherPanel
 
 // Serialized: some tests set the globals popupBarSource and NSTimeZone.default.
 @MainActor @Suite(.serialized)
 struct BarTests {
+    @Test("the weather pill opens its panel once a report has come in")
+    func weatherPopup() {
+        let saved = weatherReport
+        defer { weatherReport = saved }
+        weatherReport = nil
+        #expect(!hasPopup("weather"))
+        weatherReport = WeatherReport()
+        #expect(hasPopup("weather"))
+    }
+
+    @Test("the weather asks wttr.in for a place rounded to two decimals")
+    func weatherPlace() {
+        #expect(weatherURL(nil).absoluteString == "https://wttr.in/?format=j1")
+        #expect(weatherURL(CLLocationCoordinate2D(latitude: -32.93456, longitude: 151.71549)).absoluteString
+            == "https://wttr.in/-32.93,151.72?format=j1")
+    }
+
     @Test("windows on one frame keep the layout order")
     func parkedWindows() {
         #expect(layoutOrder([(1799, 12, "Voice Memos"), (1799, 12, "Notes")]) == ["Voice Memos", "Notes"])
