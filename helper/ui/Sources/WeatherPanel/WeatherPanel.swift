@@ -158,7 +158,8 @@ enum Sky {
         switch self {
         case .clear: return [Color(hex: 0x2F7BD8), Color(hex: 0x7DB9E8)]
         case .partly: return [Color(hex: 0x4A7FB5), Color(hex: 0x8FB3D4)]
-        case .cloudy, .fog: return [Color(hex: 0x5F6D7C), Color(hex: 0x98A5B3)]
+        case .cloudy: return [Color(hex: 0x4F5B68), Color(hex: 0x8793A0)]
+        case .fog: return [Color(hex: 0x8C959D), Color(hex: 0xAEB5BB)]
         case .drizzle, .rain, .heavy: return [Color(hex: 0x3F4B5B), Color(hex: 0x6B7A8F)]
         case .storm: return [Color(hex: 0x252B36), Color(hex: 0x4C566A)]
         case .snow: return [Color(hex: 0x8A9BB0), Color(hex: 0xC9D5E2)]
@@ -195,8 +196,11 @@ public struct WeatherPanel: View {
         .padding(14)
         .frame(width: 340)
         .foregroundStyle(.white)
-        .background(LinearGradient(colors: Sky(code: report.code).sky(night: report.night),
-                                   startPoint: .top, endPoint: .bottom))
+        .background {
+            LinearGradient(colors: Sky(code: report.code).sky(night: report.night),
+                           startPoint: .top, endPoint: .bottom)
+            SkyEffects(sky: Sky(code: report.code), night: report.night)
+        }
     }
 
     var header: some View {
@@ -351,7 +355,8 @@ extension WeatherReport {
         r.temp = temp
         r.feels = temp - 2
         let names: [Int: String] = [113: night ? "Clear" : "Sunny", 116: "Partly cloudy",
-                                    389: "Thunderstorm", 338: "Heavy snow"]
+                                    122: "Overcast", 248: "Fog", 296: "Light rain",
+                                    308: "Heavy rain", 389: "Thunderstorm", 338: "Heavy snow"]
         r.desc = names[code] ?? "Weather"
         r.code = code
         r.night = night
@@ -379,6 +384,11 @@ extension WeatherReport {
 #Preview("wttr.in answer") { WeatherPanel(report: .fixture) }
 #Preview("sunny") { WeatherPanel(report: .sample(113)) }
 #Preview("clear night") { WeatherPanel(report: .sample(113, night: true, temp: 14)) }
+#Preview("partly cloudy") { WeatherPanel(report: .sample(116, temp: 21)) }
+#Preview("overcast") { WeatherPanel(report: .sample(122, temp: 17)) }
+#Preview("fog") { WeatherPanel(report: .sample(248, temp: 11)) }
+#Preview("light rain") { WeatherPanel(report: .sample(296, temp: 16)) }
+#Preview("heavy rain") { WeatherPanel(report: .sample(308, temp: 15)) }
 #Preview("storm") { WeatherPanel(report: .sample(389, temp: 19)) }
 #Preview("snow") { WeatherPanel(report: .sample(338, temp: -2)) }
 #endif
