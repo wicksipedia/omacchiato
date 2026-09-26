@@ -35,9 +35,11 @@ import IOBluetooth
 import IOKit.ps
 import SystemConfiguration
 import UniformTypeIdentifiers
-// swiftc builds helper/gauge into this module, and SwiftPM builds it as its own.
+// swiftc builds helper/ui into this module, and SwiftPM builds it as its own.
+import SwiftUI
 #if canImport(StatusGauge)
 import StatusGauge
+import WeatherPanel
 #endif
 
 // DisplayServices (private) — the same calls Control Center makes, and
@@ -1795,30 +1797,10 @@ func statusRows() -> [PopupRow] {
 }
 
 // --- weather (no publisher; wttr.in, refreshed on a long timer)
-// One j1 fetch feeds both the pill and its popup — weather.sh does the
-// same, via a cache file it writes atomically because a click can read it
-// mid-write. In one process the struct IS the cache and that race cannot
-// be expressed.
+// One j1 fetch feeds both the pill and its popup.
 
-struct Weather {
-    var emoji = ""
-    var temp = ""
-    var desc = ""
-    var feels = ""
-    var low = ""
-    var high = ""
-    var wind = ""
-    var humidity = ""
-    var rain = ""
-    var sunrise = ""
-    var sunset = ""
-    var moon = ""
-    var location = ""
-}
+var weatherReport: WeatherReport?
 
-var weather: Weather?
-
-// WWO condition code -> glyph, night-aware for the clear/partly pair
 func weatherEmoji(_ code: Int, night: Bool) -> String {
     switch code {
     case 113: return night ? "🌙" : "☀️"
@@ -1833,86 +1815,18 @@ func weatherEmoji(_ code: Int, night: Bool) -> String {
     }
 }
 
-func moonEmoji(_ phase: String) -> String {
-    switch phase {
-    case "New Moon": return "🌑"
-    case "Waxing Crescent": return "🌒"
-    case "First Quarter": return "🌓"
-    case "Waxing Gibbous": return "🌔"
-    case "Full Moon": return "🌕"
-    case "Waning Gibbous": return "🌖"
-    case "Last Quarter", "Third Quarter": return "🌗"
-    case "Waning Crescent": return "🌘"
-    default: return "🌙"
-    }
-}
-
 func updateWeather() {
     guard let url = URL(string: "https://wttr.in/?format=j1") else { return }
     var request = URLRequest(url: url)
     request.timeoutInterval = 15
     URLSession.shared.dataTask(with: request) { data, _, _ in
-        guard let data,
-              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let current = (root["current_condition"] as? [[String: Any]])?.first,
-              let today = (root["weather"] as? [[String: Any]])?.first
-        else { return }
-
-        func text(_ d: [String: Any], _ key: String) -> String { d[key] as? String ?? "" }
-        func nested(_ d: [String: Any], _ key: String) -> String {
-            ((d[key] as? [[String: Any]])?.first?["value"] as? String) ?? ""
-        }
-
-        var w = Weather()
-        let hour = Calendar.current.component(.hour, from: Date())
-        w.emoji = weatherEmoji(Int(text(current, "weatherCode")) ?? 0, night: hour < 7 || hour >= 20)
-        w.temp = text(current, "temp_C")
-        w.desc = nested(current, "weatherDesc").lowercased()
-        w.feels = text(current, "FeelsLikeC")
-        w.low = text(today, "mintempC")
-        w.high = text(today, "maxtempC")
-        w.humidity = text(current, "humidity")
-
-        let degrees = Int(text(current, "winddirDegree")) ?? 0
-        let arrows = ["↓", "↙", "←", "↖", "↑", "↗", "→", "↘"]
-        w.wind = "\(arrows[((degrees + 180) / 45) % 8]) \(text(current, "windspeedKmph")) km/h"
-
-        // rain earns a row only with real signal: falling now, or likely today
-        let precip = Double(text(current, "precipMM")) ?? 0
-        let chance = ((today["hourly"] as? [[String: Any]]) ?? [])
-            .compactMap { Int(($0["chanceofrain"] as? String) ?? "0") }.max() ?? 0
-        if precip > 0 {
-            w.rain = "☔ \(text(current, "precipMM"))mm now"
-            if chance >= 30 { w.rain += " · rain \(chance)% today" }
-        } else if chance >= 30 {
-            w.rain = "☔ rain \(chance)% today"
-        }
-
-        if let astro = (today["astronomy"] as? [[String: Any]])?.first {
-            w.sunrise = text(astro, "sunrise")
-            w.sunset = text(astro, "sunset")
-            w.moon = "\(moonEmoji(text(astro, "moon_phase"))) \(text(astro, "moon_phase").lowercased())"
-        }
-
-        if let area = (root["nearest_area"] as? [[String: Any]])?.first {
-            // wttr repeats the city as its region ("Porto, Porto"), so the
-            // region is dropped whenever either name contains the other
-            let city = nested(area, "areaName")
-            let region = nested(area, "region")
-            let country = nested(area, "country")
-            var parts = [city]
-            if !region.isEmpty,
-               !city.lowercased().contains(region.lowercased()),
-               !region.lowercased().contains(city.lowercased()) {
-                parts.append(region)
-            }
-            if !country.isEmpty { parts.append(country) }
-            w.location = parts.joined(separator: ", ")
-        }
-
+        guard let data, let report = WeatherReport(j1: data) else { return }
         DispatchQueue.main.async {
-            weather = w
-            set("weather") { $0.icon = ""; $0.label = "\(w.emoji) \(w.temp)°C" }
+            weatherReport = report
+            set("weather") {
+                $0.icon = ""
+                $0.label = "\(weatherEmoji(report.code, night: report.night)) \(report.temp)°C"
+            }
             if openPopup == "weather" { refreshPopup() }
         }
     }.resume()
@@ -2247,6 +2161,14 @@ var popupAnchorX: CGFloat = 0
 var popupAlignLeft = false
 
 func refreshPopup() {
+    if openPopup == "weather", let window = popupWindow,
+       let host = window.contentView as? NSHostingView<WeatherPanel>, let report = weatherReport {
+        host.rootView = WeatherPanel(report: report)
+        let size = host.fittingSize
+        window.setFrame(NSRect(x: window.frame.maxX - size.width, y: popupTopY - size.height,
+                               width: size.width, height: size.height), display: true)
+        return
+    }
     guard let name = openPopup, let view = popupView, let window = popupWindow else { return }
     view.rows = popupRows(for: name)
     let size = view.measure()
@@ -2271,6 +2193,10 @@ func refreshPopup() {
 func showPopup(_ name: String, under anchor: NSRect, on surface: BarSurface, alignLeft: Bool = false) {
     if openPopup == name { closePopup(); return }
     closePopup()
+    if name == "weather" {
+        if let report = weatherReport { showWeatherPanel(report, under: anchor, on: surface) }
+        return
+    }
     let rows = popupRows(for: name)
     guard !rows.isEmpty else { return }
 
@@ -2330,6 +2256,38 @@ func showPopup(_ name: String, under anchor: NSRect, on surface: BarSurface, ali
     popupView = view
     openPopup = name
     setPopupKeys(true)
+}
+
+// The weather popup is a SwiftUI panel with its own sky, so it has no
+// rows, no glass and no theme border. It takes no keys.
+func showWeatherPanel(_ report: WeatherReport, under anchor: NSRect, on surface: BarSurface) {
+    let host = NSHostingView(rootView: WeatherPanel(report: report))
+    let size = host.fittingSize
+    let screen = surface.screen
+    popupTopY = surface.window.frame.minY - 4
+    popupAnchorX = anchor.maxX
+    popupAlignLeft = false
+    let x = min(max(screen.frame.minX + 6, anchor.maxX - size.width), screen.frame.maxX - size.width - 6)
+    let window = PopupWindow(contentRect: NSRect(x: x, y: popupTopY - size.height,
+                                                 width: size.width, height: size.height),
+                             styleMask: .borderless, backing: .buffered, defer: false)
+    window.isOpaque = false
+    window.backgroundColor = .clear
+    window.hasShadow = true
+    window.level = .popUpMenu
+    window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+    host.wantsLayer = true
+    host.layer?.cornerRadius = 16
+    host.layer?.masksToBounds = true
+    window.contentView = host
+    window.alphaValue = 0
+    window.orderFrontRegardless()
+    NSAnimationContext.runAnimationGroup { ctx in
+        ctx.duration = dur(0.12)
+        window.animator().alphaValue = 1
+    }
+    popupWindow = window
+    openPopup = "weather"
 }
 
 // ↑ and ↓ move through the rows of an open popup, Return clicks the row and
@@ -2914,23 +2872,6 @@ func bluetoothRows() -> [PopupRow] {
     return rows
 }
 
-func weatherRows() -> [PopupRow] {
-    guard let w = weather else { return [] }
-    var rows: [PopupRow] = [PopupRow(text: "\(w.emoji) \(w.temp)°C \(w.desc)", hero: true)]
-
-    // feels-like earns a mention only when it differs from the real temp
-    var today = "today \(w.low)° → \(w.high)°C"
-    if w.feels != w.temp { today = "feels \(w.feels)°C · " + today }
-    rows.append(PopupRow(text: today))
-    rows.append(PopupRow(text: "wind \(w.wind) · humidity \(w.humidity)%"))
-    if !w.rain.isEmpty { rows.append(PopupRow(text: w.rain)) }
-    if !w.sunrise.isEmpty {
-        rows.append(PopupRow(text: "sun \(w.sunrise) → \(w.sunset) · \(w.moon)"))
-    }
-    if !w.location.isEmpty { rows.append(PopupRow(text: w.location, dim: true)) }
-    return rows
-}
-
 // The system menu the hidden native menu bar used to carry, plus the two
 // omacchiato actions. "Reload Bar" has no counterpart here on purpose: there
 // is no config to re-read, the theme is watched, and a row that did
@@ -2970,7 +2911,6 @@ func popupRows(for name: String) -> [PopupRow] {
     case "apple": return appleMenuRows()
     case "clock": return calendarRows()
     case "battery": return batteryRows()
-    case "weather": return weatherRows()
     case "brightness": return brightnessRows()
     case "volume": return volumeRows()
     case "wifi": return wifiRows()
@@ -4241,7 +4181,7 @@ final class BarView: NSView {
         for name in rightOrder.reversed() {
             guard let item = rightItems[name], item.drawing else { continue }
             if let gauge = item.gauge {
-                let side = pillHeight - 6
+                let side = pillHeight - 2
                 let pill = NSRect(x: cursor - side - pillPad * 2, y: (barHeight - pillHeight) / 2,
                                   width: side + pillPad * 2, height: pillHeight)
                 let hitMaxX = cursor == bounds.maxX - padLeft ? bounds.maxX : pill.maxX + rightGap / 2
@@ -4251,7 +4191,7 @@ final class BarView: NSView {
                 hitArea.fill()
                 palette.itemBG.setFill()
                 NSBezierPath(roundedRect: pill, xRadius: radius, yRadius: radius).fill()
-                gauge.draw(in: pill.insetBy(dx: pillPad, dy: 3),
+                gauge.draw(in: pill.insetBy(dx: pillPad, dy: 1),
                            colors: .init(ink: palette.label, low: palette.red, charging: palette.green))
                 itemRects.append((name, pill, hitArea))
                 cursor = pill.minX - rightGap

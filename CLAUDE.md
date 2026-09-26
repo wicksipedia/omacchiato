@@ -54,7 +54,7 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   ```sh
   swiftc -O -F /System/Library/PrivateFrameworks -framework SkyLight -framework DisplayServices \
     -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker helper/bar-info.plist \
-    -o "$TMPDIR/omacchiato-bar" helper/bar/*.swift helper/gauge/Sources/StatusGauge/*.swift
+    -o "$TMPDIR/omacchiato-bar" helper/bar/*.swift helper/ui/Sources/*/*.swift
   cp "$TMPDIR/omacchiato-bar" omacchiato-bar.app/Contents/MacOS/omacchiato-bar
   codesign -f -s "Apple Development" --identifier com.omacchiato.bar omacchiato-bar.app
   launchctl kickstart -k "gui/$(id -u)/com.omacchiato.bar"

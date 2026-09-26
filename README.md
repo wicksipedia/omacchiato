@@ -180,7 +180,9 @@ Left to right:
 - **Plugin pills**: anything you add in `bar-plugins.conf`. The
   repo ships an AI usage pill, a GitHub pull requests pill, a
   keep-awake pill and an AirPods pill; see [Plugin pills](#plugin-pills).
-- **Weather**: wttr.in, with a details popup.
+- **Weather**: wttr.in. The popup looks like the iOS Weather app: the
+  temperature now, the next 24 hours in 3-hour steps, three days with
+  their range, and tiles for wind, humidity, UV and sunrise.
 - **Status**: one gauge in place of the wi-fi and battery pills. The
   ring is the battery and the four dots under it are the wi-fi signal.
   A click opens both popups in one. `bar-pills.conf` brings the two
