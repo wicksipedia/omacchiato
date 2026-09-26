@@ -6,14 +6,16 @@ import PackageDescription
 let package = Package(
     name: "omacchiato",
     platforms: [.macOS("26.0")],
+    dependencies: [.package(path: "helper/gauge")],
     targets: [
         .executableTarget(
             name: "omacchiato-bar",
+            dependencies: [.product(name: "StatusGauge", package: "gauge")],
             path: "helper/bar",
             linkerSettings: [.unsafeFlags([
                 "-F/System/Library/PrivateFrameworks", "-framework", "SkyLight", "-framework", "DisplayServices",
             ])]),
-        .testTarget(name: "BarTests", dependencies: ["omacchiato-bar"], path: "tests/bar"),
+        .testTarget(name: "BarTests", dependencies: ["omacchiato-bar", .product(name: "StatusGauge", package: "gauge")], path: "tests/bar"),
     ],
     swiftLanguageModes: [.v5]
 )

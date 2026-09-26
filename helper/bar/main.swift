@@ -856,6 +856,11 @@ locationGate.start()
 // bluetooth: gated on the privacy grant, which the watcher above also needs
 if rightOrder.contains("bluetooth") { bluetoothWatcher.start() }
 
+// signal strength publishes no change
+if rightOrder.contains("status") {
+    Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { _ in updateStatus() }
+}
+
 // waking clears the gamma table, so the shade has to be reasserted
 NSWorkspace.shared.notificationCenter.addObserver(
     forName: NSWorkspace.didWakeNotification, object: nil, queue: .main

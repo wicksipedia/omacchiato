@@ -9,7 +9,7 @@ section on each pill that ships. The bar itself is described in the
 `~/.config/omacchiato/bar-pills.conf` sets what each right-cluster pill
 does, one `<name> = <mode>` per line. The names are `menubar`,
 `weather`, `wifi`, `bluetooth`, `brightness`, `volume`, `mic`,
-`battery`, `clock` and `activity`. The modes are `hide` and `icon`.
+`status`, `battery`, `clock` and `activity`. The modes are `hide` and `icon`.
 `volume` also takes `muted`, and `battery` takes `time`. Lines starting
 with `#` are comments.
 
@@ -26,6 +26,20 @@ draws the volume pill only while the output device is muted or at
 zero, as a red icon, the same way the microphone pill works.
 `battery = time` shows only the battery icon on AC power; on battery
 it adds the time left, in whole hours or in minutes under an hour.
+
+The status pill is one gauge for the battery and the wi-fi, and it
+replaces the `wifi` and `battery` pills. The ring is the Mac battery,
+and the four dots that close the ring at the bottom are the wi-fi
+signal. The ring is red at 20 % or less and green on AC power. The
+wi-fi glyph in the ring is dim when no network is joined, and a slash
+through it means wi-fi is off. A click opens the battery and wi-fi rows
+in one popup, and a middle click turns wi-fi on or off. `wifi` and
+`battery` show only when the file names them, for example
+`wifi = icon` or `battery = time`. `status = hide` removes the gauge.
+
+To change the gauge, open `helper/gauge/Package.swift` in Xcode, then
+open `StatusGauge.swift` and show the canvas (Option-Command-Return).
+The previews draw every state at bar size and large, in light and dark.
 
 `popup = glass` draws the popups on Liquid Glass, so the desktop shows
 through them, instead of the theme's flat background. The system

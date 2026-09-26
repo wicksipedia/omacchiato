@@ -181,6 +181,10 @@ Left to right:
   repo ships an AI usage pill, a GitHub pull requests pill, a
   keep-awake pill and an AirPods pill; see [Plugin pills](#plugin-pills).
 - **Weather**: wttr.in, with a details popup.
+- **Status**: one gauge in place of the wi-fi and battery pills. The
+  ring is the battery and the four dots under it are the wi-fi signal.
+  A click opens both popups in one. `bar-pills.conf` brings the two
+  separate pills back.
 - **Wi-fi**: the pill is the icon alone. The popup names the network
   and adds the IP and router, signal with a verdict, link rate and
   security generation, and the channel with its band and width. Under

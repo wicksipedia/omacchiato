@@ -35,6 +35,10 @@ import IOBluetooth
 import IOKit.ps
 import SystemConfiguration
 import UniformTypeIdentifiers
+// swiftc builds helper/gauge into this module, and SwiftPM builds it as its own.
+#if canImport(StatusGauge)
+import StatusGauge
+#endif
 
 // DisplayServices (private) — the same calls Control Center makes, and
 // the same ones helper/main.swift uses for `omacchiato-helper brightness`.
@@ -645,10 +649,12 @@ struct BarItem: Equatable {
     // width: tickerText is cut to fit, and tickerTail always shows.
     var tickerText = ""
     var tickerTail = ""
+    // drawn in place of the icon and label
+    var gauge: StatusGauge?
 }
 
 // screen order, left to right
-let rightOrderAll = ["weather", "wifi", "bluetooth", "brightness", "mic", "volume", "battery", "clock", "activity"]
+let rightOrderAll = ["weather", "wifi", "bluetooth", "brightness", "mic", "volume", "status", "battery", "clock", "activity"]
 
 // `<key> = <value>` lines in ~/.config/omacchiato/<name>
 func readConf(_ name: String) -> [String: String] {
@@ -724,8 +730,8 @@ func requestPermissions() -> Never {
     default: report("bluetooth", "denied")
     }
 
-    // Skip the grant of a hidden pill. Only the wifi pill reads the location.
-    if pillModes["wifi"] != "hide" {
+    // Skip the grant of a hidden pill. Only the wi-fi rows read the location.
+    if pillModes["status"] != "hide" || (pillModes["wifi"] ?? "hide") != "hide" {
         let answer = PermissionAnswer()
         let manager = CLLocationManager()
         manager.delegate = answer
@@ -813,7 +819,11 @@ let barPlugins: [BarPlugin] = {
 
 // A hidden pill also skips its provider, so hiding weather stops the
 // wttr.in fetches and hiding bluetooth never touches the Bluetooth grant.
-let rightOrder = (["menubar"] + barPlugins.map(\.name) + rightOrderAll).filter { pillModes[$0] != "hide" }
+// The status gauge replaces these two, so they show only when
+// bar-pills.conf names them.
+let optInPills: Set = ["wifi", "battery"]
+let rightOrder = (["menubar"] + barPlugins.map(\.name) + rightOrderAll)
+    .filter { pillModes[$0] != "hide" && (!optInPills.contains($0) || pillModes[$0] != nil) }
 let iconOnly = Set(pillModes.filter { $0.value == "icon" }.keys)
 
 // Accessibility > Display > Reduce motion: the popup must appear at once.
@@ -1235,6 +1245,7 @@ func powerModeName() -> String? {
 }
 
 func updateBattery() {
+    defer { updateStatus() }
     guard let blob = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
           let list = IOPSCopyPowerSourcesList(blob)?.takeRetainedValue() as? [CFTypeRef]
     else { return }
@@ -1654,6 +1665,7 @@ func watchNightShift() {
 var wifiDevice = CWWiFiClient.shared().interface()?.interfaceName ?? "en0"
 
 func updateWifi() {
+    defer { updateStatus() }
     let powered = CWWiFiClient.shared().interface()?.powerOn() ?? false
     guard powered else {
         set("wifi") { $0.icon = "󰖪"; $0.iconColor = nil; $0.label = "off" }
@@ -1676,6 +1688,7 @@ func updateWifi() {
 // held. The binary carries helper/bar-info.plist for the usage string,
 // without which the prompt cannot even be raised.
 func updateBluetooth() {
+    defer { updateStatus() }
     guard CBCentralManager.authorization == .allowedAlways else { return }
     guard BTGetPower() != 0 else {
         set("bluetooth") { $0.drawing = true; $0.icon = "󰂲"; $0.iconColor = nil; $0.label = "off" }
@@ -1758,6 +1771,28 @@ final class BluetoothWatcher: NSObject, CBCentralManagerDelegate {
     }
 }
 let bluetoothWatcher = BluetoothWatcher()
+
+// --- status (battery and wi-fi in one gauge)
+
+func updateStatus() {
+    guard rightOrder.contains("status") else { return }
+    var battery = 0.0, charging = false
+    if let blob = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
+       let source = (IOPSCopyPowerSourcesList(blob)?.takeRetainedValue() as? [CFTypeRef])?.first,
+       let d = IOPSGetPowerSourceDescription(blob, source)?.takeUnretainedValue() as? [String: Any] {
+        let cur = d[kIOPSCurrentCapacityKey] as? Int ?? 0
+        let max = d[kIOPSMaxCapacityKey] as? Int ?? 100
+        battery = max > 0 ? Double(cur) / Double(max) : 0
+        charging = (d[kIOPSPowerSourceStateKey] as? String) == kIOPSACPowerValue
+    }
+    let interface = CWWiFiClient.shared().interface()
+    let wifi = interface?.powerOn() == true ? wifiLevel(rssi: interface?.rssiValue() ?? 0) : nil
+    set("status") { $0.gauge = StatusGauge(battery: battery, charging: charging, wifi: wifi) }
+}
+
+func statusRows() -> [PopupRow] {
+    batteryRows() + [PopupRow(separator: true)] + wifiRows()
+}
 
 // --- weather (no publisher; wttr.in, refreshed on a long timer)
 // One j1 fetch feeds both the pill and its popup — weather.sh does the
@@ -2194,7 +2229,7 @@ var popupView: PopupView?
 var openPopup: String? // which bar item owns it
 
 func closePopup() {
-    if openPopup == "wifi" { stopHotspotBrowse() }
+    if openPopup == "wifi" || openPopup == "status" { stopHotspotBrowse() }
     setPopupKeys(false)
     popupWindow?.orderOut(nil)
     popupWindow = nil
@@ -2657,7 +2692,7 @@ final class HotspotWatcher: NSObject {
     @objc func session(_ session: AnyObject, updatedFoundDevices devices: [AnyObject]) {
         DispatchQueue.main.async {
             hotspotDevices = devices.compactMap { $0 as? NSObject }
-            if openPopup == "wifi" { refreshPopup() }
+            if openPopup == "wifi" || openPopup == "status" { refreshPopup() }
         }
     }
 }
@@ -2743,7 +2778,7 @@ func scanWifi() {
             wifiNetworks = list
             wifiScanAt = Date.timeIntervalSinceReferenceDate
             wifiScanning = false
-            if openPopup == "wifi" { refreshPopup() }
+            if openPopup == "wifi" || openPopup == "status" { refreshPopup() }
         }
     }
 }
@@ -2939,6 +2974,7 @@ func popupRows(for name: String) -> [PopupRow] {
     case "brightness": return brightnessRows()
     case "volume": return volumeRows()
     case "wifi": return wifiRows()
+    case "status": return statusRows()
     case "bluetooth": return bluetoothRows()
     case "appmenu": return appMenuRows()
     case "menubar": return menuBarAppRows()
@@ -4204,6 +4240,23 @@ final class BarView: NSView {
         var tickerShown = false
         for name in rightOrder.reversed() {
             guard let item = rightItems[name], item.drawing else { continue }
+            if let gauge = item.gauge {
+                let side = pillHeight - 6
+                let pill = NSRect(x: cursor - side - pillPad * 2, y: (barHeight - pillHeight) / 2,
+                                  width: side + pillPad * 2, height: pillHeight)
+                let hitMaxX = cursor == bounds.maxX - padLeft ? bounds.maxX : pill.maxX + rightGap / 2
+                let hitArea = NSRect(x: pill.minX - rightGap / 2, y: 0,
+                                     width: hitMaxX - pill.minX + rightGap / 2, height: bounds.height)
+                NSColor.clear.clickable.setFill()
+                hitArea.fill()
+                palette.itemBG.setFill()
+                NSBezierPath(roundedRect: pill, xRadius: radius, yRadius: radius).fill()
+                gauge.draw(in: pill.insetBy(dx: pillPad, dy: 3),
+                           colors: .init(ink: palette.label, low: palette.red, charging: palette.green))
+                itemRects.append((name, pill, hitArea))
+                cursor = pill.minX - rightGap
+                continue
+            }
             let parts = ([BarPart(icon: item.icon, iconColor: item.iconColor, label: item.label)] + item.parts)
                 .filter { !($0.icon.isEmpty && $0.label.isEmpty) }
             guard !parts.isEmpty else { continue }
@@ -4368,7 +4421,7 @@ final class BarView: NSView {
         switch hit(event) {
         case "volume":
             toggleMute() // the CoreAudio listener repaints
-        case "wifi":
+        case "wifi", "status":
             guard let interface = CWWiFiClient.shared().interface() else { return }
             try? interface.setPower(!interface.powerOn())
             updateWifi()
