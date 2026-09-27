@@ -13,7 +13,8 @@ desktop for macOS 26 and 27, built around the
 [OmniWM](https://github.com/BarutSRB/OmniWM) window manager. One
 `install.sh` gives you a Super key on Caps Lock, niri columns and
 Hyprland's dwindle layout, a status bar that draws its pills, popups,
-sliders and screen dimming from one process, trackpad swipes, a
+sliders and screen dimming from one process, one gauge for the battery
+and the wi-fi, trackpad swipes, a
 workspace overview with live window previews, and a theme switch that
 recolours the bar, the focus border, the terminal and the wallpaper in
 one command.
@@ -140,6 +141,24 @@ its only timers are the weather fetch and the clock. OmniWM keeps a
 42-point strip at the top of each display free for it, and fullscreen
 windows keep out of the strip too.
 
+#### One gauge for the battery and the wi-fi
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/status-gauge-dark.png">
+  <img src="docs/screenshots/status-gauge-light.png" alt="Six states of the status gauge: full with a strong signal, charging with a green ring, half with a fair signal, low battery with a short red ring, no network with the dots and the wi-fi glyph dim, and wi-fi off with a slash through the glyph">
+</picture>
+
+The status pill puts the battery and the wi-fi in one icon, after the
+battery and signal gauge on the iPhone Duo. The ring
+fills with the charge. It turns green on AC power and red at 20% or
+less. The four dots that close the ring show the wi-fi signal, and a
+slash through the glyph means wi-fi is off. A click opens the battery
+and wi-fi popups as one, and a middle click turns wi-fi on or off.
+
+The gauge replaces the separate wi-fi and battery pills by default.
+`wifi = icon` or `battery = time` in `bar-pills.conf` brings either one
+back, and `status = hide` removes the gauge.
+
 ![Left end of the bar: the Apple menu, workspace chips with the apps on each workspace, and the front app's name](docs/screenshots/bar-left.png)
 
 Left to right:
@@ -169,7 +188,7 @@ Left to right:
 
 ![The Apple menu popup under its pill: About This Mac, System Information, System Settings, App Store, Recent Items, Force Quit, Sleep, Restart, Shut Down, Lock Screen, Log Out, and Omacchiato's theme row naming the current theme at the bottom](docs/screenshots/popup-apple.png)
 
-![Right end of the bar: the menu bar apps grid, the Claude usage pill at 5%, the keep-awake cup, the GitHub pill with two open pull requests, wi-fi, battery with three hours left, the date and time, and the activity pill](docs/screenshots/bar-right.png)
+![Right end of the bar: the menu bar apps grid, the Claude usage pill at 5%, the keep-awake cup, the GitHub pill with two open pull requests, the update pill with three new commits, the weather at 16°C under cloud, the status gauge with a nearly full ring and four lit dots, the date and time, and the activity pill](docs/screenshots/bar-right.png)
 
 - **Menu bar apps**: the grid pill lists the third-party apps that have
   an icon in the hidden macOS menu bar. Clicking a row gives that icon
@@ -183,10 +202,8 @@ Left to right:
 - **Weather**: wttr.in. The popup looks like the iOS Weather app: the
   temperature now, the next 24 hours in 3-hour steps, three days with
   their range, and tiles for wind, humidity, UV and sunrise.
-- **Status**: one gauge in place of the wi-fi and battery pills. The
-  ring is the battery and the four dots under it are the wi-fi signal.
-  A click opens both popups in one. `bar-pills.conf` brings the two
-  separate pills back.
+- **Status**: the battery and wi-fi gauge; see
+  [One gauge for the battery and the wi-fi](#one-gauge-for-the-battery-and-the-wi-fi).
 - **Wi-fi**: the pill is the icon alone. The popup names the network
   and adds the IP and router, signal with a verdict, link rate and
   security generation, and the channel with its band and width. Under
