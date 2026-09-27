@@ -13,6 +13,7 @@ let package = Package(
             dependencies: [
                 .product(name: "StatusGauge", package: "ui"),
                 .product(name: "WeatherPanel", package: "ui"),
+                .product(name: "StatusPanel", package: "ui"),
             ],
             path: "helper/bar",
             linkerSettings: [.unsafeFlags([

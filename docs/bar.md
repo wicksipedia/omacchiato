@@ -32,14 +32,17 @@ replaces the `wifi` and `battery` pills. The ring is the Mac battery,
 and the four dots that close the ring at the bottom are the wi-fi
 signal. The ring is red at 20 % or less and green on AC power. The
 wi-fi glyph in the ring is dim when no network is joined, and a slash
-through it means wi-fi is off. A click opens the battery and wi-fi rows
-in one popup, and a middle click turns wi-fi on or off. `wifi` and
+through it means wi-fi is off. A click opens a panel with the gauge
+drawn large, tiles for power, health, mode, signal, link, channel and
+address, a wi-fi switch, and the networks and phones to join. A middle
+click turns wi-fi on or off. `wifi` and
 `battery` show only when the file names them, for example
 `wifi = icon` or `battery = time`. `status = hide` removes the gauge.
 
-To change the gauge or the weather popup, open `helper/ui/Package.swift`
-in Xcode, then open `StatusGauge.swift` or `WeatherPanel.swift` and show
-the canvas (Option-Command-Return). The weather previews read a saved
+To change the gauge, its panel or the weather popup, open
+`helper/ui/Package.swift` in Xcode, then open `StatusGauge.swift`,
+`StatusPreviews.swift` or `WeatherPanel.swift` and show the canvas
+(Option-Command-Return). The weather previews read a saved
 wttr.in answer, `tests/fixtures/wttr-j1.json`.
 The previews draw every state at bar size and large, in light and dark.
 

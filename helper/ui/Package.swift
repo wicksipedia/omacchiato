@@ -9,10 +9,12 @@ let package = Package(
     products: [
         .library(name: "StatusGauge", targets: ["StatusGauge"]),
         .library(name: "WeatherPanel", targets: ["WeatherPanel"]),
+        .library(name: "StatusPanel", targets: ["StatusPanel"]),
     ],
     targets: [
         .target(name: "StatusGauge"),
         .target(name: "WeatherPanel"),
+        .target(name: "StatusPanel", dependencies: ["StatusGauge"]),
     ],
     swiftLanguageModes: [.v5]
 )

@@ -152,8 +152,10 @@ The status pill puts the battery and the wi-fi in one icon, after the
 battery and signal gauge on the iPhone Duo. The ring
 fills with the charge. It turns green on AC power and red at 20% or
 less. The four dots that close the ring show the wi-fi signal, and a
-slash through the glyph means wi-fi is off. A click opens the battery
-and wi-fi popups as one, and a middle click turns wi-fi on or off.
+slash through the glyph means wi-fi is off. A click opens a panel with
+the gauge drawn large, tiles for power, battery health, signal, link
+and channel, a wi-fi switch, and the networks and phones to join. A
+middle click turns wi-fi on or off.
 
 The gauge replaces the separate wi-fi and battery pills by default.
 `wifi = icon` or `battery = time` in `bar-pills.conf` brings either one

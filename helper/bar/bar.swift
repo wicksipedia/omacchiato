@@ -39,6 +39,7 @@ import UniformTypeIdentifiers
 import SwiftUI
 #if canImport(StatusGauge)
 import StatusGauge
+import StatusPanel
 import WeatherPanel
 #endif
 
@@ -1820,9 +1821,19 @@ func updateStatus() {
     set("status") { $0.gauge = StatusGauge(battery: battery, charging: charging, wifi: wifi) }
 }
 
-func statusRows() -> [PopupRow] {
-    batteryRows() + [PopupRow(separator: true)] + wifiRows()
+func statusReport() -> StatusReport {
+    StatusReport(battery: batteryInfo(), wifi: wifiInfo())
 }
+
+let statusActions: StatusActions = {
+    var actions = StatusActions()
+    actions.join = joinWifi
+    actions.hotspot = startHotspot(named:)
+    actions.toggleWifi = { toggleWifiPower(); refreshPopup() }
+    actions.batterySettings = openBatterySettings
+    actions.networkSettings = openNetworkSettings
+    return actions
+}()
 
 // --- weather (no publisher; wttr.in, refreshed on a long timer)
 // One j1 fetch feeds both the pill and its popup.
@@ -2199,9 +2210,9 @@ var popupAnchorX: CGFloat = 0
 var popupAlignLeft = false
 
 func refreshPopup() {
-    if openPopup == "weather", let window = popupWindow,
-       let host = window.contentView as? NSHostingView<WeatherPanel>, let report = weatherReport {
-        host.rootView = WeatherPanel(report: report)
+    if let name = openPopup, let window = popupWindow,
+       let host = window.contentView as? PanelHost, let view = panelView(name) {
+        host.rootView = view
         let size = host.fittingSize
         window.setFrame(NSRect(x: window.frame.maxX - size.width, y: popupTopY - size.height,
                                width: size.width, height: size.height), display: true)
@@ -2231,8 +2242,8 @@ func refreshPopup() {
 func showPopup(_ name: String, under anchor: NSRect, on surface: BarSurface, alignLeft: Bool = false) {
     if openPopup == name { closePopup(); return }
     closePopup()
-    if name == "weather" {
-        if let report = weatherReport { showWeatherPanel(report, under: anchor, on: surface) }
+    if let view = panelView(name) {
+        showPanel(name, view, under: anchor, on: surface)
         return
     }
     let rows = popupRows(for: name)
@@ -2298,13 +2309,30 @@ func showPopup(_ name: String, under anchor: NSRect, on surface: BarSurface, ali
 
 // A click on a pill opens its popup only when the popup has something to show.
 func hasPopup(_ name: String) -> Bool {
-    name == "weather" ? weatherReport != nil : !popupRows(for: name).isEmpty
+    switch name {
+    case "weather": return weatherReport != nil
+    case "status": return true
+    default: return !popupRows(for: name).isEmpty
+    }
 }
 
-// The weather popup is a SwiftUI panel with its own sky, so it has no
-// rows, no glass and no theme border. It takes no keys.
-func showWeatherPanel(_ report: WeatherReport, under anchor: NSRect, on surface: BarSurface) {
-    let host = NSHostingView(rootView: WeatherPanel(report: report))
+// The weather and status popups are SwiftUI panels. They draw their own
+// background, so they have no rows, no theme border and take no keys.
+func panelView(_ name: String) -> AnyView? {
+    switch name {
+    case "weather": return weatherReport.map { AnyView(WeatherPanel(report: $0).clipShape(.rect(cornerRadius: 16))) }
+    case "status": return AnyView(GaugeStatusPanel(report: statusReport(), actions: statusActions))
+    default: return nil
+    }
+}
+
+final class PanelHost: NSHostingView<AnyView> {
+    // The popup window never becomes key, so the first click must count.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+}
+
+func showPanel(_ name: String, _ view: AnyView, under anchor: NSRect, on surface: BarSurface) {
+    let host = PanelHost(rootView: view)
     let size = host.fittingSize
     let screen = surface.screen
     popupTopY = surface.window.frame.minY - 4
@@ -2319,9 +2347,6 @@ func showWeatherPanel(_ report: WeatherReport, under anchor: NSRect, on surface:
     window.hasShadow = true
     window.level = .popUpMenu
     window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
-    host.wantsLayer = true
-    host.layer?.cornerRadius = 16
-    host.layer?.masksToBounds = true
     window.contentView = host
     window.alphaValue = 0
     window.orderFrontRegardless()
@@ -2330,7 +2355,7 @@ func showWeatherPanel(_ report: WeatherReport, under anchor: NSRect, on surface:
         window.animator().alphaValue = 1
     }
     popupWindow = window
-    openPopup = "weather"
+    openPopup = name
 }
 
 // ↑ and ↓ move through the rows of an open popup, Return clicks the row and
@@ -2606,80 +2631,78 @@ func securityName(_ s: CWSecurity) -> String? {
     }
 }
 
-func batteryRows() -> [PopupRow] {
-    var rows: [PopupRow] = []
+func batteryInfo() -> StatusReport.Battery? {
+    guard let blob = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
+          let list = IOPSCopyPowerSourcesList(blob)?.takeRetainedValue() as? [CFTypeRef],
+          let source = list.first,
+          let d = IOPSGetPowerSourceDescription(blob, source)?.takeUnretainedValue() as? [String: Any]
+    else { return nil }
     let raw = smartBattery()
     let data = raw["BatteryData"] as? [String: Any] ?? [:]
-
-    if let blob = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
-       let list = IOPSCopyPowerSourcesList(blob)?.takeRetainedValue() as? [CFTypeRef],
-       let source = list.first,
-       let d = IOPSGetPowerSourceDescription(blob, source)?.takeUnretainedValue() as? [String: Any] {
-        let cur = d[kIOPSCurrentCapacityKey] as? Int ?? 0
-        let max = d[kIOPSMaxCapacityKey] as? Int ?? 100
-        let pct = max > 0 ? Int((Double(cur) / Double(max) * 100).rounded()) : cur
-        let onAC = (d[kIOPSPowerSourceStateKey] as? String) == kIOPSACPowerValue
-        // this key arrives as a number, not a boolean, so a Bool cast alone
-        // reads every charging battery as charged
-        let charging = (d[kIOPSIsChargingKey] as? Bool)
-            ?? ((d[kIOPSIsChargingKey] as? Int) == 1)
-        rows.append(PopupRow(text: "battery", detail: "\(pct)%", hero: true,
-                             inlineBar: Double(pct) / 100,
-                             tint: pct <= 20 && !onAC ? .systemRed : nil))
-        // 65535 is the "not known yet" answer, which arrives whenever the
-        // rate has just changed
-        let minutes = onAC ? (d[kIOPSTimeToFullChargeKey] as? Int ?? -1)
-                           : (d[kIOPSTimeToEmptyKey] as? Int ?? -1)
-        let left = minutes > 0 && minutes < 65535
-            ? "\(minutes / 60)h \(minutes % 60)m " + (onAC ? "to full" : "left") : ""
-        rows.append(PopupRow(text: charging ? "charging"
-                                            : (onAC ? "charged, on AC" : "on battery"),
-                             detail: left))
-    }
-
-    rows.append(PopupRow(separator: true))
+    let cur = d[kIOPSCurrentCapacityKey] as? Int ?? 0
+    let max = d[kIOPSMaxCapacityKey] as? Int ?? 100
+    let onAC = (d[kIOPSPowerSourceStateKey] as? String) == kIOPSACPowerValue
+    // this key arrives as a number, not a boolean, so a Bool cast alone
+    // reads every charging battery as charged
+    let charging = (d[kIOPSIsChargingKey] as? Bool) ?? ((d[kIOPSIsChargingKey] as? Int) == 1)
+    var b = StatusReport.Battery(percent: max > 0 ? Int((Double(cur) / Double(max) * 100).rounded()) : cur,
+                                 charging: charging, onAC: onAC)
+    // 65535 is the "not known yet" answer, which arrives whenever the
+    // rate has just changed
+    let minutes = onAC ? (d[kIOPSTimeToFullChargeKey] as? Int ?? -1) : (d[kIOPSTimeToEmptyKey] as? Int ?? -1)
+    if minutes > 0 && minutes < 65535 { b.minutesLeft = minutes }
     applyHighPowerMode(readHighPowerMode())
-    if let mode = powerModeName() {
-        rows.append(PopupRow(text: "mode", detail: mode))
-    }
+    b.mode = powerModeName()
     switch ProcessInfo.processInfo.thermalState {
-    case .nominal: break // the ordinary state is not worth a row
-    case .fair: rows.append(PopupRow(text: "thermal", detail: "fair"))
-    case .serious: rows.append(PopupRow(text: "thermal", detail: "serious"))
-    case .critical: rows.append(PopupRow(text: "thermal", detail: "critical"))
-    @unknown default: break
+    case .fair: b.thermal = "fair"
+    case .serious: b.thermal = "serious"
+    case .critical: b.thermal = "critical"
+    default: break // the ordinary state is not worth a row
     }
     // amperage is negative while discharging: the sign is the direction,
     // and the pill only wants the size
     if let mv = raw["Voltage"] as? Int, let ma = raw["Amperage"] as? Int, ma != 0 {
-        let watts = Double(mv) * Double(abs(ma)) / 1_000_000
-        rows.append(PopupRow(text: ma < 0 ? "draw" : "charging at",
-                             detail: String(format: "%.1f W", watts)))
+        b.watts = Double(mv) * Double(abs(ma)) / 1_000_000
     }
-    if let adapter = raw["AdapterDetails"] as? [String: Any],
-       let watts = adapter["Watts"] as? Int {
-        rows.append(PopupRow(text: "adapter", detail: "\(watts) W"))
+    b.adapterWatts = (raw["AdapterDetails"] as? [String: Any])?["Watts"] as? Int
+    // Apple rounds this to a whole 100% for a long while; the ratio is
+    // the number that actually moves
+    if let design = data["DesignCapacity"] as? Int, let full = data["FullChargeCapacity"] as? Int, design > 0 {
+        b.health = Int((Double(full) / Double(design) * 100).rounded())
     }
+    b.cycles = raw["CycleCount"] as? Int
+    return b
+}
 
+func openBatterySettings() {
+    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Battery-Settings.extension")!)
+    closePopup()
+}
+
+func batteryRows() -> [PopupRow] {
+    var rows: [PopupRow] = []
+    let b = batteryInfo()
+    if let b {
+        rows.append(PopupRow(text: "battery", detail: "\(b.percent)%", hero: true,
+                             inlineBar: Double(b.percent) / 100, tint: b.low ? .systemRed : nil))
+        rows.append(PopupRow(text: b.charging ? "charging" : (b.onAC ? "charged, on AC" : "on battery"),
+                             detail: b.timeText ?? ""))
+    }
     rows.append(PopupRow(separator: true))
-    if let design = data["DesignCapacity"] as? Int,
-       let full = data["FullChargeCapacity"] as? Int, design > 0 {
-        // Apple rounds this to a whole 100% for a long while; the ratio is
-        // the number that actually moves
-        let health = Int((Double(full) / Double(design) * 100).rounded())
+    if let mode = b?.mode { rows.append(PopupRow(text: "mode", detail: mode)) }
+    if let thermal = b?.thermal { rows.append(PopupRow(text: "thermal", detail: thermal)) }
+    if let watts = b?.watts {
+        rows.append(PopupRow(text: b?.charging == true ? "charging at" : "draw", detail: String(format: "%.1f W", watts)))
+    }
+    if let adapter = b?.adapterWatts { rows.append(PopupRow(text: "adapter", detail: "\(adapter) W")) }
+    rows.append(PopupRow(separator: true))
+    if let health = b?.health {
         let verdict = health >= 90 ? "" : (health >= 80 ? "  fair" : "  worn")
         rows.append(PopupRow(text: "health", detail: "\(health)%\(verdict)"))
     }
-    if let cycles = raw["CycleCount"] as? Int {
-        rows.append(PopupRow(text: "cycles", detail: "\(cycles)"))
-    }
-
+    if let cycles = b?.cycles { rows.append(PopupRow(text: "cycles", detail: "\(cycles)")) }
     rows.append(PopupRow(separator: true))
-    rows.append(PopupRow(text: "Battery Settings…", dim: true, action: {
-        NSWorkspace.shared.open(
-            URL(string: "x-apple.systempreferences:com.apple.Battery-Settings.extension")!)
-        closePopup()
-    }))
+    rows.append(PopupRow(text: "Battery Settings…", dim: true, action: openBatterySettings))
     return rows
 }
 
@@ -2808,87 +2831,112 @@ func joinWifi(_ ssid: String) {
     }
 }
 
-func wifiRows() -> [PopupRow] {
+// Reading this starts a scan and the hotspot browse, whose answers
+// refresh the open popup.
+func wifiInfo() -> StatusReport.WiFi {
     let interface = CWWiFiClient.shared().interface()
-    var rows: [PopupRow] = [
-        // the SSID is location-sensitive data: it needs the Location
-        // grant AND a bundled binary (measured on macOS 26.3 — an
-        // unbundled build reads nil however it is authorised), which
-        // is why the bar ships inside a .app. See install.sh.
-        PopupRow(text: interface?.ssid() ?? "wi-fi", hero: true),
-    ]
+    var w = StatusReport.WiFi(on: interface?.powerOn() ?? false)
+    // the SSID is location-sensitive data: it needs the Location
+    // grant AND a bundled binary (measured on macOS 26.3 — an
+    // unbundled build reads nil however it is authorised), which
+    // is why the bar ships inside a .app. See install.sh.
+    w.ssid = interface?.ssid()
     let net = wifiIPv4()
-    rows.append(PopupRow(text: "ip \(net.ip.ifEmpty("none"))"))
-    if !net.router.isEmpty { rows.append(PopupRow(text: "router \(net.router)")) }
-    if let rssi = interface?.rssiValue(), rssi != 0 {
+    w.ip = net.ip.isEmpty ? nil : net.ip
+    w.router = net.router.isEmpty ? nil : net.router
+    if let rssi = interface?.rssiValue(), rssi != 0 { w.rssi = rssi }
+    if let rate = interface?.transmitRate(), rate > 0 { w.rate = Int(rate) }
+    if let sec = interface?.security() { w.security = securityName(sec) }
+    if let channel = interface?.wlanChannel() {
+        // a bare channel number means nothing to most people; the band
+        // is what says "you are on the fast radio"
+        w.channel = channel.channelNumber
+        switch channel.channelBand {
+        case .band2GHz: w.band = "2.4 GHz"
+        case .band5GHz: w.band = "5 GHz"
+        case .band6GHz: w.band = "6 GHz"
+        default: break
+        }
+        switch channel.channelWidth {
+        case .width20MHz: w.width = "20 MHz"
+        case .width40MHz: w.width = "40 MHz"
+        case .width80MHz: w.width = "80 MHz"
+        case .width160MHz: w.width = "160 MHz"
+        default: break
+        }
+    }
+    scanWifi()
+    w.scanning = wifiScanning
+    w.networks = wifiNetworks.filter { $0.ssid != w.ssid }.prefix(6).compactMap { network in
+        network.ssid.map { .init(ssid: $0, rssi: network.rssiValue, open: network.supportsSecurity(.none)) }
+    }
+    startHotspotBrowse()
+    w.phones = hotspotDevices.map { device in
+        let name = device.value(forKey: "deviceName") as? String ?? "phone"
+        // an iPhone hotspot takes the name of the phone
+        return .init(name: name, battery: (device.value(forKey: "batteryLife") as? Double).map { Int($0) },
+                     connected: name == w.ssid)
+    }
+    return w
+}
+
+func openNetworkSettings() {
+    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.wifi-settings-extension")!)
+    closePopup()
+}
+
+func toggleWifiPower() {
+    guard let interface = CWWiFiClient.shared().interface() else { return }
+    try? interface.setPower(!interface.powerOn())
+    updateWifi()
+}
+
+func wifiRows() -> [PopupRow] {
+    let w = wifiInfo()
+    var rows: [PopupRow] = [PopupRow(text: w.ssid ?? "wi-fi", hero: true)]
+    rows.append(PopupRow(text: "ip \(w.ip ?? "none")"))
+    if let router = w.router { rows.append(PopupRow(text: "router \(router)")) }
+    if let rssi = w.rssi {
         let verdict = rssi >= -55 ? "excellent" : (rssi >= -67 ? "good" : (rssi >= -75 ? "fair" : "weak"))
         rows.append(PopupRow(text: "signal \(rssi) dBm  \(verdict)"))
     }
     // how fast, and how safe — the two questions the old rows left open
-    var link: [String] = []
-    if let rate = interface?.transmitRate(), rate > 0 { link.append("\(Int(rate)) Mbps") }
-    if let sec = interface?.security(), let name = securityName(sec) { link.append(name) }
+    let link = [w.rate.map { "\($0) Mbps" }, w.security].compactMap { $0 }
     if !link.isEmpty { rows.append(PopupRow(text: "link " + link.joined(separator: "  "))) }
-    if let channel = interface?.wlanChannel() {
-        // a bare channel number means nothing to most people; the band
-        // is what says "you are on the fast radio"
-        var parts = ["channel \(channel.channelNumber)"]
-        switch channel.channelBand {
-        case .band2GHz: parts.append("2.4 GHz")
-        case .band5GHz: parts.append("5 GHz")
-        case .band6GHz: parts.append("6 GHz")
-        default: break
-        }
-        switch channel.channelWidth {
-        case .width20MHz: parts.append("20 MHz")
-        case .width40MHz: parts.append("40 MHz")
-        case .width80MHz: parts.append("80 MHz")
-        case .width160MHz: parts.append("160 MHz")
-        default: break
-        }
-        rows.append(PopupRow(text: parts.joined(separator: "  ")))
+    if let channel = w.channel {
+        rows.append(PopupRow(text: (["channel \(channel)"] + [w.band, w.width].compactMap { $0 }).joined(separator: "  ")))
     }
-    scanWifi()
-    let current = interface?.ssid()
-    let others = wifiNetworks.filter { $0.ssid != current }.prefix(6)
     rows.append(PopupRow(separator: true))
     rows.append(PopupRow(text: "networks", dim: true))
     // the one you are on leads the list with a tick, the way the macOS
     // menu marks it. A lock on every row says nothing, so only the rare
     // open network carries a word.
-    if let current, !current.isEmpty {
-        rows.append(PopupRow(icon: "\u{F012C}", text: current, highlight: true,
-                             iconTint: palette.accent))
+    if let current = w.ssid, !current.isEmpty {
+        rows.append(PopupRow(icon: "\u{F012C}", text: current, highlight: true, iconTint: palette.accent))
     }
-    for network in others {
-        guard let ssid = network.ssid else { continue }
-        rows.append(PopupRow(icon: wifiStrengthGlyph(network.rssiValue), text: ssid,
-                             detail: network.supportsSecurity(.none) ? "open" : "",
-                             action: { joinWifi(ssid) }))
+    for network in w.networks {
+        rows.append(PopupRow(icon: wifiStrengthGlyph(network.rssi), text: network.ssid,
+                             detail: network.open ? "open" : "", action: { joinWifi(network.ssid) }))
     }
-    if others.isEmpty, wifiScanning {
-        rows.append(PopupRow(text: "looking…", dim: true))
-    }
-    startHotspotBrowse()
-    if !hotspotDevices.isEmpty {
+    if w.networks.isEmpty, w.scanning { rows.append(PopupRow(text: "looking…", dim: true)) }
+    if !w.phones.isEmpty {
         rows.append(PopupRow(separator: true))
         rows.append(PopupRow(text: "phones", dim: true))
-        for device in hotspotDevices {
-            let name = device.value(forKey: "deviceName") as? String ?? "phone"
-            let battery = device.value(forKey: "batteryLife") as? Double
-            // an iPhone hotspot takes the name of the phone
-            let sharing = name == current
-            rows.append(PopupRow(icon: "\u{F011C}", text: name,
-                                 detail: sharing ? "connected" : battery.map { "\(Int($0))%" } ?? "",
-                                 highlight: sharing,
-                                 action: sharing ? nil : { startHotspot(device) }))
+        for phone in w.phones {
+            rows.append(PopupRow(icon: "\u{F011C}", text: phone.name,
+                                 detail: phone.connected ? "connected" : phone.battery.map { "\($0)%" } ?? "",
+                                 highlight: phone.connected,
+                                 action: phone.connected ? nil : { startHotspot(named: phone.name) }))
         }
     }
-    rows.append(PopupRow(text: "network settings…", dim: true, action: {
-        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.wifi-settings-extension")!)
-        closePopup()
-    }))
+    rows.append(PopupRow(text: "network settings…", dim: true, action: openNetworkSettings))
     return rows
+}
+
+func startHotspot(named name: String) {
+    if let device = hotspotDevices.first(where: { $0.value(forKey: "deviceName") as? String == name }) {
+        startHotspot(device)
+    }
 }
 
 func bluetoothRows() -> [PopupRow] {
@@ -2957,7 +3005,6 @@ func popupRows(for name: String) -> [PopupRow] {
     case "brightness": return brightnessRows()
     case "volume": return volumeRows()
     case "wifi": return wifiRows()
-    case "status": return statusRows()
     case "bluetooth": return bluetoothRows()
     case "appmenu": return appMenuRows()
     case "menubar": return menuBarAppRows()
@@ -4405,9 +4452,7 @@ final class BarView: NSView {
         case "volume":
             toggleMute() // the CoreAudio listener repaints
         case "wifi", "status":
-            guard let interface = CWWiFiClient.shared().interface() else { return }
-            try? interface.setPower(!interface.powerOn())
-            updateWifi()
+            toggleWifiPower()
         default: break
         }
     }
