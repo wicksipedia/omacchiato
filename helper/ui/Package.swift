@@ -13,6 +13,7 @@ let package = Package(
         .library(name: "CalendarPanel", targets: ["CalendarPanel"]),
         .library(name: "AIUsagePanel", targets: ["AIUsagePanel"]),
         .library(name: "PRPanel", targets: ["PRPanel"]),
+        .library(name: "MenuBarPanel", targets: ["MenuBarPanel"]),
     ],
     targets: [
         .target(name: "StatusGauge"),
@@ -21,6 +22,7 @@ let package = Package(
         .target(name: "CalendarPanel", dependencies: ["StatusPanel"]),
         .target(name: "AIUsagePanel", dependencies: ["StatusPanel"]),
         .target(name: "PRPanel", dependencies: ["StatusPanel"]),
+        .target(name: "MenuBarPanel", dependencies: ["StatusPanel"]),
     ],
     swiftLanguageModes: [.v5]
 )

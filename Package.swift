@@ -17,6 +17,7 @@ let package = Package(
                 .product(name: "CalendarPanel", package: "ui"),
                 .product(name: "AIUsagePanel", package: "ui"),
                 .product(name: "PRPanel", package: "ui"),
+                .product(name: "MenuBarPanel", package: "ui"),
             ],
             path: "helper/bar",
             linkerSettings: [.unsafeFlags([

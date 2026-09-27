@@ -193,11 +193,12 @@ Left to right:
 ![Right end of the bar: the menu bar apps grid, the Claude usage pill at 5%, the keep-awake cup, the GitHub pill with two open pull requests, the update pill with three new commits, the weather at 16°C under cloud, the status gauge with a nearly full ring and four lit dots, the date and time, and the activity pill](docs/screenshots/bar-right.png)
 
 - **Menu bar apps**: the grid pill lists the third-party apps that have
-  an icon in the hidden macOS menu bar. Clicking a row gives that icon
-  a real click: the pointer moves to the top edge so the menu bar
-  slides in (about 0.25 s), the bar clicks the icon, and the pointer
-  moves back. An icon that the notch hides has nowhere to click, so its
-  row opens the app instead.
+  an icon in the hidden macOS menu bar, with each app's own icon.
+  Clicking a row gives that icon a real click: the pointer moves to the
+  top edge so the menu bar slides in (about 0.25 s), the bar clicks the
+  icon, and the pointer moves back. macOS hides an icon that does not
+  fit next to the camera notch, so its row carries an open-app mark and
+  a click opens the app instead.
 - **Plugin pills**: anything you add in `bar-plugins.conf`. The
   repo ships an AI usage pill, a GitHub pull requests pill, a
   keep-awake pill and an AirPods pill; see [Plugin pills](#plugin-pills).

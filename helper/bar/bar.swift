@@ -41,6 +41,7 @@ import SwiftUI
 import StatusGauge
 import AIUsagePanel
 import CalendarPanel
+import MenuBarPanel
 import PRPanel
 import StatusPanel
 import WeatherPanel
@@ -2321,7 +2322,7 @@ func showPopup(_ name: String, under anchor: NSRect, on surface: BarSurface, ali
 func hasPopup(_ name: String) -> Bool {
     switch name {
     case "weather": return weatherReport != nil
-    case "status", "clock": return true
+    case "status", "clock", "menubar": return true
     default: return pluginPanels[name] != nil || !popupRows(for: name).isEmpty
     }
 }
@@ -2337,6 +2338,13 @@ func panelView(_ name: String) -> AnyView? {
         case "control-center": return AnyView(ControlCenterStatusPanel(report: report, actions: statusActions))
         case "settings": return AnyView(SettingsStatusPanel(report: report, actions: statusActions))
         default: return AnyView(GaugeStatusPanel(report: report, actions: statusActions))
+        }
+    case "menubar":
+        let report = menuBarReport()
+        switch pillModes["menubar_panel"] {
+        case "grid": return AnyView(GridMenuBarPanel(report: report, actions: menuBarActions))
+        case "dock": return AnyView(DockMenuBarPanel(report: report, actions: menuBarActions))
+        default: return AnyView(ListMenuBarPanel(report: report, actions: menuBarActions))
         }
     case "clock":
         let report = calendarReport()
@@ -3024,7 +3032,6 @@ func popupRows(for name: String) -> [PopupRow] {
     case "wifi": return wifiRows()
     case "bluetooth": return bluetoothRows()
     case "appmenu": return appMenuRows()
-    case "menubar": return menuBarAppRows()
     default:
         popupBarSource = pluginRows[name] ?? []
         return foldSections(name, popupBarSource)
@@ -3169,57 +3176,62 @@ func menuBarLabel(_ raw: String, app: String) -> String {
     return label.trimmingCharacters(in: .whitespaces)
 }
 
-func menuBarAppRows() -> [PopupRow] {
-    let opts = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
-    guard AXIsProcessTrustedWithOptions(opts) else {
-        return [PopupRow(text: "grant Accessibility to omacchiato-bar", hero: true),
-                PopupRow(text: "System Settings opened the pane — toggle the bar on,", dim: true),
-                PopupRow(text: "then click the pill again", dim: true)]
+// refreshPopup() calls panelView, which calls back in here, so a finished
+// scan must not start another.
+func scanMenuBar() {
+    guard !menuBarScanning, Date().timeIntervalSince(menuBarScannedAt) > 2 else { return }
+    menuBarScanning = true
+    DispatchQueue.global(qos: .userInitiated).async {
+        let items = menuBarItems()
+        DispatchQueue.main.async {
+            let keys = { (list: [MenuBarItem]) in list.map { "\($0.app.processIdentifier)|\($0.label)" } }
+            let changed = menuBarCache.map(keys) != keys(items)
+            menuBarCache = items
+            menuBarScanning = false
+            menuBarScannedAt = Date()
+            if changed, openPopup == "menubar" { refreshPopup() }
+        }
     }
-    // refreshPopup() calls back in here, so a finished scan must not start another
-    if !menuBarScanning, Date().timeIntervalSince(menuBarScannedAt) > 2 {
-        menuBarScanning = true
+}
+
+func menuBarAppName(_ item: MenuBarItem) -> String {
+    item.app.localizedName ?? item.app.bundleIdentifier ?? "?"
+}
+
+func menuBarReport() -> MenuBarReport {
+    guard AXIsProcessTrusted() else { return MenuBarReport(items: nil, access: false) }
+    scanMenuBar()
+    guard let items = menuBarCache else { return MenuBarReport(items: nil) }
+    return MenuBarReport(items: menuBarTitles(items.map { (menuBarAppName($0), $0.label) }).map { index, text in
+        MenuBarReport.Item(id: index, title: text, app: menuBarAppName(items[index]),
+                           icon: items[index].app.icon, hidden: items[index].parked)
+    })
+}
+
+let menuBarActions: MenuBarActions = {
+    var actions = MenuBarActions()
+    actions.click = { index in
+        guard let items = menuBarCache, items.indices.contains(index) else { return }
+        let item = items[index]
+        closePopup()
+        // A real click, as a hand gives one: AXPress on an icon behind
+        // the notch leaves the menu bar stuck on screen until that app
+        // quits. An icon with nowhere to click opens its app instead.
         DispatchQueue.global(qos: .userInitiated).async {
-            let items = menuBarItems()
+            guard item.parked || !clickMenuBarItem(item) else { return }
+            tlog("menubar: \(menuBarAppName(item)) has no clickable icon, opening the app")
             DispatchQueue.main.async {
-                let keys = { (list: [MenuBarItem]) in list.map { "\($0.app.processIdentifier)|\($0.label)" } }
-                let changed = menuBarCache.map(keys) != keys(items)
-                menuBarCache = items
-                menuBarScanning = false
-                menuBarScannedAt = Date()
-                if changed, openPopup == "menubar" { refreshPopup() }
+                guard let url = item.app.bundleURL else { return }
+                NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
             }
         }
     }
-    var rows: [PopupRow] = []
-    if let items = menuBarCache {
-        let appName = { (item: MenuBarItem) in
-            item.app.localizedName ?? item.app.bundleIdentifier ?? "?"
-        }
-        for (index, text) in menuBarTitles(items.map { (appName($0), $0.label) }) {
-            let item = items[index]
-            let name = appName(item)
-            rows.append(PopupRow(image: item.app.icon, text: text, detail: item.parked ? "opens app" : "", action: {
-                closePopup()
-                // A real click, as a hand gives one: AXPress on an icon behind
-                // the notch leaves the menu bar stuck on screen until that app
-                // quits. An icon with nowhere to click opens its app instead.
-                DispatchQueue.global(qos: .userInitiated).async {
-                    guard item.parked || !clickMenuBarItem(item) else { return }
-                    tlog("menubar: \(name) has no clickable icon, opening the app")
-                    DispatchQueue.main.async {
-                        guard let url = item.app.bundleURL else { return }
-                        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
-                    }
-                }
-            }))
-        }
-        if items.isEmpty { rows.append(PopupRow(text: "No menu bar apps running", dim: true)) }
-    } else {
-        rows.append(PopupRow(text: "Looking…", dim: true))
+    actions.grantAccess = {
+        closePopup()
+        _ = AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
     }
-    return rows
-}
+    return actions
+}()
 
 // By name, not by process: an app can run two of them, and two rows of
 // one name still choose nothing. The scan follows launch order, so the

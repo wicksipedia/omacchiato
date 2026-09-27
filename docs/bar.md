@@ -46,10 +46,12 @@ then open `StatusGauge.swift`, `StatusPreviews.swift`,
 wttr.in answer, `tests/fixtures/wttr-j1.json`.
 The previews draw every state at bar size and large, in light and dark.
 
-`status_panel` and `clock_panel` pick the design of the status and clock
-popups. `status_panel` takes `gauge` (the default), `control-center` or
-`settings`. `clock_panel` takes `timeline` (the default), `up-next` or
-`month`. Each design shows the same things and takes the same clicks.
+`status_panel`, `clock_panel` and `menubar_panel` pick the design of the
+status, clock and menu bar apps popups. `status_panel` takes `gauge`
+(the default), `control-center` or `settings`. `clock_panel` takes
+`timeline` (the default), `up-next` or `month`. `menubar_panel` takes
+`list` (the default), `grid` or `dock`. Each design shows the same
+things and takes the same clicks.
 
 ```
 status_panel = settings
