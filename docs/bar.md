@@ -359,35 +359,44 @@ leaves out a repository of automated PRs, and `org:name` keeps one
 organisation. For the icon, the Nerd Font pull request glyph is
 U+F407.
 
-Each PR gets one mark, for what it needs next. If more than one
-applies, the first in this list wins:
+The popup is a panel. A bar at the top counts the open PRs by stage,
+and the panel then groups the PRs by stage, in this order:
 
-- a pencil: a draft
-- a red warning: CI failed, or the branch has merge conflicts
-- a yellow clock: CI is running
-- a yellow comment: feedback to resolve, which is changes requested or
-  a review thread from someone else that nobody has resolved
-- a green check: ready to merge, approved with passing checks and no
-  conflicts
-- a muted clock: waiting for a review
+- Needs You: CI failed, the branch has merge conflicts, changes were
+  requested, or a review thread from someone else is not resolved
+- Checks Running
+- In Review: waiting for a review
+- Ready to Merge: approved, with passing checks and no conflicts
+- Drafts
+- Done: merged or closed in the last week, while its notification is
+  unread
 
-Under the mark, a sentence appears only where it says more than the
-mark does: a merge conflict, a failed check, changes requested, or the
-number of threads left to resolve. A pull request that is only waiting
-takes one row.
+A row shows the PR's mark, its title, the repository and number, the
+lines added and removed, and the time since its last change. A PR that
+sits on the branch of another PR is indented under it. Under a PR that
+needs you, a red line says why, such as "2 checks failed" or "3 threads
+to resolve". A click on a row opens the PR.
 
-The pill turns red while CI fails on any open PR. Clicking a PR row or
-the line under it opens the PR. To drop a PR from the list,
-unsubscribe from its notifications on GitHub.
+`github_panel` in `bar-pills.conf` picks another design, with the
+pill's name from `bar-plugins.conf`. `reminders` shows a tile with a
+count for each stage, and a click on a tile shows only that stage.
+`tracker` shows checks, review and merge as three steps on each PR.
+The default is `inbox`.
 
-An update is an unread GitHub notification on the PR. GitHub marks the
-notification read when you open the PR, so the `!` goes at the next
-run after you look. A PR merged (🟣) or closed (⚫) in the last week
-stays in the list, with a merge glyph or an x, while its notification
-is unread. To find those
-notifications the script reads every page of your unread inbox, about
-half a second per 50, while the search runs. If GitHub is out of
-reach, the popup keeps the last list and says when it was fetched.
+```
+github_panel = reminders
+```
+
+The pill turns red while CI fails on any open PR. To drop a PR from
+the list, unsubscribe from its notifications on GitHub.
+
+An update is an unread GitHub notification on the PR. It puts a blue
+dot on the row and a `!` on the pill. GitHub marks the notification
+read when you open the PR, so the dot goes at the next run after you
+look. To find those notifications, the script reads every page of your
+unread inbox, about half a second per 50, while the search runs. If
+GitHub is out of reach, the popup keeps the last list and says when it
+was fetched.
 
 ## The keep-awake pill
 

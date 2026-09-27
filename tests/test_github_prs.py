@@ -86,5 +86,20 @@ class Marks(unittest.TestCase):
                          gh.icon(pr(0, ci="FAILURE"), "me"))
 
 
+class Panel(unittest.TestCase):
+    def test_panel_lists_each_pr_in_stack_order(self):
+        failing = pr(2, ci="FAILURE", base="branch-1")
+        failing["commits"]["nodes"][0]["commit"]["statusCheckRollup"]["contexts"] = {
+            "checkRunCountsByState": [{"state": "FAILURE", "count": 2}, {"state": "SUCCESS", "count": 9}],
+            "statusContextCountsByState": [{"state": "SUCCESS", "count": 1}]}
+        p = gh.render([pr(1, decision="APPROVED"), failing], [], {"a/b#2"}, "me")["panel"]
+        self.assertEqual(p["kind"], "github-prs")
+        first, second = p["prs"]
+        self.assertEqual((first["number"], first["depth"], first["review"]), (1, 0, "approved"))
+        self.assertEqual((second["number"], second["depth"], second["checks"]), (2, 1, "failed"))
+        self.assertEqual(second["check_counts"], {"failed": 2, "passed": 10})
+        self.assertTrue(second["unread"] and not first["unread"])
+
+
 if __name__ == "__main__":
     unittest.main()

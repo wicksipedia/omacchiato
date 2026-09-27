@@ -279,13 +279,12 @@ popup rows, and the bar draws the result. The format is under
   days and active hours.
 - **GitHub pull requests** (`omacchiato-github-prs`): the pill counts your
   open PRs and adds `!` when one has an unread notification. The popup
-  groups them by repository and marks each with what it needs next: a
-  pencil for a draft, a red warning for a failed check or a merge
-  conflict, a yellow clock for a running check, a yellow comment for
-  feedback to resolve, a green check for approved, and a muted clock
-  for waiting. A sentence follows only where it says more than the
-  mark. A PR based on another PR in the list sits under it, indented
-  and marked `↳`.
+  groups them by what they wait for: Needs You, Checks Running, In
+  Review, Ready to Merge, Drafts and Done. A bar at the top counts each
+  group. A red line under a PR that needs you says why, such as a failed
+  check or a thread to resolve. Each row also shows the lines added and
+  removed, and a blue dot marks an unread update. A PR based on another
+  PR in the list sits under it, indented.
 - **Keep awake** (`omacchiato-keep-awake`): a cup while something holds
   the Mac awake, nothing otherwise. It reads the power assertions
   rather than any app's saved setting, ignores the ones the system

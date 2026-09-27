@@ -16,6 +16,7 @@ let package = Package(
                 .product(name: "StatusPanel", package: "ui"),
                 .product(name: "CalendarPanel", package: "ui"),
                 .product(name: "AIUsagePanel", package: "ui"),
+                .product(name: "PRPanel", package: "ui"),
             ],
             path: "helper/bar",
             linkerSettings: [.unsafeFlags([
@@ -27,6 +28,7 @@ let package = Package(
             .product(name: "WeatherPanel", package: "ui"),
             .product(name: "CalendarPanel", package: "ui"),
             .product(name: "AIUsagePanel", package: "ui"),
+            .product(name: "PRPanel", package: "ui"),
         ], path: "tests/bar"),
     ],
     swiftLanguageModes: [.v5]

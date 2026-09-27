@@ -41,6 +41,7 @@ import SwiftUI
 import StatusGauge
 import AIUsagePanel
 import CalendarPanel
+import PRPanel
 import StatusPanel
 import WeatherPanel
 #endif
@@ -2345,7 +2346,21 @@ func panelView(_ name: String) -> AnyView? {
         default: return AnyView(TimelineCalendarPanel(report: report, actions: calendarActions))
         }
     default:
-        guard let json = pluginPanels[name], let report = AIUsageReport(json: json) else { return nil }
+        guard let json = pluginPanels[name] else { return nil }
+        if let report = PRReport(json: json) {
+            var actions = PRActions()
+            actions.open = { url in
+                if url.scheme == "https" { NSWorkspace.shared.open(url) }
+                closePopup()
+            }
+            actions.openAll = { actions.open(URL(string: "https://github.com/pulls")!) }
+            switch pillModes[name + "_panel"] {
+            case "reminders": return AnyView(RemindersPRPanel(report: report, actions: actions))
+            case "tracker": return AnyView(TrackerPRPanel(report: report, actions: actions))
+            default: return AnyView(InboxPRPanel(report: report, actions: actions))
+            }
+        }
+        guard let report = AIUsageReport(json: json) else { return nil }
         let actions = aiUsageActions(report: json["report"] as? String)
         switch pillModes[name + "_panel"] {
         case "screen-time": return AnyView(ScreenTimeAIUsagePanel(report: report, actions: actions))
