@@ -248,6 +248,8 @@ Left to right:
   </tr>
 </table>
 
+<img src="docs/screenshots/popup-weather.png" width="340" alt="The weather popup over a grey, cloudy sky: the place (blurred here), 16° and overcast, feels like 12° with a low of 14° and a high of 18°, an hourly forecast in 3-hour steps with the chance of rain, a 3-day forecast with a temperature bar for each day, and tiles for wind, humidity, UV index, sunrise and sunset">
+
 A popup stays open while the pointer is anywhere in the bar or the
 popup, and closes when it is in neither. Click paths never touch the
 network: each pill fetches on a timer into the model and renders from
