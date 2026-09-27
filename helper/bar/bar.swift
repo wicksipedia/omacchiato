@@ -39,6 +39,7 @@ import UniformTypeIdentifiers
 import SwiftUI
 #if canImport(StatusGauge)
 import StatusGauge
+import AIUsagePanel
 import CalendarPanel
 import StatusPanel
 import WeatherPanel
@@ -845,6 +846,9 @@ var popupGlass: Bool {
 var rightItems: [String: BarItem] = [:]
 // popup rows a plugin last returned, keyed by pill name
 var pluginRows: [String: [PopupRow]] = [:]
+// A plugin's "panel" object, for a plugin that has a SwiftUI panel. It
+// replaces the rows in the popup.
+var pluginPanels: [String: [String: Any]] = [:]
 
 func set(_ name: String, _ mutate: (inout BarItem) -> Void) {
     var item = rightItems[name] ?? BarItem()
@@ -1074,6 +1078,7 @@ func showPluginProblem(_ plugin: BarPlugin, _ problem: (what: String, detail: St
     rows.append(PopupRow(text: "run again", dim: true, action: { runPlugin(plugin) }))
     let good = pluginGoodRows[plugin.name] ?? []
     pluginRows[plugin.name] = rows + (good.isEmpty ? [] : [PopupRow(separator: true)] + good)
+    pluginPanels[plugin.name] = nil
     set(plugin.name) {
         if $0.icon.isEmpty && $0.label.isEmpty { $0.icon = "\u{F071}" }
         $0.iconColor = palette.muted
@@ -1112,6 +1117,7 @@ func runPlugin(_ plugin: BarPlugin) {
             if pluginGate.finish(plugin.name) { runPlugin(plugin) }
             pluginGoodRows[plugin.name] = pluginPopupRows(obj?["rows"] as? [[String: Any]] ?? [], of: plugin)
             pluginRows[plugin.name] = pluginGoodRows[plugin.name]
+            pluginPanels[plugin.name] = obj?["panel"] as? [String: Any]
             let color = pluginColor(obj?["color"] as? String)
             let icon = obj?["icon"] as? String ?? plugin.icon
             let parts = rawParts.map {
@@ -2219,6 +2225,8 @@ func refreshPopup() {
                                width: size.width, height: size.height), display: true)
         return
     }
+    // A plugin that failed has no panel: close it, and the next click shows the error.
+    if popupWindow?.contentView is PanelHost { closePopup(); return }
     guard let name = openPopup, let view = popupView, let window = popupWindow else { return }
     view.rows = popupRows(for: name)
     let size = view.measure()
@@ -2313,7 +2321,7 @@ func hasPopup(_ name: String) -> Bool {
     switch name {
     case "weather": return weatherReport != nil
     case "status", "clock": return true
-    default: return !popupRows(for: name).isEmpty
+    default: return pluginPanels[name] != nil || !popupRows(for: name).isEmpty
     }
 }
 
@@ -2336,13 +2344,48 @@ func panelView(_ name: String) -> AnyView? {
         case "month": return AnyView(MonthCalendarPanel(report: report, actions: calendarActions))
         default: return AnyView(TimelineCalendarPanel(report: report, actions: calendarActions))
         }
-    default: return nil
+    default:
+        guard let json = pluginPanels[name], let report = AIUsageReport(json: json) else { return nil }
+        let actions = aiUsageActions(report: json["report"] as? String)
+        switch pillModes[name + "_panel"] {
+        case "screen-time": return AnyView(ScreenTimeAIUsagePanel(report: report, actions: actions))
+        case "forecast": return AnyView(ForecastAIUsagePanel(report: report, actions: actions))
+        default: return AnyView(RingsAIUsagePanel(report: report, actions: actions))
+        }
     }
+}
+
+func aiUsageActions(report command: String?) -> AIUsageActions {
+    var actions = AIUsageActions()
+    actions.open = { url in
+        if url.scheme == "https" { NSWorkspace.shared.open(url) }
+        closePopup()
+    }
+    actions.openReport = {
+        closePopup()
+        guard let command, !command.isEmpty else { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            _ = shell("/usr/bin/open", ["-na", terminalApp, "--args",
+                                        "--title=omacchiato-plugin", "--command=\(command)"])
+        }
+    }
+    return actions
 }
 
 final class PanelHost: NSHostingView<AnyView> {
     // The popup window never becomes key, so the first click must count.
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    // A panel can change its own size, as when a section opens. Keep the
+    // top right corner under the pill.
+    override func layout() {
+        super.layout()
+        let size = fittingSize
+        guard let window, abs(size.height - window.frame.height) > 0.5 || abs(size.width - window.frame.width) > 0.5
+        else { return }
+        window.setFrame(NSRect(x: window.frame.maxX - size.width, y: window.frame.maxY - size.height,
+                               width: size.width, height: size.height), display: true)
+    }
 }
 
 func showPanel(_ name: String, _ view: AnyView, under anchor: NSRect, on surface: BarSurface) {
@@ -3379,10 +3422,6 @@ func appMenuRows() -> [PopupRow] {
     }
     if !rows.isEmpty { rows[0].highlight = true }
     return rows
-}
-
-extension String {
-    func ifEmpty(_ fallback: String) -> String { isEmpty ? fallback : self }
 }
 
 // --- cheatsheet (Super+K) --------------------------------------------------

@@ -232,35 +232,55 @@ Copilot logos are black or white, so they take the theme's label
 colour. The percents are green under 50%, yellow under 80% and red
 above.
 
-The popup has one section for each `--panel` provider. The first opens
-with the popup and the rest start closed; click a header to open one.
-If tokscale reports more than one Codex account, each account gets a
-section. A header carries the provider's logo, its name, the plan in
-small quiet type, and the usage and reset of the five-hour window, so a
-closed section still answers the question you opened the popup for.
+The popup is a panel with one card for each `--panel` provider. If
+tokscale reports more than one Codex account, each account gets a card.
+A card header carries the provider's logo, its name and the plan. Click
+a header to open or close the card. A closed card shows the percent of
+its fullest window. `--open` names the providers whose cards start
+open, separated by commas. The default is the first `--panel` provider.
 
-Inside, each usage window takes one row: its name, a bar, and the
-percent with the time until it resets. The bar has a tick at the share
-of the window that has passed, and the bar's colour compares the two:
-green at or near an even pace, yellow more than 5 points ahead, and red
-more than 20 points ahead or at 90% used. A window whose plan carries
-no limit is left out.
+```ini
+command = omacchiato-ai-usage --pill claude,codex --panel claude,codex,copilot --open claude
+```
 
-A status row appears only while a provider is not operational. It reads
+An open card shows the usage windows as rings, outside in, as the
+Activity app shows its rings. A table next to the rings gives each
+window's percent and the time until it resets. The tick on a ring marks
+the share of the window that has passed, and the colour compares the
+two: green at or near an even pace, orange more than 5 points ahead,
+and red more than 20 points ahead or at 90% used. A window whose plan
+carries no limit is left out.
+
+A status box appears only while a provider is not operational. It reads
 the provider's components on its status page:
 Claude Code on status.claude.com, the Codex components on
 status.openai.com, and Copilot on githubstatus.com. It ignores the
 page's overall rating, which also drops when another product of that
 company has a problem. If the worst component is not operational, the
 pill gets 🏥 for a minor problem or 🪦 for a major one. An open
-incident adds rows with its title, its state and the time of its latest
-update, and a click opens the incident page. status.openai.com lists no
-incidents, so Codex has the status row only.
+incident adds its title, its state and the time of its latest update,
+and a click opens the incident page. The box stays on screen when the
+card is closed. status.openai.com lists no incidents, so Codex has the
+status line only.
 
-After the providers, a closed section holds the last seven days from
-tokscale's read of the session logs on this Mac: tokens per day and per
-model with their value at API prices, sessions, active days and active
-hours. The last row opens tokscale's full report in a terminal.
+After the providers, a card shows the last seven days from tokscale's
+read of the session logs on this Mac. A bar chart gives the tokens of
+each day, split by model, with a dashed line at the daily average. A
+bar under the chart gives each model's share of the week. The card also
+gives the week's tokens and their value at API prices. The last row
+opens tokscale's full report in a terminal.
+
+`<pill>_panel` in `bar-pills.conf` picks another design, with the pill's
+name from `bar-plugins.conf`: `screen-time` leads with the daily
+average, and `forecast` says where each window is heading at the
+current rate. The default is `rings`.
+
+```
+ai_panel = forecast
+```
+
+The script prints the panel's data under `panel`, and the rows too. The
+bar shows the rows when the panel data is missing.
 
 The script runs `tokscale usage` at most every five minutes and reads
 the week every ten minutes. If a provider is missing from one run, the

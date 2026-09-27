@@ -11,12 +11,14 @@ let package = Package(
         .library(name: "WeatherPanel", targets: ["WeatherPanel"]),
         .library(name: "StatusPanel", targets: ["StatusPanel"]),
         .library(name: "CalendarPanel", targets: ["CalendarPanel"]),
+        .library(name: "AIUsagePanel", targets: ["AIUsagePanel"]),
     ],
     targets: [
         .target(name: "StatusGauge"),
         .target(name: "WeatherPanel"),
         .target(name: "StatusPanel", dependencies: ["StatusGauge"]),
         .target(name: "CalendarPanel", dependencies: ["StatusPanel"]),
+        .target(name: "AIUsagePanel", dependencies: ["StatusPanel"]),
     ],
     swiftLanguageModes: [.v5]
 )

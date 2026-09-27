@@ -160,7 +160,9 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   use `x-apple.systempreferences:`. `foldSections`
   keys a section's open state by header text, because the detail changes.
   `parts` is a list of `icon`, `icon_color` and `label` that the pill
-  draws after its own icon and label. Plugin commands run with
+  draws after its own icon and label. A `panel` object with
+  `kind = ai-usage` replaces the rows with the SwiftUI panel in
+  `helper/ui/Sources/AIUsagePanel`, which `AIUsageReport(json:)` decodes. Plugin commands run with
   the bar's TCC grants.
 - AppKit hit-tests a non-opaque window by alpha, so a pill background
   with zero alpha takes no clicks. `NSColor.clickable` raises zero alpha
