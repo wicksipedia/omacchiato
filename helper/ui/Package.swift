@@ -10,11 +10,13 @@ let package = Package(
         .library(name: "StatusGauge", targets: ["StatusGauge"]),
         .library(name: "WeatherPanel", targets: ["WeatherPanel"]),
         .library(name: "StatusPanel", targets: ["StatusPanel"]),
+        .library(name: "CalendarPanel", targets: ["CalendarPanel"]),
     ],
     targets: [
         .target(name: "StatusGauge"),
         .target(name: "WeatherPanel"),
         .target(name: "StatusPanel", dependencies: ["StatusGauge"]),
+        .target(name: "CalendarPanel", dependencies: ["StatusPanel"]),
     ],
     swiftLanguageModes: [.v5]
 )

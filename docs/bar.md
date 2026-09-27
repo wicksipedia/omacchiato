@@ -39,12 +39,22 @@ click turns wi-fi on or off. `wifi` and
 `battery` show only when the file names them, for example
 `wifi = icon` or `battery = time`. `status = hide` removes the gauge.
 
-To change the gauge, its panel or the weather popup, open
-`helper/ui/Package.swift` in Xcode, then open `StatusGauge.swift`,
-`StatusPreviews.swift` or `WeatherPanel.swift` and show the canvas
-(Option-Command-Return). The weather previews read a saved
+To change the gauge or a panel, open `helper/ui/Package.swift` in Xcode,
+then open `StatusGauge.swift`, `StatusPreviews.swift`,
+`CalendarPreviews.swift` or `WeatherPanel.swift` and show the canvas
+(Option-Command-Return). Each preview file shows every design. The weather previews read a saved
 wttr.in answer, `tests/fixtures/wttr-j1.json`.
 The previews draw every state at bar size and large, in light and dark.
+
+`status_panel` and `clock_panel` pick the design of the status and clock
+popups. `status_panel` takes `gauge` (the default), `control-center` or
+`settings`. `clock_panel` takes `timeline` (the default), `up-next` or
+`month`. Each design shows the same things and takes the same clicks.
+
+```
+status_panel = settings
+clock_panel = month
+```
 
 `popup = glass` draws the popups on Liquid Glass, so the desktop shows
 through them, instead of the theme's flat background. The system

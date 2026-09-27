@@ -39,6 +39,7 @@ import UniformTypeIdentifiers
 import SwiftUI
 #if canImport(StatusGauge)
 import StatusGauge
+import CalendarPanel
 import StatusPanel
 import WeatherPanel
 #endif
@@ -2311,17 +2312,30 @@ func showPopup(_ name: String, under anchor: NSRect, on surface: BarSurface, ali
 func hasPopup(_ name: String) -> Bool {
     switch name {
     case "weather": return weatherReport != nil
-    case "status": return true
+    case "status", "clock": return true
     default: return !popupRows(for: name).isEmpty
     }
 }
 
-// The weather and status popups are SwiftUI panels. They draw their own
+// The weather, status and clock popups are SwiftUI panels. They draw their own
 // background, so they have no rows, no theme border and take no keys.
 func panelView(_ name: String) -> AnyView? {
     switch name {
     case "weather": return weatherReport.map { AnyView(WeatherPanel(report: $0).clipShape(.rect(cornerRadius: 16))) }
-    case "status": return AnyView(GaugeStatusPanel(report: statusReport(), actions: statusActions))
+    case "status":
+        let report = statusReport()
+        switch pillModes["status_panel"] {
+        case "control-center": return AnyView(ControlCenterStatusPanel(report: report, actions: statusActions))
+        case "settings": return AnyView(SettingsStatusPanel(report: report, actions: statusActions))
+        default: return AnyView(GaugeStatusPanel(report: report, actions: statusActions))
+        }
+    case "clock":
+        let report = calendarReport()
+        switch pillModes["clock_panel"] {
+        case "up-next": return AnyView(UpNextCalendarPanel(report: report, actions: calendarActions))
+        case "month": return AnyView(MonthCalendarPanel(report: report, actions: calendarActions))
+        default: return AnyView(TimelineCalendarPanel(report: report, actions: calendarActions))
+        }
     default: return nil
     }
 }
@@ -2459,88 +2473,34 @@ func loadTodayEvents() {
     }
 }
 
-// How long you have, on the next event only: the clock time is already
-// in the row, and a count on every row reads as noise.
-func countdown(to event: EKEvent, now: Date) -> String {
-    if event.isAllDay { return "" }
-    let left = event.startDate.timeIntervalSince(now)
-    if left <= 0 { return "now" }
-    if left < 3600 { return "in \(Int(left / 60)) min" }
-    if left < 12 * 3600 { return "in \(Int(left / 3600)) h" }
-    return ""
-}
-
-func eventRows() -> [PopupRow] {
+func calendarReport() -> CalendarReport {
+    let now = Date()
     guard EKEventStore.authorizationStatus(for: .event) == .fullAccess else {
-        return [PopupRow(separator: true),
-                PopupRow(text: "see today's events…", dim: true, action: {
-                    NSWorkspace.shared.open(URL(
-                        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars")!)
-                    closePopup()
-                })]
+        return CalendarReport(now: now, access: false, events: [])
     }
     loadTodayEvents()
-    let now = Date()
-    let left = todayEvents.filter { $0.endDate > now }
-    guard !left.isEmpty else {
-        return [PopupRow(separator: true), PopupRow(text: "nothing left today", dim: true)]
-    }
-    let time = DateFormatter()
-    time.dateFormat = "HH:mm"
-    var rows = [PopupRow(separator: true), PopupRow(text: "today", dim: true)]
-    // a long title would widen the whole popup: measure() takes the
-    // widest row, and the month grid below it holds the useful width
-    for (index, event) in left.prefix(6).enumerated() {
-        let title = event.title ?? "event"
-        let cut = title.count > 20 ? String(title.prefix(19)) + "…" : title
-        rows.append(PopupRow(icon: "\u{F111}",
-                             text: event.isAllDay ? cut : time.string(from: event.startDate) + "  " + cut,
-                             detail: event.isAllDay ? "all day" : countdown(to: event, now: now),
-                             highlight: index == 0,
-                             action: calendarLink(id: event.calendarItemIdentifier, start: event.startDate,
-                                                  repeats: event.hasRecurrenceRules)
-                                 .map { link in { closePopup(); NSWorkspace.shared.open(link) } },
-                             iconTint: event.calendar.cgColor.flatMap { NSColor(cgColor: $0) }))
-    }
-    return rows
+    return CalendarReport(now: now, access: true, events: todayEvents.filter { $0.endDate > now }.map { event in
+        CalendarReport.Event(id: event.calendarItemIdentifier, title: event.title ?? "Event",
+                             start: event.startDate, end: event.endDate, allDay: event.isAllDay,
+                             repeats: event.hasRecurrenceRules, location: event.location,
+                             color: event.calendar.cgColor.map { Color(cgColor: $0) } ?? .blue)
+    })
 }
 
-func calendarRows() -> [PopupRow] { monthRows(Date()) + eventRows() }
-
-func monthRows(_ now: Date) -> [PopupRow] {
-    var rows: [PopupRow] = []
-    var cal = Calendar(identifier: .gregorian)
-    cal.firstWeekday = 2 // Monday, like the shell version
-    let title = DateFormatter()
-    title.dateFormat = "MMMM yyyy"
-    rows.append(PopupRow(text: title.string(from: now).lowercased(),
-                         detail: "week \(cal.component(.weekOfYear, from: now))", hero: true))
-    rows.append(PopupRow(dim: true, columns: ["mo", "tu", "we", "th", "fr", "sa", "su"]))
-
-    guard let monthStart = cal.date(from: cal.dateComponents([.year, .month], from: now)),
-          let range = cal.range(of: .day, in: .month, for: now) else { return rows }
-    let today = cal.component(.day, from: now)
-    // weekday index with Monday = 0
-    let leading = (cal.component(.weekday, from: monthStart) + 5) % 7
-    let prevDays = cal.range(of: .day, in: .month,
-                             for: cal.date(byAdding: .month, value: -1, to: monthStart)!)!.count
-
-    var cells: [(Int, Bool)] = [] // day, in-month
-    for i in 0..<leading { cells.append((prevDays - leading + 1 + i, false)) }
-    for d in range { cells.append((d, true)) }
-    var next = 1
-    while cells.count % 7 != 0 { cells.append((next, false)); next += 1 }
-
-    for week in stride(from: 0, to: cells.count, by: 7) {
-        let slice = cells[week..<min(week + 7, cells.count)]
-        let monday = cal.date(byAdding: .day, value: week - leading, to: monthStart) ?? monthStart
-        rows.append(PopupRow(action: { openCalendarWeek(of: monday) },
-                             columns: slice.map { $0.1 ? String($0.0) : "" },
-                             columnAccent: slice.firstIndex { $0.0 == today && $0.1 }
-                                 .map { $0 - slice.startIndex }))
+let calendarActions: CalendarActions = {
+    var actions = CalendarActions()
+    actions.openWeek = openCalendarWeek(of:)
+    actions.openEvent = { event in
+        guard let link = calendarLink(id: event.id, start: event.start, repeats: event.repeats) else { return }
+        closePopup()
+        NSWorkspace.shared.open(link)
     }
-    return rows
-}
+    actions.grantAccess = {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars")!)
+        closePopup()
+    }
+    return actions
+}()
 
 func brightnessRows() -> [PopupRow] {
     var value: Float = 0
@@ -3000,7 +2960,6 @@ func popupRows(for name: String) -> [PopupRow] {
     popupBarSource = []
     switch name {
     case "apple": return appleMenuRows()
-    case "clock": return calendarRows()
     case "battery": return batteryRows()
     case "brightness": return brightnessRows()
     case "volume": return volumeRows()

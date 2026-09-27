@@ -54,12 +54,18 @@ struct GaugeGlyph: View {
     }
 }
 
-struct PanelCard<Content: View>: View {
+public struct PanelCard<Content: View>: View {
     var title: String?
     var symbol: String?
     @ViewBuilder var content: Content
 
-    var body: some View {
+    public init(title: String? = nil, symbol: String? = nil, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.symbol = symbol
+        self.content = content()
+    }
+
+    public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let title {
                 Label(title.uppercased(), systemImage: symbol ?? "")
@@ -76,12 +82,17 @@ struct PanelCard<Content: View>: View {
 }
 
 // A row that highlights under the pointer and runs its action on a click.
-struct HoverRow<Content: View>: View {
+public struct HoverRow<Content: View>: View {
     var action: (() -> Void)?
     @ViewBuilder var content: Content
     @State private var hovered = false
 
-    var body: some View {
+    public init(action: (() -> Void)?, @ViewBuilder content: () -> Content) {
+        self.action = action
+        self.content = content()
+    }
+
+    public var body: some View {
         content
             .padding(.horizontal, 6)
             .padding(.vertical, 5)
@@ -235,11 +246,13 @@ struct SettingsRow: View {
 // coloured icons and set the text colour from the windows behind.
 // The fill keeps the text legible over any window.
 struct PanelBackground: ViewModifier {
+    var width: CGFloat = 320
+
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: 22)
         content
             .padding(12)
-            .frame(width: 320)
+            .frame(width: width)
             .background {
                 Color.clear.glassEffect(.regular, in: shape)
                 shape.fill(.background.opacity(0.6))
@@ -248,5 +261,5 @@ struct PanelBackground: ViewModifier {
 }
 
 extension View {
-    func statusPanelBackground() -> some View { modifier(PanelBackground()) }
+    public func statusPanelBackground(width: CGFloat = 320) -> some View { modifier(PanelBackground(width: width)) }
 }

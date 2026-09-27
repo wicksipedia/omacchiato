@@ -14,6 +14,7 @@ let package = Package(
                 .product(name: "StatusGauge", package: "ui"),
                 .product(name: "WeatherPanel", package: "ui"),
                 .product(name: "StatusPanel", package: "ui"),
+                .product(name: "CalendarPanel", package: "ui"),
             ],
             path: "helper/bar",
             linkerSettings: [.unsafeFlags([
@@ -23,6 +24,7 @@ let package = Package(
             "omacchiato-bar",
             .product(name: "StatusGauge", package: "ui"),
             .product(name: "WeatherPanel", package: "ui"),
+            .product(name: "CalendarPanel", package: "ui"),
         ], path: "tests/bar"),
     ],
     swiftLanguageModes: [.v5]

@@ -2,6 +2,7 @@ import AppKit
 import CoreLocation
 import Testing
 @testable import omacchiato_bar
+import CalendarPanel
 import WeatherPanel
 
 // Serialized: some tests set the globals popupBarSource and NSTimeZone.default.
@@ -104,13 +105,21 @@ struct BarTests {
     func monthGrid() throws {
         let cal = Calendar(identifier: .gregorian)
         let sep21 = try #require(cal.date(from: DateComponents(year: 2026, month: 9, day: 21, hour: 12)))
-        let month = monthRows(sep21)
-        let weeks = Array(month.compactMap(\.columns).dropFirst())
-        #expect(weeks.first == ["", "1", "2", "3", "4", "5", "6"])
+        let weeks = monthWeeks(sep21)
+        #expect(weeks.first?.cells.map(\.day) == [nil, 1, 2, 3, 4, 5, 6])
         #expect(weeks.count == 5)
-        #expect(weeks.allSatisfy { $0.count == 7 })
-        let today = try #require(month.first { $0.columnAccent != nil })
-        #expect(today.columns?[today.columnAccent!] == "21")
+        #expect(weeks.allSatisfy { $0.cells.count == 7 })
+        #expect(weeks.flatMap(\.cells).filter(\.today).map(\.day) == [21])
+        #expect(cal.component(.weekday, from: weeks[0].monday) == 2)
+    }
+
+    @Test("events that overlap share the width, and a free lane is reused")
+    func lanes() {
+        let t = { (h: Double) in Date(timeIntervalSinceReferenceDate: h * 3600) }
+        let spans = [(t(9), t(10)), (t(9.5), t(11)), (t(10), t(10.5)), (t(12), t(13))]
+        let lanes = timelineLanes(spans.map { (start: $0.0, end: $0.1) })
+        #expect(lanes.map(\.at) == [0, 1, 0, 0])
+        #expect(lanes.map(\.of) == [2, 2, 2, 1])
     }
 
     @Test("a week link counts the day the clocks change")
