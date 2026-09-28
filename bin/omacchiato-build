@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# omacchiato-build <target> <out-path> — build and sign one binary.
+#
+# Targets: helper, overview, omni (out-path is the binary) and bar,
+# gesture (out-path is the .app). install.sh and omacchiato-release both
+# build through this script, so a release holds the same binaries as a
+# local build.
+#
+# With an Apple Development identity in the keychain, the binary is signed
+# with it, and TCC grants survive a rebuild. Without one, the linker's
+# ad-hoc signature stays, and every rebuild needs new grants.
+set -euo pipefail
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TARGET="${1:?usage: omacchiato-build <helper|overview|omni|bar|gesture> <out-path>}"
+OUT="${2:?usage: omacchiato-build <target> <out-path>}"
+PF=/System/Library/PrivateFrameworks
+G="$REPO_DIR/helper/gesture"
+
+IDENTITY=""
+security find-identity -p codesigning -v 2>/dev/null | grep -q "Apple Development" && IDENTITY="Apple Development"
+
+sign() {
+  local id=$1 path=$2
+  shift 2
+  if [ -n "$IDENTITY" ]; then
+    codesign -f -s "$IDENTITY" --identifier "$id" ${1+"$@"} "$path" 2>/dev/null ||
+      echo "omacchiato-build: could not sign $path" >&2
+  elif [ $# -gt 0 ]; then
+    # the entitlements need a signature, so an ad-hoc one carries them
+    codesign -f --sign - "$@" "$path" 2>/dev/null || echo "omacchiato-build: could not sign $path" >&2
+  fi
+}
+
+mkdir -p "$(dirname "$OUT")"
+case "$TARGET" in
+  helper)
+    swiftc -O -F "$PF" -framework DisplayServices -o "$OUT" "$REPO_DIR/helper/main.swift"
+    sign com.omacchiato.helper "$OUT"
+    ;;
+  overview)
+    swiftc -O -F "$PF" -framework SkyLight -o "$OUT" "$REPO_DIR/helper/overview.swift"
+    sign com.omacchiato.overview "$OUT"
+    ;;
+  omni)
+    # C11 lets yyjson.h and omniwm.h both declare the yyjson typedefs
+    clang -std=c11 -O2 -arch arm64 -o "$OUT" "$G/omniwm.c" "$G/yyjson.c" "$G/omnicli.c" \
+      -framework ApplicationServices -framework CoreFoundation
+    sign com.omacchiato.omni "$OUT"
+    ;;
+  bar)
+    # The plist is compiled into the binary and is also the bundle's
+    # Info.plist. The usage strings live there.
+    mkdir -p "$OUT/Contents/MacOS"
+    swiftc -O -F "$PF" -framework SkyLight -framework DisplayServices \
+      -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker "$REPO_DIR/helper/bar-info.plist" \
+      -o "$OUT/Contents/MacOS/omacchiato-bar" "$REPO_DIR"/helper/bar/*.swift "$REPO_DIR"/helper/ui/Sources/*/*.swift
+    cp "$REPO_DIR/helper/bar-info.plist" "$OUT/Contents/Info.plist"
+    sign com.omacchiato.bar "$OUT"
+    ;;
+  gesture)
+    mkdir -p "$OUT/Contents/MacOS"
+    clang -std=c11 -O3 -fobjc-arc -arch arm64 \
+      -Wno-pointer-integer-compare -Wno-incompatible-pointer-types-discards-qualifiers -Wno-absolute-value \
+      -o "$OUT/Contents/MacOS/omacchiato-gesture" "$G/omniwm.c" "$G/yyjson.c" "$G/haptic.c" "$G/event_tap.m" "$G/main.m" \
+      -framework CoreFoundation -framework IOKit -F"$PF" -framework MultitouchSupport \
+      -framework ApplicationServices -framework Cocoa -ldl
+    cp "$G/gesture-info.plist" "$OUT/Contents/Info.plist"
+    echo "APPL????" > "$OUT/Contents/PkgInfo"
+    sign com.omacchiato.gesture "$OUT" --entitlements "$G/accessibility.entitlements"
+    ;;
+  *)
+    echo "omacchiato-build: unknown target $TARGET" >&2
+    exit 2
+    ;;
+esac

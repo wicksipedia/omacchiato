@@ -228,15 +228,23 @@ mkdir -p "$HOME/.local/bin"
 # tiny compiled helper (cursor position, wallpaper) — replaces the
 # cliclick and desktoppr dependencies; swiftc ships with the CLT that
 # Homebrew already requires
-if [ ! -x "$HOME/.local/bin/omacchiato-helper" ] || [ "$REPO_DIR/helper/main.swift" -nt "$HOME/.local/bin/omacchiato-helper" ]; then
+# A binary built before the Apple Development identity existed has only
+# an ad-hoc signature. Build it again, so its grants survive later builds.
+unsigned() {
+  security find-identity -p codesigning -v 2>/dev/null | grep -q "Apple Development" &&
+    codesign -dv "$1" 2>&1 | grep -q '^TeamIdentifier=not set'
+}
+if [ ! -x "$HOME/.local/bin/omacchiato-helper" ] || [ "$REPO_DIR/helper/main.swift" -nt "$HOME/.local/bin/omacchiato-helper" ] \
+  || unsigned "$HOME/.local/bin/omacchiato-helper"; then
   log "Building omacchiato-helper"
-  swiftc -O -F /System/Library/PrivateFrameworks -framework DisplayServices -o "$HOME/.local/bin/omacchiato-helper" "$REPO_DIR/helper/main.swift"
+  "$REPO_DIR/bin/omacchiato-build" helper "$HOME/.local/bin/omacchiato-helper"
 fi
 
 # workspace overview overlay (4-finger swipe up)
-if [ ! -x "$HOME/.local/bin/omacchiato-overview" ] || [ "$REPO_DIR/helper/overview.swift" -nt "$HOME/.local/bin/omacchiato-overview" ]; then
+if [ ! -x "$HOME/.local/bin/omacchiato-overview" ] || [ "$REPO_DIR/helper/overview.swift" -nt "$HOME/.local/bin/omacchiato-overview" ] \
+  || unsigned "$HOME/.local/bin/omacchiato-overview"; then
   log "Building omacchiato-overview"
-  swiftc -O -F /System/Library/PrivateFrameworks -framework SkyLight -o "$HOME/.local/bin/omacchiato-overview" "$REPO_DIR/helper/overview.swift"
+  "$REPO_DIR/bin/omacchiato-build" overview "$HOME/.local/bin/omacchiato-overview"
 fi
 
 
@@ -260,14 +268,11 @@ BAR_BIN="$BAR_APP/Contents/MacOS/omacchiato-bar"
 if [ ! -x "$BAR_BIN" ] \
   || [ -n "$(find "$REPO_DIR/helper/bar" -name '*.swift' -newer "$BAR_BIN")" ] \
   || [ -n "$(find "$REPO_DIR/helper/ui" -name '*.swift' -newer "$BAR_BIN")" ] \
-  || [ "$REPO_DIR/helper/bar-info.plist" -nt "$BAR_BIN" ]; then
+  || [ "$REPO_DIR/helper/bar-info.plist" -nt "$BAR_BIN" ] \
+  || unsigned "$BAR_APP"; then
   log "Building omacchiato-bar"
-  mkdir -p "$BAR_APP/Contents/MacOS"
-  swiftc -O -F /System/Library/PrivateFrameworks -framework SkyLight -framework DisplayServices \
-    -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker "$REPO_DIR/helper/bar-info.plist" \
-    -o "$BAR_BIN" "$REPO_DIR"/helper/bar/*.swift "$REPO_DIR"/helper/ui/Sources/*/*.swift
+  "$REPO_DIR/bin/omacchiato-build" bar "$BAR_APP"
 fi
-cp "$REPO_DIR/helper/bar-info.plist" "$BAR_APP/Contents/Info.plist"
 mark "built-bar-app"
 # The dwindle, borders and ffm daemons are gone. migrate-omacosy.sh stops
 # them, and these are the files they left.
@@ -287,14 +292,9 @@ fi
 rm -f "$REPO_DIR/config/aerospace/aerospace.toml"
 rmdir "$REPO_DIR/config/aerospace" 2>/dev/null || true
 
-# stable code identity so TCC grants survive rebuilds (skipped when no
-# signing identity is present — then re-grant after each rebuild)
-if security find-identity -p codesigning -v 2>/dev/null | grep -q "Apple Development"; then
-  codesign -f -s "Apple Development" --identifier com.omacchiato.helper "$HOME/.local/bin/omacchiato-helper" 2>/dev/null || true
-  # the BUNDLE is signed now; the identifier is what grants key on
-  codesign -f -s "Apple Development" --identifier com.omacchiato.bar "$BAR_APP" 2>/dev/null || true
-  codesign -f -s "Apple Development" --identifier com.omacchiato.overview "$HOME/.local/bin/omacchiato-overview" 2>/dev/null || true
-else
+# omacchiato-build signs each binary with a stable identity, so TCC
+# grants survive rebuilds. Without one, re-grant after each rebuild.
+if ! security find-identity -p codesigning -v 2>/dev/null | grep -q "Apple Development"; then
   log "NOTE: no Apple Development signing identity found."
   log "  macOS ties permission grants to the binary's signature — without a"
   log "  stable identity, every rebuild (each install.sh re-run) invalidates"
@@ -302,10 +302,6 @@ else
   log "  System Settings > Privacy & Security. Free fix: Xcode > Settings >"
   log "  Accounts > Manage Certificates > + > Apple Development, then re-run."
 fi
-# (omacchiato-gesture is signed in section 4, right after its build —
-# the linker signs each build ad-hoc, so signing here
-# would be overwritten and every rebuild would invalidate the
-# Accessibility grant again)
 
 mkdir -p "$HOME/.config/omacchiato"
 # app choices, RESOLVED (apps.local.conf already applied) and copied: the
@@ -487,8 +483,7 @@ fi
 # ~3 ms launch; no grants involved, so it is simply rebuilt when stale)
 G="$REPO_DIR/helper/gesture"
 if [ ! -x "$HOME/.local/bin/omacchiato-omni" ] || find "$G/omniwm.c" "$G/omniwm.h" "$G/omnicli.c" "$G/yyjson.c" "$G/yyjson.h" -newer "$HOME/.local/bin/omacchiato-omni" 2>/dev/null | grep -q .; then
-  # C11 lets yyjson.h and omniwm.h both declare the yyjson typedefs
-  clang -std=c11 -O2 -arch arm64 -o "$HOME/.local/bin/omacchiato-omni" "$G/omniwm.c" "$G/yyjson.c" "$G/omnicli.c" -framework ApplicationServices -framework CoreFoundation \
+  "$REPO_DIR/bin/omacchiato-build" omni "$HOME/.local/bin/omacchiato-omni" \
     || echo "omacchiato-omni build failed"
 fi
 GESTURE_STALE=""
@@ -498,24 +493,10 @@ fi
 if [ -n "$GESTURE_STALE" ]; then
   log "Building omacchiato-gesture (grant Accessibility + Input Monitoring when prompted)"
   launchctl unload "$HOME/Library/LaunchAgents/com.omacchiato.gesture.plist" 2>/dev/null || true
-  G="$REPO_DIR/helper/gesture"
-  mkdir -p "$GESTURE_APP/Contents/MacOS"
-  clang -std=c11 -O3 -fobjc-arc -arch arm64 \
-    -Wno-pointer-integer-compare -Wno-incompatible-pointer-types-discards-qualifiers -Wno-absolute-value \
-    -o "$GESTURE_BIN" "$G/omniwm.c" "$G/yyjson.c" "$G/haptic.c" "$G/event_tap.m" "$G/main.m" \
-    -framework CoreFoundation -framework IOKit -F/System/Library/PrivateFrameworks -framework MultitouchSupport \
-    -framework ApplicationServices -framework Cocoa -ldl \
+  # the build signs the app before launchd can start it: the only
+  # binary launchd ever starts is the one the user grants
+  "$REPO_DIR/bin/omacchiato-build" gesture "$GESTURE_APP" \
     || echo "omacchiato-gesture build failed"
-  cp "$G/gesture-info.plist" "$GESTURE_APP/Contents/Info.plist"
-  echo "APPL????" > "$GESTURE_APP/Contents/PkgInfo"
-  # sign BEFORE anything launches: the only binary launchd ever starts
-  # is the one the user grants
-  if security find-identity -p codesigning -v 2>/dev/null | grep -q "Apple Development"; then
-    codesign -f -s "Apple Development" --identifier com.omacchiato.gesture \
-      --entitlements "$G/accessibility.entitlements" "$GESTURE_APP" 2>/dev/null || true
-  else
-    codesign -f --entitlements "$G/accessibility.entitlements" --sign - "$GESTURE_APP" 2>/dev/null || true
-  fi
 fi
 cat > "$HOME/Library/LaunchAgents/com.omacchiato.gesture.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

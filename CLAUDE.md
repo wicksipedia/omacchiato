@@ -60,6 +60,13 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   launchctl kickstart -k "gui/$(id -u)/com.omacchiato.bar"
   ```
 
+- `bin/omacchiato-build <target> <out-path>` builds and signs one
+  binary. `install.sh` and `bin/omacchiato-release` both use it.
+- `bin/omacchiato-release` publishes `origin/main` as a GitHub release
+  with a date version (`vYYYY.MM.DD`). It needs a clean tree, the Apple
+  Development identity and `gh`. It reuses the gesture app of the last
+  release while `helper/gesture/` is the same. The plan is in
+  `docs/plans/2026-09-28-versioned-releases-design.md`.
 - TCC keys a grant on the code signature. Sign with the same Apple
   Development identity and identifier every time, and the bar, overview
   and helper keep their grants across rebuilds.

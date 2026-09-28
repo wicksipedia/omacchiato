@@ -1,0 +1,182 @@
+#!/usr/bin/env python3
+"""omacchiato-release: build, sign and publish a GitHub release of main.
+
+The version is the date, vYYYY.MM.DD. A second release on the same day
+is vYYYY.MM.DD.1, then .2, because
+the first one counts as .0. The release holds one tarball with the
+signed binaries, and SHA256SUMS.
+
+The gesture app keeps the build of the previous release while nothing
+in helper/gesture/ changed. TCC pins its Accessibility grant to the
+exact build, so a new build costs every user that grant.
+"""
+
+import datetime
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parent.parent
+TEAM_ID = "V66SHHUE58"
+REQUIREMENT = 'anchor apple generic and certificate leaf[subject.OU] = "%s"' % TEAM_ID
+REMOTE = "origin"
+BRANCH = "main"
+# target, path inside the tarball
+BINARIES = [
+    ("helper", "omacchiato-helper"),
+    ("overview", "omacchiato-overview"),
+    ("omni", "omacchiato-omni"),
+    ("bar", "omacchiato-bar.app"),
+    ("gesture", "omacchiato-gesture.app"),
+]
+VERSION_TAG = re.compile(r"^v(\d{4})\.(\d{2})\.(\d{2})(?:\.(\d+))?$")
+
+
+def version_key(tag):
+    """Sort key for a version tag, or None if the tag is not a version."""
+    m = VERSION_TAG.match(tag)
+    if not m:
+        return None
+    return tuple(int(g) for g in m.groups(default="0"))
+
+
+def next_version(today, tags):
+    """The first free version for today among the existing tags."""
+    base = "v" + today.strftime("%Y.%m.%d")
+    if base not in tags:
+        return base
+    n = 1
+    while "%s.%d" % (base, n) in tags:
+        n += 1
+    return "%s.%d" % (base, n)
+
+
+def latest_version(tags):
+    """The newest version tag, or None."""
+    versions = [t for t in tags if version_key(t)]
+    return max(versions, key=version_key) if versions else None
+
+
+def repo_slug(url):
+    """owner/name from a GitHub remote URL, in HTTPS or SSH form."""
+    m = re.search(r"github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?/?$", url)
+    if not m:
+        raise ValueError("not a GitHub remote: %s" % url)
+    return "%s/%s" % m.groups()
+
+
+def tarball_name(version):
+    return "omacchiato-%s-arm64.tar.gz" % version
+
+
+def die(msg):
+    sys.exit("\033[1;31m==>\033[0m " + msg)
+
+
+def say(msg):
+    print("\033[1;34m==>\033[0m " + msg, flush=True)
+
+
+def run(*args, **kw):
+    return subprocess.run(args, check=True, **kw)
+
+
+def out(*args):
+    return subprocess.run(args, check=True, capture_output=True, text=True).stdout.strip()
+
+
+def git(*args):
+    return out("git", "-C", str(REPO), *args)
+
+
+def preflight():
+    if git("status", "--porcelain"):
+        die("the tree has local changes; commit or stash them first")
+    run("git", "-C", str(REPO), "fetch", "--quiet", "--tags", REMOTE, BRANCH)
+    if git("rev-parse", "HEAD") != git("rev-parse", "%s/%s" % (REMOTE, BRANCH)):
+        die("HEAD is not %s/%s; release only what is on %s" % (REMOTE, BRANCH, BRANCH))
+    if "Apple Development" not in out("security", "find-identity", "-p", "codesigning", "-v"):
+        die("no Apple Development identity in the keychain")
+    if shutil.which("gh") is None:
+        die("gh is missing: brew install gh")
+
+
+def gesture_unchanged(prev):
+    """True if helper/gesture/ is the same at the previous tag and HEAD."""
+    return subprocess.run(["git", "-C", str(REPO), "diff", "--quiet", prev, "HEAD",
+                           "--", "helper/gesture"]).returncode == 0
+
+
+def reuse_gesture(slug, prev, stage, tmp):
+    """Copy the gesture app out of the previous release. False if that fails."""
+    dl = tmp / "prev"
+    dl.mkdir()
+    try:
+        run("gh", "release", "download", prev, "-R", slug, "-D", str(dl),
+            "-p", tarball_name(prev))
+        run("tar", "-xzf", str(dl / tarball_name(prev)), "-C", str(dl), "omacchiato-gesture.app")
+        verify(dl / "omacchiato-gesture.app")
+        shutil.copytree(dl / "omacchiato-gesture.app", stage / "omacchiato-gesture.app", symlinks=True)
+    except (subprocess.CalledProcessError, OSError):
+        shutil.rmtree(stage / "omacchiato-gesture.app", ignore_errors=True)
+        return False
+    return True
+
+
+def verify(path):
+    run("codesign", "--verify", "--strict", "-R=" + REQUIREMENT, str(path))
+
+
+def main():
+    preflight()
+    tags = set(git("tag", "--list", "v*").split())
+    version = next_version(datetime.date.today(), tags)
+    prev = latest_version(tags)
+    slug = repo_slug(git("remote", "get-url", REMOTE))
+    head = git("rev-parse", "HEAD")
+    say("releasing %s (%s) to %s" % (version, head[:9], slug))
+
+    say("running the tests")
+    run(str(REPO / "bin" / "omacchiato-test"))
+
+    with tempfile.TemporaryDirectory() as t:
+        tmp = Path(t)
+        stage = tmp / "stage"
+        stage.mkdir()
+        notes = []
+        for target, name in BINARIES:
+            if target == "gesture" and prev and gesture_unchanged(prev):
+                say("reusing the gesture app of %s" % prev)
+                if reuse_gesture(slug, prev, stage, tmp):
+                    continue
+                say("could not reuse it; building a new one")
+            say("building %s" % name)
+            run(str(REPO / "bin" / "omacchiato-build"), target, str(stage / name))
+            if target == "gesture":
+                notes.append("The gesture daemon is a new build. Grant it Accessibility "
+                             "and Input Monitoring again after the update.")
+        for _, name in BINARIES:
+            verify(stage / name)
+
+        tarball = tmp / tarball_name(version)
+        run("tar", "-czf", str(tarball), "-C", str(stage), *[n for _, n in BINARIES])
+        sums = tmp / "SHA256SUMS"
+        # run in tmp, so the file names the tarball without a folder
+        sums.write_text(subprocess.run(["shasum", "-a", "256", tarball.name], cwd=tmp,
+                                       check=True, capture_output=True, text=True).stdout)
+
+        say("publishing %s" % version)
+        cmd = ["gh", "release", "create", version, str(tarball), str(sums),
+               "-R", slug, "--target", head, "--title", version, "--generate-notes"]
+        if notes:
+            cmd += ["--notes", "\n".join(notes)]
+        run(*cmd)
+    run("git", "-C", str(REPO), "fetch", "--quiet", REMOTE, "tag", version)
+    say("released %s" % version)
+
+
+if __name__ == "__main__":
+    main()
