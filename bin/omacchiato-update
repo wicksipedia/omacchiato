@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
-# omacchiato-update [--check] — pull this repo and re-run install.sh.
+# omacchiato-update [--check] [--edge] — move this repo to the newest
+# release and re-run install.sh.
 #
-# install.sh is idempotent and rebuilds only the binaries whose sources
-# changed, so updating is a pull plus a re-run. This finds the clone
+# The newest release is the newest date tag (vYYYY.MM.DD) on the branch
+# that the clone tracks. At a release tag, install.sh downloads that
+# release's binaries. --edge takes the tip of the branch instead, and
+# install.sh builds the binaries. A branch with no release tags also
+# takes its tip. This finds the clone
 # (the bin/ scripts are symlinked into it), refuses to touch a tree
 # that has your own edits in it, shows what changed, and hands over to
 # install.sh.
@@ -39,9 +43,17 @@ requirements() {
 }
 
 # The same for permissions. --check only reports, so it opens no Settings page.
-MODE="${1:-}"
+CHECK=""
+EDGE=""
+for arg in "$@"; do
+  case "$arg" in
+    --check) CHECK=1 ;;
+    --edge) EDGE=1 ;;
+    *) die "usage: omacchiato-update [--check] [--edge]" ;;
+  esac
+done
 permissions() {
-  [ "$MODE" = --check ] && return
+  [ -n "$CHECK" ] && return
   "$REPO/bin/omacchiato-permissions" || say "WARNING: a permission above is still off. Run omacchiato-permissions to try again."
 }
 
@@ -59,9 +71,17 @@ say "checking for updates"
 # the branch's own upstream, so a clone of a fork pulls from the fork
 UPSTREAM="$(git -C "$REPO" rev-parse --abbrev-ref '@{upstream}' 2>/dev/null)" ||
   die "$BRANCH tracks no remote branch; set one with: git branch -u <remote>/<branch>"
-git -C "$REPO" fetch --quiet "${UPSTREAM%%/*}" "${UPSTREAM#*/}" || die "could not reach the remote"
+git -C "$REPO" fetch --quiet --tags "${UPSTREAM%%/*}" "${UPSTREAM#*/}" || die "could not reach the remote"
+TARGET="$UPSTREAM"
+if [ -z "$EDGE" ]; then
+  # sed, not head: head would close the pipe early, and pipefail would stop the script
+  TAG="$(git -C "$REPO" tag --list 'v*' --merged "$UPSTREAM" --sort=-v:refname |
+    { grep -E '^v[0-9]{4}\.[0-9]{2}\.[0-9]{2}(\.[0-9]+)?$' || true; } | sed -n 1p)"
+  [ -n "$TAG" ] && TARGET="$TAG"
+fi
+say "newest: $TARGET"
 LOCAL="$(git -C "$REPO" rev-parse HEAD)"
-REMOTE="$(git -C "$REPO" rev-parse "$UPSTREAM")"
+REMOTE="$(git -C "$REPO" rev-parse "$TARGET^{commit}")"
 
 if [ "$LOCAL" = "$REMOTE" ]; then
   say "already up to date ($(git -C "$REPO" log -1 --format='%h %s'))"
@@ -76,13 +96,13 @@ fi
 # clone ends up in a state nobody can reason about.
 if git -C "$REPO" merge-base --is-ancestor "$REMOTE" "$LOCAL"; then
   AHEAD="$(git -C "$REPO" rev-list --count "$REMOTE..$LOCAL")"
-  say "nothing to pull — you are $AHEAD commit(s) ahead of $UPSTREAM"
+  say "nothing to pull — you are $AHEAD commit(s) ahead of $TARGET"
   requirements
   permissions
   exit 0
 fi
 if ! git -C "$REPO" merge-base --is-ancestor "$LOCAL" "$REMOTE"; then
-  die "your branch and $UPSTREAM have both moved — resolve by hand"
+  die "your branch and $TARGET have both moved — resolve by hand"
 fi
 
 COUNT="$(git -C "$REPO" rev-list --count "$LOCAL..$REMOTE")"
@@ -90,18 +110,18 @@ say "$COUNT new commit(s):"
 git -C "$REPO" log --no-merges --format='    %h %s' "$LOCAL..$REMOTE" | head -20
 [ "$COUNT" -gt 20 ] && say "    ... and $((COUNT - 20)) more"
 
-if [ "${1:-}" = "--check" ]; then
+if [ -n "$CHECK" ]; then
   say "run without --check to apply"
   requirements
   exit 0
 fi
 
 say "pulling"
-git -C "$REPO" merge --ff-only "$UPSTREAM" --quiet ||
+git -C "$REPO" merge --ff-only "$REMOTE" --quiet ||
   die "fast-forward failed; resolve by hand"
 
 # install.sh rebuilds only what changed and restarts the agents it
 # owns, so it is the update step as well as the install step
 say "running install.sh"
 "$REPO/install.sh"
-say "updated to $(git -C "$REPO" log -1 --format='%h %s')"
+say "updated to $TARGET ($(git -C "$REPO" log -1 --format='%h %s'))"

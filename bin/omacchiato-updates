@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
-"""Print a bar pill when the omacchiato clone has commits to pull.
+"""Print a bar pill when a newer omacchiato release is out.
 
 The pill is hidden while the clone is up to date. Its popup lists the new
 commits and has a row that runs omacchiato-update in a terminal.
 """
 
 import json
+import re
 import shlex
 import subprocess
 from pathlib import Path
 
 UPDATE_ICON = "\U000f06b0"
 SHOWN = 10
+RELEASE = re.compile(r"^v\d{4}\.\d{2}\.\d{2}(\.\d+)?$")
 
 # ~/.local/bin holds a link to this file, so resolve it to find the clone
 REPO = Path(__file__).resolve().parent.parent
@@ -45,14 +47,23 @@ def pill(subjects):
     return {"icon": UPDATE_ICON, "label": str(len(subjects)), "color": "yellow", "rows": rows}
 
 
+def newest_release(tags):
+    """The first release tag in git's newest-first list, or None."""
+    return next((t for t in tags.split() if RELEASE.match(t)), None)
+
+
 def main():
     upstream = git("rev-parse", "--abbrev-ref", "@{upstream}")
     subjects = []
     if upstream:
         # With no arguments, fetch uses the remote that the branch tracks.
         # If the fetch fails, the last fetched state stays.
-        git("fetch", "--quiet", timeout=30)
-        log = git("log", "--no-merges", "--format=%s", "HEAD..@{upstream}")
+        git("fetch", "--quiet", "--tags", timeout=30)
+        # omacchiato-update takes the newest release, or the branch tip
+        # while the branch has no release
+        tags = git("tag", "--list", "v*", "--merged", "@{upstream}", "--sort=-v:refname") or ""
+        target = newest_release(tags) or "@{upstream}"
+        log = git("log", "--no-merges", "--format=%s", "HEAD.." + target)
         subjects = log.splitlines() if log else []
     print(json.dumps(pill(subjects)))
 

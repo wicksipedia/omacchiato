@@ -225,23 +225,75 @@ pkill -f "Karabiner-Menu|Karabiner-NotificationWindow" 2>/dev/null || true
 # theme scripts on PATH (the Karabiner theme chord calls ~/.local/bin/theme-next)
 mkdir -p "$HOME/.local/bin"
 
-# tiny compiled helper (cursor position, wallpaper) — replaces the
-# cliclick and desktoppr dependencies; swiftc ships with the CLT that
-# Homebrew already requires
+# --- Release binaries -------------------------------------------------------
+# A clean clone at a release tag installs the binaries of that GitHub
+# release and builds nothing. The tarball must match SHA256SUMS, and each
+# binary must carry the signature of the release team. If a step fails,
+# the builds below run. OMACCHIATO_BUILD=1 always builds.
+# curl sets no quarantine mark, so Gatekeeper does not ask for notarization.
+RELEASE_TEAM=V66SHHUE58 # keep in sync with TEAM_ID in bin/omacchiato-release
+PREBUILT=""
+fetch_release() {
+  local tag remote url slug base name
+  [ -z "${OMACCHIATO_BUILD:-}" ] || return 1
+  [ -z "$(git -C "$REPO_DIR" status --porcelain 2>/dev/null)" ] || return 1
+  tag="$(git -C "$REPO_DIR" describe --exact-match --tags --match 'v[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9]*' HEAD 2>/dev/null)" || return 1
+  remote="$(git -C "$REPO_DIR" rev-parse --abbrev-ref '@{upstream}' 2>/dev/null)" || return 1
+  url="$(git -C "$REPO_DIR" remote get-url "${remote%%/*}")" || return 1
+  slug="$(printf '%s\n' "$url" | sed -nE 's#.*github\.com[:/]([^/]+/[^/]+)$#\1#p' | sed 's/\.git$//')"
+  [ -n "$slug" ] || return 1
+  base="https://github.com/$slug/releases/download/$tag"
+  RELEASE_TMP="$(mktemp -d)"
+  log "Downloading the $tag binaries from $slug"
+  if ! { curl -fsSL -o "$RELEASE_TMP/omacchiato-$tag-arm64.tar.gz" "$base/omacchiato-$tag-arm64.tar.gz" &&
+    curl -fsSL -o "$RELEASE_TMP/SHA256SUMS" "$base/SHA256SUMS" &&
+    (cd "$RELEASE_TMP" && shasum -a 256 -s -c SHA256SUMS) &&
+    mkdir "$RELEASE_TMP/x" && tar -xzf "$RELEASE_TMP/omacchiato-$tag-arm64.tar.gz" -C "$RELEASE_TMP/x"; }; then
+    log "The download or its checksum failed."
+    return 1
+  fi
+  for name in omacchiato-helper omacchiato-overview omacchiato-omni omacchiato-bar.app omacchiato-gesture.app; do
+    codesign --verify --strict -R="anchor apple generic and certificate leaf[subject.OU] = \"$RELEASE_TEAM\"" \
+      "$RELEASE_TMP/x/$name" 2>/dev/null && continue
+    log "$name in $tag does not carry the signature of team $RELEASE_TEAM."
+    return 1
+  done
+  PREBUILT="$RELEASE_TMP/x"
+}
+cdhash() { codesign -dv --verbose=4 "$1" 2>&1 | sed -n 's/^CDHash=//p'; }
+# Replace an installed binary with the release copy, unless it is the same build.
+place() {
+  [ "$(cdhash "$PREBUILT/$1")" = "$(cdhash "$2")" ] && return 0
+  rm -rf "$2"
+  mkdir -p "$(dirname "$2")"
+  cp -R "$PREBUILT/$1" "$2"
+}
+RELEASE_TMP=""
+trap '[ -z "$RELEASE_TMP" ] || rm -rf "$RELEASE_TMP"' EXIT
+fetch_release || log "Building the binaries from source"
+
 # A binary built before the Apple Development identity existed has only
 # an ad-hoc signature. Build it again, so its grants survive later builds.
 unsigned() {
   security find-identity -p codesigning -v 2>/dev/null | grep -q "Apple Development" &&
     codesign -dv "$1" 2>&1 | grep -q '^TeamIdentifier=not set'
 }
-if [ ! -x "$HOME/.local/bin/omacchiato-helper" ] || [ "$REPO_DIR/helper/main.swift" -nt "$HOME/.local/bin/omacchiato-helper" ] \
+
+# tiny compiled helper (cursor position, wallpaper) — replaces the
+# cliclick and desktoppr dependencies; swiftc ships with the CLT that
+# Homebrew already requires
+if [ -n "$PREBUILT" ]; then
+  place omacchiato-helper "$HOME/.local/bin/omacchiato-helper"
+elif [ ! -x "$HOME/.local/bin/omacchiato-helper" ] || [ "$REPO_DIR/helper/main.swift" -nt "$HOME/.local/bin/omacchiato-helper" ] \
   || unsigned "$HOME/.local/bin/omacchiato-helper"; then
   log "Building omacchiato-helper"
   "$REPO_DIR/bin/omacchiato-build" helper "$HOME/.local/bin/omacchiato-helper"
 fi
 
 # workspace overview overlay (4-finger swipe up)
-if [ ! -x "$HOME/.local/bin/omacchiato-overview" ] || [ "$REPO_DIR/helper/overview.swift" -nt "$HOME/.local/bin/omacchiato-overview" ] \
+if [ -n "$PREBUILT" ]; then
+  place omacchiato-overview "$HOME/.local/bin/omacchiato-overview"
+elif [ ! -x "$HOME/.local/bin/omacchiato-overview" ] || [ "$REPO_DIR/helper/overview.swift" -nt "$HOME/.local/bin/omacchiato-overview" ] \
   || unsigned "$HOME/.local/bin/omacchiato-overview"; then
   log "Building omacchiato-overview"
   "$REPO_DIR/bin/omacchiato-build" overview "$HOME/.local/bin/omacchiato-overview"
@@ -265,7 +317,9 @@ fi
 # strings live there and a stale binary asks for nothing
 BAR_APP="$HOME/.local/share/omacchiato/omacchiato-bar.app"
 BAR_BIN="$BAR_APP/Contents/MacOS/omacchiato-bar"
-if [ ! -x "$BAR_BIN" ] \
+if [ -n "$PREBUILT" ]; then
+  place omacchiato-bar.app "$BAR_APP"
+elif [ ! -x "$BAR_BIN" ] \
   || [ -n "$(find "$REPO_DIR/helper/bar" -name '*.swift' -newer "$BAR_BIN")" ] \
   || [ -n "$(find "$REPO_DIR/helper/ui" -name '*.swift' -newer "$BAR_BIN")" ] \
   || [ "$REPO_DIR/helper/bar-info.plist" -nt "$BAR_BIN" ] \
@@ -294,7 +348,7 @@ rmdir "$REPO_DIR/config/aerospace" 2>/dev/null || true
 
 # omacchiato-build signs each binary with a stable identity, so TCC
 # grants survive rebuilds. Without one, re-grant after each rebuild.
-if ! security find-identity -p codesigning -v 2>/dev/null | grep -q "Apple Development"; then
+if [ -z "$PREBUILT" ] && ! security find-identity -p codesigning -v 2>/dev/null | grep -q "Apple Development"; then
   log "NOTE: no Apple Development signing identity found."
   log "  macOS ties permission grants to the binary's signature — without a"
   log "  stable identity, every rebuild (each install.sh re-run) invalidates"
@@ -482,12 +536,20 @@ fi
 # omacchiato-omni: the scripts' held-socket client for OmniWM (plain C,
 # ~3 ms launch; no grants involved, so it is simply rebuilt when stale)
 G="$REPO_DIR/helper/gesture"
-if [ ! -x "$HOME/.local/bin/omacchiato-omni" ] || find "$G/omniwm.c" "$G/omniwm.h" "$G/omnicli.c" "$G/yyjson.c" "$G/yyjson.h" -newer "$HOME/.local/bin/omacchiato-omni" 2>/dev/null | grep -q .; then
+if [ -n "$PREBUILT" ]; then
+  place omacchiato-omni "$HOME/.local/bin/omacchiato-omni"
+elif [ ! -x "$HOME/.local/bin/omacchiato-omni" ] || find "$G/omniwm.c" "$G/omniwm.h" "$G/omnicli.c" "$G/yyjson.c" "$G/yyjson.h" -newer "$HOME/.local/bin/omacchiato-omni" 2>/dev/null | grep -q .; then
   "$REPO_DIR/bin/omacchiato-build" omni "$HOME/.local/bin/omacchiato-omni" \
     || echo "omacchiato-omni build failed"
 fi
 GESTURE_STALE=""
-if [ ! -x "$GESTURE_BIN" ]; then GESTURE_STALE=1
+if [ -n "$PREBUILT" ]; then
+  if [ "$(cdhash "$PREBUILT/omacchiato-gesture.app")" != "$(cdhash "$GESTURE_APP")" ]; then
+    log "Installing omacchiato-gesture (grant Accessibility + Input Monitoring when prompted)"
+    launchctl unload "$HOME/Library/LaunchAgents/com.omacchiato.gesture.plist" 2>/dev/null || true
+    place omacchiato-gesture.app "$GESTURE_APP"
+  fi
+elif [ ! -x "$GESTURE_BIN" ]; then GESTURE_STALE=1
 elif find "$REPO_DIR/helper/gesture" -newer "$GESTURE_BIN" 2>/dev/null | grep -q .; then GESTURE_STALE=1
 fi
 if [ -n "$GESTURE_STALE" ]; then

@@ -19,8 +19,13 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   names in `bar-plugins.conf` and the herdr config. `install.sh` and
   `uninstall.sh` run it first, so they know the new names only. The new
   signing identifiers need new TCC grants.
-- `omacchiato-update` pulls the branch that the local branch tracks, then
-  runs `install.sh` again.
+- `omacchiato-update` fast-forwards the local branch to the newest date
+  tag on the branch that it tracks, then runs `install.sh` again.
+  `--edge`, or a branch with no tags, takes the branch tip. At a tag,
+  `install.sh` downloads the binaries of that GitHub release, and
+  checks `SHA256SUMS` and the team ID in `RELEASE_TEAM`. It replaces
+  a binary only when its CDHash changed. `OMACCHIATO_BUILD=1` forces a
+  build.
 - `config/requirements.conf` holds the minimum app versions that
   `bin/omacchiato-requirements` checks. Raise one when Omacchiato starts to
   write a setting that only a newer version of the app reads.

@@ -61,8 +61,9 @@ macOS privacy (TCC) blocks launchd services from reading `~/Documents`,
 `~/Desktop` and `~/Downloads`. If you clone there anyway, the installer
 copies the configs instead; edits then need an `install.sh` re-run.
 
-`install.sh` compiles the helper binaries, so it needs Apple's Command
-Line Tools (`xcode-select --install`). Homebrew requires them too, so a
+`install.sh` compiles the helper binaries, except at a release tag,
+where it downloads the signed binaries of that release instead. It
+needs Apple's Command Line Tools (`xcode-select --install`). Homebrew requires them too, so a
 Mac with Homebrew already has them, and `install.sh` stops with that
 command when they are missing. Full Xcode is not needed. A free Apple
 Development certificate, which you make in Xcode under Settings >
@@ -85,13 +86,23 @@ asks you to approve its driver extension.
 To update:
 
 ```sh
-omacchiato-update          # pull, then re-run the installer
+omacchiato-update          # move to the newest release, then re-run the installer
 omacchiato-update --check  # only say whether there is anything new
+omacchiato-update --edge   # take the newest commit instead, and build it
 ```
 
+A release is a date tag, such as `v2026.09.28`, with a GitHub release
+that holds the signed binaries. At a release tag, `install.sh`
+downloads them with `curl`, checks the checksum and the signature, and
+builds nothing. If a check fails, it builds from source. Do not
+download a release in a browser: the browser marks the files, and
+macOS then refuses to run them. `OMACCHIATO_BUILD=1 ./install.sh`
+always builds from source.
+
 `omacchiato-update` refuses a clone with local edits and a branch that
-has diverged, and pulls the branch that yours tracks, so a clone of a
-fork updates from the fork. Nothing contacts the network unless you
+has diverged, and follows the branch that yours tracks, so a clone of a
+fork updates from the fork. A branch with no release tags updates to its
+newest commit. Nothing contacts the network unless you
 run it.
 
 ## What you get
@@ -306,8 +317,8 @@ popup rows, and the bar draws the result. The format is under
 - **CPU, memory and disk** (`omacchiato-stats`): the percentage in use,
   in yellow from 75 % and red from 90 %. The popups list the processes
   that use the most CPU or memory, and the free space on the disk.
-- **Updates** (`omacchiato-updates`): shows only when your clone has
-  commits to pull, with their count. The popup lists them, and a row
+- **Updates** (`omacchiato-updates`): shows only when a newer release
+  is out, with the number of new commits. The popup lists them, and a row
   runs `omacchiato-update` in a terminal.
 - **AirPods** (`omacchiato-airpods`): shows only while AirPods Pro or
   AirPods Max are connected, with the lowest battery level. The popup

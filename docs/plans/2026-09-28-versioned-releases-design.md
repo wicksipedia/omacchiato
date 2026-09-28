@@ -97,19 +97,17 @@ them at a pinned version and checks a pinned hash.
    never installs the binaries that failed.
 3. **Do not sign again on the user's Mac.** A release binary keeps the
    signature it came with. `install.sh` signs only what it built.
-4. **Record the version** in `~/.local/state/omacchiato/version`, next
-   to the manifest. `uninstall.sh` removes it.
-5. **`omacchiato-update` follows tags.** It fetches tags from the
+4. **`omacchiato-update` follows tags.** It fetches tags from the
    remote that the branch tracks, takes the newest `v*` tag
    (`git tag --sort=-v:refname`), and fast-forwards the local branch to
    that tag with `git merge --ff-only`. The branch stays `main`, so the
    current checks (local changes, ahead, diverged) still apply.
    `omacchiato-update --edge` keeps the old behaviour: pull the branch
    tip and build locally.
-6. **`omacchiato-updates` (the pill)** compares the local `HEAD` with
+5. **`omacchiato-updates` (the pill)** compares the local `HEAD` with
    the newest tag, not with the branch tip. The popup lists the commits
    between the two.
-7. **Existing installs.** The first update to a release changes the
+6. **Existing installs.** The first update to a release changes the
    signature of the bar, the helper and the overview from the user's own
    certificate to the maintainer's certificate. Each of them then needs
    its grants again, one time. `omacchiato-permissions` already runs at
@@ -173,7 +171,9 @@ environment that needs the maintainer's approval.
   protected environment in phase 3.
 - **Certificate expiry.** An Apple Development certificate expires after
   one year. Renew it before the next release. The subject stays the
-  same, so the grants stay.
+  same, so the grants stay. Not yet tested: whether `codesign --verify` rejects
+  an old release after the certificate expires. If it does, install.sh
+  builds from source. Signing the release with `--timestamp` may fix it.
 - **Forks.** A fork has no releases, or has releases signed with a
   different certificate. The requirement check fails, and `install.sh`
   builds locally. The team ID variable lets a fork change the check.
