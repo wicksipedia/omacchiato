@@ -121,26 +121,11 @@ func panelView(_ name: String) -> AnyView? {
     switch name {
     case "weather": return weatherReport.map { AnyView(WeatherPanel(report: $0).clipShape(.rect(cornerRadius: 16))) }
     case "status":
-        let report = statusReport()
-        switch pillModes["status_panel"] {
-        case "control-center": return AnyView(ControlCenterStatusPanel(report: report, actions: statusActions))
-        case "settings": return AnyView(SettingsStatusPanel(report: report, actions: statusActions))
-        default: return AnyView(GaugeStatusPanel(report: report, actions: statusActions))
-        }
+        return statusPanel(pillModes["status_panel"], statusReport(), statusActions)
     case "menubar":
-        let report = menuBarReport()
-        switch pillModes["menubar_panel"] {
-        case "grid": return AnyView(GridMenuBarPanel(report: report, actions: menuBarActions))
-        case "dock": return AnyView(DockMenuBarPanel(report: report, actions: menuBarActions))
-        default: return AnyView(ListMenuBarPanel(report: report, actions: menuBarActions))
-        }
+        return menuBarPanel(pillModes["menubar_panel"], menuBarReport(), menuBarActions)
     case "activity":
-        let report = activityReport()
-        switch pillModes["activity_panel"] {
-        case "widgets": return AnyView(WidgetsActivityPanel(report: report, actions: activityActions))
-        case "top": return AnyView(TopActivityPanel(report: report, actions: activityActions))
-        default: return AnyView(MonitorActivityPanel(report: report, actions: activityActions))
-        }
+        return activityPanel(pillModes["activity_panel"], activityReport(), activityActions)
     case "volume": return soundReport().map { AnyView(SoundPanel(report: $0, actions: soundActions)) }
     case "brightness": return AnyView(DisplayPanel(report: displayReport(), actions: displayActions))
     case "bluetooth": return AnyView(BluetoothPanel(report: bluetoothReport(), actions: bluetoothActions))
@@ -149,12 +134,7 @@ func panelView(_ name: String) -> AnyView? {
     case "apple", "appmenu":
         return cascadePanel(name)
     case "clock":
-        let report = calendarReport()
-        switch pillModes["clock_panel"] {
-        case "up-next": return AnyView(UpNextCalendarPanel(report: report, actions: calendarActions))
-        case "month": return AnyView(MonthCalendarPanel(report: report, actions: calendarActions))
-        default: return AnyView(TimelineCalendarPanel(report: report, actions: calendarActions))
-        }
+        return calendarPanel(pillModes["clock_panel"], calendarReport(), calendarActions)
     default:
         guard let json = pluginPanels[name] else { return rowsPanel(popupRows(for: name)) }
         if let report = StatsReport(json: json) {
@@ -185,19 +165,75 @@ func panelView(_ name: String) -> AnyView? {
                 closePopup()
             }
             actions.openAll = { actions.open(URL(string: "https://github.com/pulls")!) }
-            switch pillModes[name + "_panel"] {
-            case "reminders": return AnyView(RemindersPRPanel(report: report, actions: actions))
-            case "tracker": return AnyView(TrackerPRPanel(report: report, actions: actions))
-            default: return AnyView(InboxPRPanel(report: report, actions: actions))
-            }
+            return prPanel(pillModes[name + "_panel"], report, actions)
         }
         guard let report = AIUsageReport(json: json) else { return nil }
-        let actions = aiUsageActions(report: json["report"] as? String)
-        switch pillModes[name + "_panel"] {
-        case "screen-time": return AnyView(ScreenTimeAIUsagePanel(report: report, actions: actions))
-        case "forecast": return AnyView(ForecastAIUsagePanel(report: report, actions: actions))
-        default: return AnyView(RingsAIUsagePanel(report: report, actions: actions))
-        }
+        return aiUsagePanel(pillModes[name + "_panel"], report, aiUsageActions(report: json["report"] as? String))
+    }
+}
+
+// Each design of a panel, by its name in bar-pills.conf. The popup and the
+// settings window's preview both draw through these, so they cannot differ.
+// Keep the names in sync with panelDesigns in Settings.swift.
+func statusPanel(_ design: String?, _ report: StatusReport, _ actions: StatusActions) -> AnyView {
+    switch design {
+    case "control-center": return AnyView(ControlCenterStatusPanel(report: report, actions: actions))
+    case "settings": return AnyView(SettingsStatusPanel(report: report, actions: actions))
+    default: return AnyView(GaugeStatusPanel(report: report, actions: actions))
+    }
+}
+
+func menuBarPanel(_ design: String?, _ report: MenuBarReport, _ actions: MenuBarActions) -> AnyView {
+    switch design {
+    case "grid": return AnyView(GridMenuBarPanel(report: report, actions: actions))
+    case "dock": return AnyView(DockMenuBarPanel(report: report, actions: actions))
+    default: return AnyView(ListMenuBarPanel(report: report, actions: actions))
+    }
+}
+
+func activityPanel(_ design: String?, _ report: ActivityReport, _ actions: ActivityActions) -> AnyView {
+    switch design {
+    case "widgets": return AnyView(WidgetsActivityPanel(report: report, actions: actions))
+    case "top": return AnyView(TopActivityPanel(report: report, actions: actions))
+    default: return AnyView(MonitorActivityPanel(report: report, actions: actions))
+    }
+}
+
+func calendarPanel(_ design: String?, _ report: CalendarReport, _ actions: CalendarActions) -> AnyView {
+    switch design {
+    case "up-next": return AnyView(UpNextCalendarPanel(report: report, actions: actions))
+    case "month": return AnyView(MonthCalendarPanel(report: report, actions: actions))
+    default: return AnyView(TimelineCalendarPanel(report: report, actions: actions))
+    }
+}
+
+func prPanel(_ design: String?, _ report: PRReport, _ actions: PRActions) -> AnyView {
+    switch design {
+    case "reminders": return AnyView(RemindersPRPanel(report: report, actions: actions))
+    case "tracker": return AnyView(TrackerPRPanel(report: report, actions: actions))
+    default: return AnyView(InboxPRPanel(report: report, actions: actions))
+    }
+}
+
+func aiUsagePanel(_ design: String?, _ report: AIUsageReport, _ actions: AIUsageActions) -> AnyView {
+    switch design {
+    case "screen-time": return AnyView(ScreenTimeAIUsagePanel(report: report, actions: actions))
+    case "forecast": return AnyView(ForecastAIUsagePanel(report: report, actions: actions))
+    default: return AnyView(RingsAIUsagePanel(report: report, actions: actions))
+    }
+}
+
+// A design drawn with the sample data of the Xcode previews, and buttons
+// that do nothing, for the settings window.
+func designPreview(kind: String, design: String?) -> AnyView? {
+    switch kind {
+    case "status": return statusPanel(design, .onBattery, .init())
+    case "menubar": return menuBarPanel(design, .busy, .init())
+    case "activity": return activityPanel(design, .building, .init())
+    case "clock": return calendarPanel(design, .busy, .init())
+    case "github-prs": return prPanel(design, .busy, .init())
+    case "ai-usage": return aiUsagePanel(design, .busy, .init())
+    default: return nil
     }
 }
 

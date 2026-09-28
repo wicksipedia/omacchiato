@@ -167,7 +167,9 @@ struct SettingsPillPage: View {
                 }
                 if !pill.panelDesigns.isEmpty || pill.aiUsage != nil {
                     Section {
-                        if !pill.panelDesigns.isEmpty {
+                        if let kind = pill.panelKind, actions.preview(kind, pill.panelValue) != nil {
+                            SettingsDesignPicker(pill: pill, kind: kind, actions: actions)
+                        } else if !pill.panelDesigns.isEmpty {
                             Picker("Design", selection: Binding(get: { pill.panelValue },
                                                                 set: { actions.set(pill.key + "_panel", $0) })) {
                                 ForEach(pill.shownPanelDesigns, id: \.self) { Text($0.title).tag($0.value) }
@@ -175,6 +177,9 @@ struct SettingsPillPage: View {
                         }
                         if let options = pill.aiUsage {
                             SettingsAIUsagePopup(options: options) { actions.setPlugin(pill.key, "command", $0.command) }
+                        }
+                        if let kind = pill.panelKind, let chosen = actions.preview(kind, pill.panelValue) {
+                            SettingsDesignPreview(view: chosen)
                         }
                     } header: {
                         Text("Popup")
@@ -193,6 +198,72 @@ struct SettingsPillPage: View {
         .navigationTitle(pill.title)
     }
 }
+
+// The designs of a popup as thumbnails to pick from. Each is the real
+// panel with the sample data of the Xcode previews, so no popup needs
+// opening to compare them.
+struct SettingsDesignPicker: View {
+    var pill: SettingsReport.Pill
+    var kind: String
+    var actions: SettingsActions
+
+    static let thumbScale: CGFloat = 0.36
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+                ForEach(pill.shownPanelDesigns, id: \.self) { choice in
+                    let on = choice.value == pill.panelValue
+                    Button { actions.set(pill.key + "_panel", choice.value) } label: {
+                        VStack(spacing: 6) {
+                            thumbnail(actions.preview(kind, choice.value))
+                                .overlay(RoundedRectangle(cornerRadius: 10)
+                                    .strokeBorder(on ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.separator),
+                                                  lineWidth: on ? 3 : 1))
+                            Text(choice.title)
+                                .font(.callout.weight(on ? .semibold : .regular))
+                                .foregroundStyle(on ? .primary : .secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(choice.title) design")
+                    .accessibilityAddTraits(on ? .isSelected : [])
+                }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
+    }
+
+    // The top of the panel, scaled down on a desktop. A tall panel is cut off.
+    func thumbnail(_ view: AnyView?) -> some View {
+        (view ?? AnyView(EmptyView()))
+            .fixedSize()
+            .allowsHitTesting(false)
+            .scaleEffect(Self.thumbScale, anchor: .top)
+            .padding(.top, 10)
+            .frame(width: 150, height: 180, alignment: .top)
+            .background(settingsDesktop)
+            .clipShape(.rect(cornerRadius: 10))
+            .accessibilityHidden(true)
+    }
+}
+
+// The chosen design at full size, on a desktop as wide as the form.
+struct SettingsDesignPreview: View {
+    var view: AnyView
+
+    var body: some View {
+        view.fixedSize()
+            .allowsHitTesting(false)
+            .padding(24)
+            .frame(maxWidth: .infinity)
+            .background(settingsDesktop)
+            .clipShape(.rect(cornerRadius: 12))
+            .padding(.vertical, 6)
+            .accessibilityHidden(true)
+    }
+}
+
+let settingsDesktop = LinearGradient(colors: [.teal, .blue, .indigo], startPoint: .topLeading, endPoint: .bottomTrailing)
 
 // Which providers the AI usage pill shows, and over which window: one
 // menu for each provider, with Off first.

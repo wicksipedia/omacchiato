@@ -83,7 +83,8 @@ func settingsReport() -> SettingsReport {
             : [.init(optIn ? "show" : nil, "Shown")] + info.extras
         return .init(key: key, title: info.title, symbol: info.symbol, tint: info.tint, summary: info.summary,
                      group: group, optIn: optIn, value: pillModes[key], styles: styles,
-                     panelDesigns: panelDesigns[designs] ?? [], panelValue: pillModes[key + "_panel"])
+                     panelDesigns: panelDesigns[designs] ?? [], panelValue: pillModes[key + "_panel"],
+                     panelKind: panelDesigns[designs] == nil ? nil : designs)
     }
     var pills = ["menubar"].compactMap { key in builtinPills[key].map { pill(key, $0, group: .bar, designs: key) } }
     for key in rightOrderAll {
@@ -137,6 +138,7 @@ let settingsActions: SettingsActions = {
     }
     actions.save = { applyConfig($0, $1) }
     actions.theme = themeActions
+    actions.preview = { designPreview(kind: $0, design: $1) }
     actions.setPlugin = { plugin, key, value in
         applyConfig("bar-plugins.conf", iniSet(confText("bar-plugins.conf"), section: plugin, key: key, value: value))
     }

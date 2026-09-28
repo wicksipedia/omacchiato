@@ -135,6 +135,13 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   keep in sync with `main()` in `bin/omacchiato-ai-usage`). `confSet`,
   `iniSet` and `iniRemove` change one line or section and keep comments
   and order.
+- A popup with designs shows them in the settings as thumbnails, then
+  the chosen one at full size. They are the real panels, drawn through
+  the same `statusPanel`, `prPanel` and like functions in `Popups.swift`
+  as the popup, with the sample data in each module's `…Samples.swift`.
+  Those samples build into the bar, not only into the Xcode previews.
+  A sample that carries a read time is a computed `static var`, so its
+  "Updated … ago" stays minutes old in a bar that runs for days.
 - Every popup is a SwiftUI view in a `PanelHost`. `panelView(name)`
   picks it: a panel of its own, a plugin's `panel` object, or
   `RowsPanel`, which draws `popupRows(for:)` as a macOS menu. Only the

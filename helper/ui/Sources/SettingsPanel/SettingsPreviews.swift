@@ -74,6 +74,31 @@ extension SettingsReport {
 
 private let size = (width: CGFloat(760), height: CGFloat(580))
 
+// The settings module draws no real panel, so these stand in for the
+// design previews. The bar passes the real panels with their sample data.
+private let standInActions: SettingsActions = {
+    var actions = SettingsActions()
+    actions.preview = { _, design in
+        AnyView(VStack(alignment: .leading, spacing: 8) {
+            Text(design ?? "Default design").font(.headline)
+            ForEach(0..<5, id: \.self) { i in
+                RoundedRectangle(cornerRadius: 6).fill(.white.opacity(0.25)).frame(height: i == 0 ? 60 : 24)
+            }
+        }
+        .padding(14)
+        .frame(width: 320)
+        .background(.black.opacity(0.35), in: .rect(cornerRadius: 22))
+        .foregroundStyle(.white))
+    }
+    return actions
+}()
+
+private let withDesigns: SettingsReport = {
+    var report = SettingsReport.sample
+    for i in report.pills.indices where report.pills[i].key == "clock" { report.pills[i].panelKind = "clock" }
+    return report
+}()
+
 #Preview("AI Usage") { SettingsView(report: .sample, page: .pill("claude")).frame(width: size.width, height: size.height) }
 #Preview("Pull Requests") { SettingsView(report: .sample, page: .pill("github")).frame(width: size.width, height: size.height) }
 #Preview("Stats") { SettingsView(report: .sample, page: .pill("cpu")).frame(width: size.width, height: size.height) }
@@ -83,6 +108,9 @@ private let size = (width: CGFloat(760), height: CGFloat(580))
 #Preview("Microphone") { SettingsView(report: .sample, page: .pill("mic")).frame(width: size.width, height: size.height) }
 #Preview("A hidden pill") { SettingsView(report: .sample, page: .pill("bluetooth")).frame(width: size.width, height: size.height) }
 #Preview("An opt-in pill") { SettingsView(report: .sample, page: .pill("battery")).frame(width: size.width, height: size.height) }
+#Preview("Popup designs, with stand-in panels") {
+    SettingsView(report: withDesigns, actions: standInActions, page: .pill("clock")).frame(width: size.width, height: 900)
+}
 #Preview("Layout") { SettingsView(report: .sample).frame(width: size.width, height: size.height) }
 #Preview("Add Plugin") { SettingsView(report: .sample, page: .addPlugin).frame(width: size.width, height: size.height) }
 #Preview("Config Files") { SettingsView(report: .sample, page: .files).frame(width: size.width, height: size.height) }

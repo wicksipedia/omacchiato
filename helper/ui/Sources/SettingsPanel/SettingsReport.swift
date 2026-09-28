@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 #if canImport(ThemePanel)
 import ThemePanel
 #endif
@@ -39,12 +40,13 @@ public struct SettingsReport {
         public var switches: [Switch]
         public var aiUsage: AIUsageOptions?
         public var plugin: PluginFields?
+        public var panelKind: String?    // which panel the designs belong to, for their previews
 
         public init(key: String, title: String, symbol: String, tint: String = "gray", summary: String = "",
                     group: Group = .bar, optIn: Bool = false, value: String? = nil, styles: [Choice] = [],
                     panelDesigns: [Choice] = [], panelValue: String? = nil,
                     canHide: Bool = true, numbers: [Number] = [], switches: [Switch] = [],
-                    aiUsage: AIUsageOptions? = nil, plugin: PluginFields? = nil) {
+                    aiUsage: AIUsageOptions? = nil, plugin: PluginFields? = nil, panelKind: String? = nil) {
             self.key = key
             self.title = title
             self.symbol = symbol
@@ -61,6 +63,7 @@ public struct SettingsReport {
             self.switches = switches
             self.aiUsage = aiUsage
             self.plugin = plugin
+            self.panelKind = panelKind
         }
 
         public var id: String { key }
@@ -206,6 +209,8 @@ public struct SettingsActions {
     public var addPlugin: (_ name: String, _ command: String) -> Void = { _, _ in }
     public var removePlugin: (_ name: String) -> Void = { _ in }
     public var theme = ThemeActions()
+    // A design drawn with sample data, or nil for a panel with no preview.
+    public var preview: (_ kind: String, _ design: String?) -> AnyView? = { _, _ in nil }
 
     public init() {}
 }
