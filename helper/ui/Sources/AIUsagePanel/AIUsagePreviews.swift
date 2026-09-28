@@ -26,13 +26,16 @@ extension AIUsageReport {
         id: "copilot", name: "Copilot", plan: "Business", glyph: "\u{ec1e}",
         metrics: [Metric(label: "Premium", used: 0.34, resetsIn: 3 * day, span: 30 * day)], open: false)
 
+    // the week before: busier early on, quiet at the end
+    static let priors = [14_000_000, 21_000_000, 8_000_000, 0, 3_000_000, 18_000_000, 9_000_000]
+
     static func week(_ tokens: [[Int]], costs: [Double]) -> [Day] {
         let names = ["Opus 5.5", "Opus 5", "Sonnet 5", "Haiku 4.5"]
         let cal = Calendar(identifier: .gregorian)
         return tokens.indices.map { i in
             Day(date: cal.date(byAdding: .day, value: i - 6, to: cal.startOfDay(for: morning)) ?? morning,
                 models: Dictionary(uniqueKeysWithValues: zip(names, tokens[i]).filter { $0.1 > 0 }),
-                cost: costs[i])
+                cost: costs[i], prior: priors[i % priors.count])
         }
     }
 

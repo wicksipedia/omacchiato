@@ -213,6 +213,14 @@ struct WeekChart: View {
     var body: some View {
         let mean = report.days.isEmpty ? 0 : report.weekTokens / report.days.count
         Chart {
+            // the week before, faded behind each day
+            ForEach(report.days.filter { $0.prior > 0 }) { day in
+                RectangleMark(x: .value("Day", day.date, unit: .day), yStart: .value("Tokens", 0),
+                              yEnd: .value("Tokens", day.prior), width: .ratio(0.8))
+                    .foregroundStyle(.primary.opacity(0.12))
+                    .clipShape(.rect(cornerRadius: 3))
+                    .accessibilityLabel("Week before")
+            }
             ForEach(slices) { s in
                 BarMark(x: .value("Day", s.day, unit: .day), y: .value("Tokens", s.tokens), width: .ratio(0.6))
                     .foregroundStyle(by: .value("Model", s.model))

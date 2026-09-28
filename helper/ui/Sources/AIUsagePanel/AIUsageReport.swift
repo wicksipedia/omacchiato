@@ -95,12 +95,14 @@ public struct AIUsageReport {
         public var date: Date
         public var models: [String: Int]    // tokens by model name
         public var cost: Double
+        public var prior: Int               // tokens on the same weekday a week earlier
         public var id: Date { date }
 
-        public init(date: Date, models: [String: Int], cost: Double) {
+        public init(date: Date, models: [String: Int], cost: Double, prior: Int = 0) {
             self.date = date
             self.models = models
             self.cost = cost
+            self.prior = prior
         }
 
         public var tokens: Int { models.values.reduce(0, +) }
@@ -137,6 +139,12 @@ public struct AIUsageReport {
     }
 
     public var weekTokens: Int { days.reduce(0) { $0 + $1.tokens } }
+    public var priorTokens: Int { days.reduce(0) { $0 + $1.prior } }
+
+    // This week against the week before, as a fraction: 0.23 is 23% more. Nil without a week before.
+    public var weekChange: Double? {
+        priorTokens > 0 ? Double(weekTokens - priorTokens) / Double(priorTokens) : nil
+    }
     public var weekCost: Double { days.reduce(0) { $0 + $1.cost } }
     public var activeDays: Int { days.filter { $0.tokens > 0 }.count }
 
@@ -219,7 +227,8 @@ extension AIUsageReport {
         }
         let days = list(json["days"]).compactMap { d -> Day? in
             guard let date = (d["date"] as? String).flatMap(day.date(from:)) else { return nil }
-            return Day(date: date, models: (d["models"] as? [String: Int]) ?? [:], cost: number(d["cost"]) ?? 0)
+            return Day(date: date, models: (d["models"] as? [String: Int]) ?? [:], cost: number(d["cost"]) ?? 0,
+                       prior: d["prior"] as? Int ?? 0)
         }
         let models = list(json["models"]).map {
             Model(name: $0["name"] as? String ?? "", tokens: $0["tokens"] as? Int ?? 0, cost: number($0["cost"]) ?? 0)

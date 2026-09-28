@@ -289,10 +289,25 @@ def week_stats(entry, tokscale, clients):
                  "active_days": (graph.get("summary") or {}).get("activeDays", 0)}
     except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError, AttributeError):
         pass  # keep the last week on screen
+    if stats is not None:
+        stats["prior"] = prior_week(tokscale, key) or stats.get("prior") or {}
     # a failed read waits too, so a broken tokscale does not run on every refresh
     entry.update({"week": stats, "week_at": NOW, "week_key": key})
     write_cache(entry)
     return stats
+
+
+def prior_week(tokscale, key):
+    """Tokens a day in the seven days before the last seven, for the faded bars."""
+    today = datetime.now().date()
+    try:
+        r = subprocess.run([tokscale, "graph", "-c", key, "--no-spinner",
+                            "--since", (today - timedelta(days=13)).isoformat(),
+                            "--until", (today - timedelta(days=7)).isoformat()],
+                           capture_output=True, text=True, timeout=STATS_TIMEOUT_S)
+        return {day["date"]: day["totals"]["tokens"] for day in json.loads(r.stdout)["contributions"]}
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
+        return None
 
 
 def human(n):
@@ -372,12 +387,14 @@ def panel(quotas, states, stats):
         today = datetime.now().date()
         week = [(today - timedelta(days=n)).isoformat() for n in range(6, -1, -1)]
         split = stats.get("day_models") or {}
+        prior = stats.get("prior") or {}
         out["days"] = []
         for day in week:
             tokens, cost = stats["days"].get(day, [0, 0])
             # a week cached before day_models existed has no split
             models = split.get(day) or ({"Other": tokens} if tokens else {})
-            out["days"].append({"date": day, "models": models, "cost": cost})
+            before = (datetime.fromisoformat(day).date() - timedelta(days=7)).isoformat()
+            out["days"].append({"date": day, "models": models, "cost": cost, "prior": prior.get(before, 0)})
         out["models"] = [{"name": model_name(m), "tokens": n, "cost": c} for m, n, c in stats["models"]]
         out["sessions"] = stats["sessions"]
         out["active_hours"] = stats["active_ms"] // 3_600_000

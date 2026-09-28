@@ -80,13 +80,42 @@ struct WeekHeadline: View {
     var report: AIUsageReport
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Text(tokenText(report.weekTokens)).font(.system(size: 22, weight: .semibold, design: .rounded))
-            Text("tokens").font(.system(size: 12)).foregroundStyle(.secondary)
-            Spacer()
-            Text(dollarText(report.weekCost)).font(.system(size: 15, weight: .semibold, design: .rounded))
-            Text("at API prices").font(.system(size: 11)).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(tokenText(report.weekTokens)).font(.system(size: 22, weight: .semibold, design: .rounded))
+                Text("tokens").font(.system(size: 12)).foregroundStyle(.secondary)
+                Spacer()
+                Text(dollarText(report.weekCost)).font(.system(size: 15, weight: .semibold, design: .rounded))
+                Text("at API prices").font(.system(size: 11)).foregroundStyle(.secondary)
+            }
+            if let change = report.weekChange {
+                WeekChange(change: change)
+            }
         }
+    }
+}
+
+// How this week compares with the week before, whose bars show faded behind this week's.
+struct WeekChange: View {
+    var change: Double
+
+    var body: some View {
+        let percent = Int((abs(change) * 100).rounded())
+        let tint = percent == 0 ? Color.secondary : (change > 0 ? Color.green : Color.red)
+        HStack(spacing: 4) {
+            Image(systemName: percent == 0 ? "equal" : (change > 0 ? "arrow.up.right" : "arrow.down.right"))
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(tint)
+            if percent == 0 {
+                Text("Same as last week")
+            } else {
+                Text("\(percent)%").foregroundStyle(tint).fontWeight(.semibold)
+                    + Text(" \(change > 0 ? "more" : "less") than last week")
+            }
+        }
+        .font(.system(size: 11))
+        .foregroundStyle(.secondary)
+        .accessibilityElement(children: .combine)
     }
 }
 

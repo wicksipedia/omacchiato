@@ -45,6 +45,20 @@ class Panel(unittest.TestCase):
         self.assertEqual((claude["open"], codex["open"]), (True, False))
         self.assertNotIn("days", out)
 
+    def test_each_day_carries_the_same_weekday_a_week_before(self):
+        from datetime import date, timedelta
+        ai.PANEL, ai.OPEN = [], []
+        today = date.today()
+        stats = {"days": {today.isoformat(): [500, 1.0]}, "day_models": {}, "models": [],
+                 "sessions": 1, "active_ms": 0,
+                 "prior": {(today - timedelta(days=7)).isoformat(): 300,
+                           (today - timedelta(days=13)).isoformat(): 40}}
+        days = ai.panel({}, {}, stats)["days"]
+        self.assertEqual(len(days), 7)
+        self.assertEqual((days[-1]["date"], days[-1]["prior"]), (today.isoformat(), 300))
+        self.assertEqual(days[0]["prior"], 40)
+        self.assertEqual(sum(d["prior"] for d in days), 340)
+
 
 if __name__ == "__main__":
     unittest.main()
