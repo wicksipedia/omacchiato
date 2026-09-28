@@ -220,7 +220,7 @@ final class BarView: NSView {
                 hitArea.fill()
                 fillPill(pill, name)
                 gauge.draw(in: pill.insetBy(dx: pillPad - (side - ink) / 2, dy: 1),
-                           colors: .init(ink: palette.label, low: palette.red, charging: palette.green))
+                           colors: .init(ink: palette.label, low: palette.red, charging: palette.green, lowPower: palette.yellow))
                 itemRects.append((name, pill, hitArea))
                 cursor = pill.minX - rightGap
                 continue

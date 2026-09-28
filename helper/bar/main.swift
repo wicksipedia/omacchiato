@@ -911,6 +911,7 @@ for name in [NSNotification.Name.NSProcessInfoPowerStateDidChange,
              ProcessInfo.thermalStateDidChangeNotification] {
     NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { _ in
         refreshPowerMode()
+        updateStatus()
     }
 }
 refreshPowerMode()

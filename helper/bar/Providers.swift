@@ -684,7 +684,10 @@ func updateStatus() {
         $0.value(forKey: "deviceName") as? String == interface?.ssid()
     })
     let link: StatusGauge.Link = ethernetInfo() != nil ? .ethernet : (hotspot ? .hotspot : .wifi)
-    set("status") { $0.gauge = StatusGauge(battery: battery, charging: charging, wifi: wifi, link: link) }
+    set("status") {
+        $0.gauge = StatusGauge(battery: battery, charging: charging,
+                               lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled, wifi: wifi, link: link)
+    }
 }
 
 func statusReport() -> StatusReport {

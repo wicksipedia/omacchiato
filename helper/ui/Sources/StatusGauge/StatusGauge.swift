@@ -6,6 +6,7 @@ import AppKit
 public struct StatusGauge: Equatable {
     public var battery: Double      // 0...1
     public var charging: Bool
+    public var lowPower: Bool       // Low Power Mode: the ring turns yellow, as the Mac's battery icon does
     public var wifi: Int?           // nil: wi-fi is off. 0: not joined. 1...4: lit dots
     public var link: Link
 
@@ -13,11 +14,16 @@ public struct StatusGauge: Equatable {
         case wifi, ethernet, hotspot
     }
 
-    public init(battery: Double, charging: Bool = false, wifi: Int? = 4, link: Link = .wifi) {
+    public init(battery: Double, charging: Bool = false, lowPower: Bool = false, wifi: Int? = 4, link: Link = .wifi) {
         self.battery = battery
         self.charging = charging
+        self.lowPower = lowPower
         self.wifi = wifi
         self.link = link
+    }
+
+    func ringColor(_ colors: Colors) -> NSColor {
+        lowPower ? colors.lowPower : (charging ? colors.charging : (batteryLow ? colors.low : colors.ink))
     }
 
     var dots: Int { link == .ethernet ? 4 : (wifi ?? 0) }
@@ -34,10 +40,13 @@ public struct StatusGauge: Equatable {
         public var ink: NSColor
         public var low: NSColor
         public var charging: NSColor
-        public init(ink: NSColor, low: NSColor = .systemRed, charging: NSColor = .systemGreen) {
+        public var lowPower: NSColor
+        public init(ink: NSColor, low: NSColor = .systemRed, charging: NSColor = .systemGreen,
+                    lowPower: NSColor = .systemYellow) {
             self.ink = ink
             self.low = low
             self.charging = charging
+            self.lowPower = lowPower
         }
     }
 
@@ -71,7 +80,7 @@ public struct StatusGauge: Equatable {
         }
         ring(Self.ringStart - Self.ringSpan, dim)
         if battery > 0 {
-            ring(ringEnd, charging ? colors.charging : (batteryLow ? colors.low : colors.ink))
+            ring(ringEnd, ringColor(colors))
         }
 
         func drawWifi() {
@@ -184,6 +193,7 @@ private let states: [(String, StatusGauge)] = [
     ("half", StatusGauge(battery: 0.5, wifi: 3)),
     ("low", StatusGauge(battery: 0.15, wifi: 1)),
     ("charging", StatusGauge(battery: 0.4, charging: true, wifi: 2)),
+    ("low power", StatusGauge(battery: 0.35, lowPower: true, wifi: 3)),
     ("not joined", StatusGauge(battery: 0.8, wifi: 0)),
     ("wi-fi off", StatusGauge(battery: 0.7, wifi: nil)),
     ("ethernet", StatusGauge(battery: 0.9, charging: true, wifi: 0, link: .ethernet)),

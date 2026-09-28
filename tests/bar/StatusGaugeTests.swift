@@ -10,6 +10,15 @@ import Testing
         #expect(!StatusGauge(battery: 0.1, charging: true).batteryLow)
     }
 
+    @Test("the ring is yellow in Low Power Mode, before green on power and red when low")
+    func ringColor() {
+        let colors = StatusGauge.Colors(ink: .black, low: .red, charging: .green, lowPower: .yellow)
+        #expect(StatusGauge(battery: 0.1, charging: true, lowPower: true).ringColor(colors) == .yellow)
+        #expect(StatusGauge(battery: 0.1, charging: true).ringColor(colors) == .green)
+        #expect(StatusGauge(battery: 0.1).ringColor(colors) == .red)
+        #expect(StatusGauge(battery: 0.5).ringColor(colors) == .black)
+    }
+
     @Test("the ring fills clockwise from its lower-left end")
     func ring() {
         #expect(StatusGauge(battery: 0).ringEnd == 220)

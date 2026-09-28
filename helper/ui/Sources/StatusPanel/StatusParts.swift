@@ -17,10 +17,10 @@ import StatusGauge
 // Pieces that every design of the status panel shares.
 
 extension StatusReport.Battery {
-    // iOS battery colors: green while charging, yellow in low power, red when low.
+    // Yellow in Low Power Mode, as the Mac's battery icon; then green while charging, red when low.
     var tint: Color {
-        if charging { return PanelColors.green }
         if mode == "low power" { return PanelColors.yellow }
+        if charging { return PanelColors.green }
         if low { return PanelColors.red }
         return .primary
     }
@@ -41,6 +41,7 @@ extension StatusReport {
     var gauge: StatusGauge {
         StatusGauge(battery: Double(battery?.percent ?? 0) / 100,
                     charging: battery?.onAC ?? false,
+                    lowPower: battery?.mode == "low power",
                     wifi: wifi.on ? wifiLevel(rssi: wifi.rssi ?? 0) : nil,
                     link: ethernet != nil ? .ethernet : (wifi.hotspot ? .hotspot : .wifi))
     }
