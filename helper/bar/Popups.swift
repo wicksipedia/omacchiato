@@ -76,7 +76,6 @@ func closePopup() {
     popupSelection = nil
     popupColumns = []
     cascadeWork?.cancel()
-    appleShowsThemes = false
     openPopup = nil
     popupOwner?.view.needsDisplay = true
     popupOwner = nil
@@ -147,9 +146,6 @@ func panelView(_ name: String) -> AnyView? {
     case "bluetooth": return AnyView(BluetoothPanel(report: bluetoothReport(), actions: bluetoothActions))
     case "battery": return AnyView(BatteryPanel(report: statusReport(), actions: statusActions))
     case "wifi": return AnyView(WifiPanel(report: statusReport(), actions: statusActions))
-    case "apple" where appleShowsThemes:
-        popupShownRows = []
-        return AnyView(ThemePanel(report: themeReport(), actions: themeActions))
     case "apple", "appmenu":
         return cascadePanel(name)
     case "clock":

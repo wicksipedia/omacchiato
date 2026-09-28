@@ -221,8 +221,7 @@ func appleRows() -> [PopupRow] {
         PopupRow(text: "Sleep", action: run("/usr/bin/pmset", ["sleepnow"])),
         PopupRow(text: "Restart…", action: systemEvents("restart")),
         PopupRow(text: "Shut Down…", action: systemEvents("shut down")),
-        PopupRow(text: "Theme", detail: currentThemeName(), dim: true,
-                 action: run("\(NSHomeDirectory())/.local/bin/theme-next", [])),
+        PopupRow(text: "Omacchiato Settings…", dim: true, action: showSettings),
     ]
 }
 

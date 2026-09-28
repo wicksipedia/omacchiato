@@ -3,10 +3,11 @@ import SwiftUI
 import StatusPanel
 #endif
 
-// The theme picker: a desktop preview, day and night slots, and the themes
-// as cards. A card sets the selected slot; Apply saves both slots through
-// theme-set. One theme in both slots runs all day.
-public struct ThemePanel: View {
+// The theme picker on the Theme page of the settings: a desktop preview,
+// day and night slots, and the themes as cards. A card sets the selected
+// slot; Apply saves both slots through theme-set. One theme in both slots
+// runs all day.
+public struct ThemePicker: View {
     var report: ThemeReport
     var actions: ThemeActions
     @State private var slot: DaySlot
@@ -28,11 +29,9 @@ public struct ThemePanel: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if let theme = report.theme(shown) {
-                // the panel's padding is 12 and its corners 22: the desktop runs edge to edge
-                ThemeMockup(theme: theme, top: 22, bottom: 0)
+                ThemeMockup(theme: theme, top: 10, bottom: 10)
                     .id(theme.name)
                     .transition(.opacity)
-                    .padding([.horizontal, .top], -12)
             }
             SlotPicker(slot: $slot, day: report.theme(day), night: report.theme(night))
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 5), spacing: 8) {
@@ -48,7 +47,6 @@ public struct ThemePanel: View {
             }
         }
         .animation(.easeOut(duration: 0.15), value: shown)
-        .statusPanelBackground(width: 440)
     }
 
     func card(_ theme: Theme) -> some View {

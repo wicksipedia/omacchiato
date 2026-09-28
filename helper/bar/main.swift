@@ -651,21 +651,6 @@ watch(FileManager.default.homeDirectoryForCurrentUser
     tlog(String(format: "theme %.2f ms", ms))
 }
 
-// theme.conf holds one name, or a light:<name>,dark:<name> pair.
-func currentThemeName() -> String {
-    guard let spec = readConf("theme.conf")["theme"] else { return "" }
-    guard spec.contains(":") else { return spec }
-    let want = app.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        ? "dark" : "light"
-    for half in spec.split(separator: ",") {
-        let pair = half.split(separator: ":", maxSplits: 1)
-        if pair.count == 2, pair[0].trimmingCharacters(in: .whitespaces) == want {
-            return pair[1].trimmingCharacters(in: .whitespaces)
-        }
-    }
-    return spec
-}
-
 // Follow the macOS light/dark switch when theme.conf holds a Ghostty-style
 // pair, `theme = light:<name>,dark:<name>`. theme-set picks the half.
 var appearanceDark: Bool?   // the appearance last handled, so a repeated change notice runs theme-set once
@@ -788,7 +773,7 @@ func attachMicListeners() {
     updateMic()
 }
 
-if rightOrder.contains("mic") {
+func startMicWatch() {
     var defaultInputAddress = AudioObjectPropertyAddress(
         mSelector: kAudioHardwarePropertyDefaultInputDevice,
         mScope: kAudioObjectPropertyScopeGlobal,
@@ -842,13 +827,6 @@ if let store = SCDynamicStoreCreate(nil, "omacchiato-bar" as CFString,
 // location: the network name's price, same responsible-process rules
 locationGate.start()
 
-// bluetooth: gated on the privacy grant, which the watcher above also needs
-if rightOrder.contains("bluetooth") { bluetoothWatcher.start() }
-
-// signal strength publishes no change
-if rightOrder.contains("status") {
-    Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { _ in updateStatus() }
-}
 
 // waking clears the gamma table, so the shade has to be reasserted
 NSWorkspace.shared.notificationCenter.addObserver(
@@ -884,8 +862,24 @@ func scheduleClock() {
 }
 scheduleClock()
 
-if rightOrder.contains("weather") {
-    Timer.scheduledTimer(withTimeInterval: 1800, repeats: true) { _ in if !screenLocked { updateWeather() } }
+// Some providers run only while their pill is on the bar. A reload starts
+// the provider of a pill that comes back. A provider is never stopped:
+// one that runs for a hidden pill costs little.
+var startedProviders: Set<String> = []
+
+func startProviders() {
+    func once(_ pill: String, _ start: () -> Void) {
+        if rightOrder.contains(pill), startedProviders.insert(pill).inserted { start() }
+    }
+    once("mic", startMicWatch)
+    // bluetooth: gated on the privacy grant, which the watcher also needs
+    once("bluetooth") { bluetoothWatcher.start() }
+    // signal strength publishes no change
+    once("status") { Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { _ in updateStatus() } }
+    once("weather") {
+        Timer.scheduledTimer(withTimeInterval: 1800, repeats: true) { _ in if !screenLocked { updateWeather() } }
+        updateWeather()
+    }
 }
 
 // --- go -------------------------------------------------------------------
@@ -918,8 +912,9 @@ refreshPowerMode()
 updateBrightness()
 updateWifi()
 set("menubar") { $0.icon = "\u{F003B}" }
-if rightOrder.contains("weather") { updateWeather() }
+startProviders()
 startPlugins()
+watchConfig()
 repaint()
 primeMedia()
 startOmniWatch() // a no-op until OmniWM runs; the WM observer starts it then

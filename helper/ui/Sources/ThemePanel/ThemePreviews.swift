@@ -16,10 +16,10 @@ extension ThemeReport {
                                   light: nil, dark: nil)
 }
 
-#Preview("One theme") { Desk { ThemePanel(report: .single) } }
-#Preview("Day and night, at night") { Desk { ThemePanel(report: .paired) } }
-#Preview("No theme, no wallpapers") { Desk { ThemePanel(report: .bare) } }
-#Preview("Dark") { Desk { ThemePanel(report: .paired) }.preferredColorScheme(.dark) }
+#Preview("One theme") { ThemePicker(report: .single).padding(20).frame(width: 520) }
+#Preview("Day and night, at night") { ThemePicker(report: .paired).padding(20).frame(width: 520) }
+#Preview("No theme, no wallpapers") { ThemePicker(report: .bare).padding(20).frame(width: 520) }
+#Preview("Dark") { ThemePicker(report: .paired).padding(20).frame(width: 520).preferredColorScheme(.dark) }
 
 #Preview("Every desktop") {
     Desk {

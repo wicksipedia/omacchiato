@@ -609,18 +609,10 @@ func appleMenuRows() -> [PopupRow] {
     var rows = rowsForMenu(apple, depth: 0, collapseAlternates: true)
     guard !rows.isEmpty else { return appleRows() }
     if rows.last?.separator != true { rows.append(PopupRow(separator: true)) }
-    rows.append(PopupRow(text: "Theme", detail: currentThemeName(), dim: true, action: {
-        cascadeWork?.cancel()
-        appMenuStack = []
-        popupSelection = nil
-        appleShowsThemes = true
-        refreshPopup()
-    }, hover: { openSubmenu(nil, depth: 0, after: 0.2) }))
+    rows.append(PopupRow(text: "Omacchiato Settings…", dim: true, action: showSettings,
+                         hover: { openSubmenu(nil, depth: 0, after: 0.2) }))
     return rows
 }
-
-// The Theme row of the Apple menu turns the popup into the theme picker.
-var appleShowsThemes = false
 
 // theme-set lives in the clone, next to the themes: follow its link there.
 let themesDir = URL(fileURLWithPath: NSHomeDirectory() + "/.local/bin/theme-set")
@@ -632,14 +624,18 @@ func themeReport() -> ThemeReport {
                 darkNow: app.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua)
 }
 
-// theme-set writes theme.conf, so the choice outlives a restart.
+// theme-set writes theme.conf, so the choice outlives a restart. The
+// settings window then reads the themes again, so Apply turns off.
 let themeActions: ThemeActions = {
     var actions = ThemeActions()
     actions.apply = { light, dark in
-        closePopup()
         let spec = ThemeReport.spec(light: light, dark: dark)
         DispatchQueue.global(qos: .userInitiated).async {
             _ = shell(NSHomeDirectory() + "/.local/bin/theme-set", [spec])
+            DispatchQueue.main.async {
+                settingsThemes = themeReport()
+                refreshSettings()
+            }
         }
     }
     return actions

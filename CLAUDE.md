@@ -116,8 +116,25 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   the built-in pills.
 - `~/.config/omacchiato/bar-pills.conf` holds `<pill> = <mode>` lines:
   `hide`, `icon`, `volume = muted`, `battery = time`,
-  `media = <characters>` and `<pill>_panel = <design>`. The bar reads it
-  once at startup.
+  `media = <characters>` and `<pill>_panel = <design>`.
+- `Config.swift` watches `bar-pills.conf` and `bar-plugins.conf`, and
+  their folder, because an editor saves by a rename and `echo >>` writes
+  in place. When the text changes, `reloadConfig()` rereads both and
+  rebuilds the pills in place: it stops and starts only the plugins that
+  changed, and starts the provider of a pill that comes back. A
+  provider is never stopped. A new setting that the bar reads once, at
+  startup, does not reload: read it at the moment of use.
+- "Omacchiato Settings…" in the Apple menu opens `Settings.swift`, a
+  window that becomes key, so it uses system controls. It has a page
+  for each pill and plugin, and every key of both files has a control.
+  `builtinPills`, `pluginPrograms`, `pluginKinds` and `panelDesigns`
+  there say what each page offers: add a new pill mode, panel design or
+  plugin script there too. A plugin's page knows it by its program,
+  because a plugin prints no panel while its pill is empty. The AI
+  usage page reads and writes the script's flags (`AIUsageOptions`,
+  keep in sync with `main()` in `bin/omacchiato-ai-usage`). `confSet`,
+  `iniSet` and `iniRemove` change one line or section and keep comments
+  and order.
 - Every popup is a SwiftUI view in a `PanelHost`. `panelView(name)`
   picks it: a panel of its own, a plugin's `panel` object, or
   `RowsPanel`, which draws `popupRows(for:)` as a macOS menu. Only the

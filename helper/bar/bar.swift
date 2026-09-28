@@ -648,11 +648,17 @@ struct BarItem: Equatable {
 // screen order, left to right
 let rightOrderAll = ["weather", "wifi", "bluetooth", "brightness", "mic", "volume", "status", "battery", "clock", "activity"]
 
+let configDir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".config/omacchiato")
+
+func confText(_ name: String) -> String {
+    (try? String(contentsOf: configDir.appendingPathComponent(name), encoding: .utf8)) ?? ""
+}
+
 // `<key> = <value>` lines in ~/.config/omacchiato/<name>
-func readConf(_ name: String) -> [String: String] {
-    let file = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".config/omacchiato/\(name)")
-    guard let text = try? String(contentsOf: file, encoding: .utf8) else { return [:] }
+func readConf(_ name: String) -> [String: String] { parseConf(confText(name)) }
+
+// A bad line is skipped, so a half-saved file cannot stop the bar.
+func parseConf(_ text: String) -> [String: String] {
     var pairs: [String: String] = [:]
     for raw in text.split(separator: "\n") {
         let line = raw.trimmingCharacters(in: .whitespaces)
@@ -664,8 +670,8 @@ func readConf(_ name: String) -> [String: String] {
     return pairs
 }
 
-// `<pill> = hide` or `<pill> = icon` per line. Read once at startup.
-let pillModes = readConf("bar-pills.conf")
+// `<pill> = hide` or `<pill> = icon` per line. reloadConfig() reads it again.
+var pillModes = readConf("bar-pills.conf")
 
 // Maps to System Settings > Accessibility > Display > Reduce Motion.
 func dur(_ seconds: Double) -> Double {

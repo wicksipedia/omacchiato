@@ -25,6 +25,7 @@ let package = Package(
         .library(name: "UpdatesPanel", targets: ["UpdatesPanel"]),
         .library(name: "KeepAwakePanel", targets: ["KeepAwakePanel"]),
         .library(name: "StatsPanel", targets: ["StatsPanel"]),
+        .library(name: "SettingsPanel", targets: ["SettingsPanel"]),
     ],
     targets: [
         .target(name: "StatusGauge"),
@@ -45,6 +46,7 @@ let package = Package(
         .target(name: "UpdatesPanel", dependencies: ["StatusPanel"]),
         .target(name: "KeepAwakePanel", dependencies: ["StatusPanel"]),
         .target(name: "StatsPanel", dependencies: ["StatusPanel", "ActivityPanel"]),
+        .target(name: "SettingsPanel", dependencies: ["StatusPanel", "ThemePanel"]),
     ],
     swiftLanguageModes: [.v5]
 )

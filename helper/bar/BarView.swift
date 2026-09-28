@@ -43,8 +43,8 @@ let padLeft: CGFloat = 10
 let pillHeight: CGFloat = 26
 let radius: CGFloat = 4
 // `left_gap` and `right_gap` in bar-pills.conf set the space between pills
-let leftGap = max(0, CGFloat(Double(pillModes["left_gap"] ?? "") ?? 6))
-let rightGap = max(0, CGFloat(Double(pillModes["right_gap"] ?? "") ?? 6))
+var leftGap: CGFloat { max(0, CGFloat(Double(pillModes["left_gap"] ?? "") ?? 6)) }
+var rightGap: CGFloat { max(0, CGFloat(Double(pillModes["right_gap"] ?? "") ?? 6)) }
 // horizontal breathing room inside a pill, each side
 let pillPad: CGFloat = 6
 

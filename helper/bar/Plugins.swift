@@ -29,7 +29,7 @@ import WeatherPanel
 
 // A pill from ~/.config/omacchiato/bar-plugins.conf: one INI section per
 // pill, with a shell command whose stdout becomes the label.
-struct BarPlugin {
+struct BarPlugin: Equatable {
     var name = ""
     var command = ""
     var icon = ""
@@ -37,10 +37,9 @@ struct BarPlugin {
     var interval: TimeInterval = 30
 }
 
-let barPlugins: [BarPlugin] = {
-    let file = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".config/omacchiato/bar-plugins.conf")
-    guard let text = try? String(contentsOf: file, encoding: .utf8) else { return [] }
+var barPlugins = parsePlugins(confText("bar-plugins.conf"))
+
+func parsePlugins(_ text: String) -> [BarPlugin] {
     var found: [BarPlugin] = []
     var current: BarPlugin?
     func flush() {
@@ -74,16 +73,29 @@ let barPlugins: [BarPlugin] = {
     let builtin = Set(rightOrderAll)
     var seen = Set<String>()
     return found.filter { !$0.name.isEmpty && !builtin.contains($0.name) && seen.insert($0.name).inserted }
-}()
+}
 
 // A hidden pill also skips its provider: hiding weather stops the wttr.in
 // fetches, and hiding bluetooth never touches the Bluetooth grant.
 // Wifi and battery are opt-in because the status gauge already shows them;
 // name a pill in bar-pills.conf to bring it back.
 let optInPills: Set = ["wifi", "battery"]
-let rightOrder = (["menubar"] + barPlugins.map(\.name) + rightOrderAll)
-    .filter { pillModes[$0] != "hide" && (!optInPills.contains($0) || pillModes[$0] != nil) }
-let iconOnly = Set(pillModes.filter { $0.value == "icon" }.keys)
+var rightOrder = pillOrder(modes: pillModes, plugins: barPlugins)
+var iconOnly = Set(pillModes.filter { $0.value == "icon" }.keys)
+
+func pillOrder(modes: [String: String], plugins: [BarPlugin]) -> [String] {
+    (["menubar"] + plugins.map(\.name) + rightOrderAll)
+        .filter { modes[$0] != "hide" && (!optInPills.contains($0) || modes[$0] != nil) }
+}
+
+// The plugins to stop and to start when the config changes. A plugin
+// whose command, icon or interval changed restarts.
+func pluginChanges(old: [BarPlugin], oldOrder: [String], new: [BarPlugin], newOrder: [String])
+    -> (stop: [String], start: [BarPlugin]) {
+    let was = old.filter { oldOrder.contains($0.name) }
+    let now = new.filter { newOrder.contains($0.name) }
+    return (was.filter { !now.contains($0) }.map(\.name), now.filter { !was.contains($0) })
+}
 
 var rightItems: [String: BarItem] = [:]
 // Rows the plugin last returned, keyed by pill name.
@@ -324,7 +336,7 @@ func showPluginProblem(_ plugin: BarPlugin, _ problem: (what: String, detail: St
 
 func runPlugin(_ plugin: BarPlugin) {
     guard Thread.isMainThread else { DispatchQueue.main.async { runPlugin(plugin) }; return }
-    guard pluginGate.start(plugin.name) else { return }
+    guard pluginIsActive(plugin), pluginGate.start(plugin.name) else { return }
     DispatchQueue.global(qos: .utility).async {
         let env = pluginEnv(plugin)
         let limit = max(plugin.interval, 30)
@@ -332,6 +344,7 @@ func runPlugin(_ plugin: BarPlugin) {
         if let problem = pluginProblem(result, limit: limit) {
             DispatchQueue.main.async {
                 if pluginGate.finish(plugin.name) { runPlugin(plugin) }
+                guard pluginIsActive(plugin) else { return }
                 showPluginProblem(plugin, problem)
             }
             return
@@ -350,6 +363,9 @@ func runPlugin(_ plugin: BarPlugin) {
         let rawParts = obj?["parts"] as? [[String: Any]] ?? []
         DispatchQueue.main.async {
             if pluginGate.finish(plugin.name) { runPlugin(plugin) }
+            // The config can change during a run. A run of a plugin that went
+            // away, or changed, must not bring its old pill back.
+            guard pluginIsActive(plugin) else { return }
             pluginGoodRows[plugin.name] = pluginPopupRows(obj?["rows"] as? [[String: Any]] ?? [], of: plugin)
             pluginRows[plugin.name] = pluginGoodRows[plugin.name]
             pluginPanels[plugin.name] = obj?["panel"] as? [String: Any]
@@ -379,21 +395,37 @@ func runPlugin(_ plugin: BarPlugin) {
 // so no plugin calls GitHub or tokscale, and one run on unlock catches up.
 var screenLocked = false
 
-func startPlugins() {
-    let plugins = barPlugins.filter { rightOrder.contains($0.name) }
-    for plugin in plugins {
-        runPlugin(plugin)
-        Timer.scheduledTimer(withTimeInterval: plugin.interval, repeats: true) { _ in
-            if !screenLocked { runPlugin(plugin) }
-        }
+var pluginTimers: [String: Timer] = [:]
+
+func activePlugins() -> [BarPlugin] { barPlugins.filter { rightOrder.contains($0.name) } }
+
+func pluginIsActive(_ plugin: BarPlugin) -> Bool { rightOrder.contains(plugin.name) && barPlugins.contains(plugin) }
+
+func startPlugin(_ plugin: BarPlugin) {
+    pluginTimers[plugin.name]?.invalidate()
+    runPlugin(plugin)
+    pluginTimers[plugin.name] = Timer.scheduledTimer(withTimeInterval: plugin.interval, repeats: true) { _ in
+        if !screenLocked { runPlugin(plugin) }
     }
+}
+
+func stopPlugin(_ name: String) {
+    pluginTimers.removeValue(forKey: name)?.invalidate()
+    rightItems[name] = nil
+    pluginRows[name] = nil
+    pluginGoodRows[name] = nil
+    pluginPanels[name] = nil
+}
+
+func startPlugins() {
+    activePlugins().forEach(startPlugin)
     let center = DistributedNotificationCenter.default()
     center.addObserver(forName: .init("com.apple.screenIsLocked"), object: nil, queue: .main) { _ in
         screenLocked = true
     }
     center.addObserver(forName: .init("com.apple.screenIsUnlocked"), object: nil, queue: .main) { _ in
         screenLocked = false
-        plugins.forEach(runPlugin)
+        activePlugins().forEach(runPlugin)
         if rightOrder.contains("weather") { updateWeather() }
     }
 }
