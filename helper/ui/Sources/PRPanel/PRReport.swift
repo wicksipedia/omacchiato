@@ -145,6 +145,14 @@ public struct PRReport {
         self.updated = updated
     }
 
+    // The script caches a read for 5 minutes and the bar polls every 2, so a
+    // normal read is under 7 minutes old. 15 minutes flags a stuck fetch.
+    public static let staleAfter: TimeInterval = 15 * 60
+
+    // When to show "Updated …" at the panel's foot: StaleNote already gives
+    // the age once the read failed, so this stamp shows only when it did not.
+    public var updatedStamp: Date? { problem == nil ? updated : nil }
+
     public func count(_ stage: Stage) -> Int { prs.filter { $0.stage == stage }.count }
 
     // The repositories with the most PRs first, then by name.

@@ -54,14 +54,28 @@ def git_log(target):
     return parse_log(git("log", "--no-merges", "--format=" + LOG_FORMAT, "HEAD.." + target))
 
 
-def panel_updates(commits, target):
+def fetched_at():
+    """Seconds since 1970 of the last successful fetch, or None."""
+    # Git touches FETCH_HEAD only when a fetch finishes, so a fetch that
+    # fails offline leaves its mtime, and this time, unchanged.
+    path = git("rev-parse", "--git-path", "FETCH_HEAD")
+    if not path:
+        return None
+    try:
+        return (REPO / path.strip()).stat().st_mtime
+    except OSError:
+        return None
+
+
+def panel_updates(commits, target, fetched):
     """The "panel" object for the bar's SwiftUI panel. Keep in sync with
     UpdatesReport.init(json:) in helper/ui/Sources/UpdatesPanel."""
     return {"kind": "updates", "target": target, "update": UPDATE,
-            "commits": commits[:SHOWN], "more": max(0, len(commits) - SHOWN)}
+            "commits": commits[:SHOWN], "more": max(0, len(commits) - SHOWN),
+            "updated": fetched}
 
 
-def pill(commits, target=None):
+def pill(commits, target=None, fetched=None):
     """The pill JSON for the commits that the clone does not have yet."""
     if not commits:
         return {"icon": "", "label": ""}
@@ -73,7 +87,7 @@ def pill(commits, target=None):
     rows += [{"separator": True},
              {"text": "Update Now", "icon": UPDATE_ICON, "terminal": UPDATE}]
     return {"icon": UPDATE_ICON, "label": str(len(commits)), "color": "yellow", "rows": rows,
-            "panel": panel_updates(commits, target)}
+            "panel": panel_updates(commits, target, fetched)}
 
 
 def newest_release(tags):
@@ -83,17 +97,18 @@ def newest_release(tags):
 
 def main():
     upstream = git("rev-parse", "--abbrev-ref", "@{upstream}")
-    commits, target = [], None
+    commits, target, fetched = [], None, None
     if upstream:
         # With no arguments, fetch uses the remote that the branch tracks.
         # If the fetch fails, the last fetched state stays.
         git("fetch", "--quiet", "--tags", timeout=30)
+        fetched = fetched_at()
         # target is the newest release, or the branch tip while the branch
         # has no release yet
         tags = git("tag", "--list", "v*", "--merged", "@{upstream}", "--sort=-v:refname") or ""
         target = newest_release(tags)
         commits = git_log(target or "@{upstream}")
-    print(json.dumps(pill(commits, target)))
+    print(json.dumps(pill(commits, target, fetched)))
 
 
 if __name__ == "__main__":

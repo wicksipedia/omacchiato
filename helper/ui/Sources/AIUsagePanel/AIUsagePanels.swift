@@ -38,6 +38,9 @@ public struct RingsAIUsagePanel: View {
                     WeekChart(report: report)
                     ModelShare(report: report).padding(.top, 4)
                 }
+            }
+            UpdatedStamp(report.updated, staleAfter: aiUsageStaleAfter)
+            if !report.days.isEmpty {
                 SettingsRow(title: "Token Report", detail: "tokscale", action: actions.openReport)
             }
         }
@@ -167,6 +170,9 @@ public struct ScreenTimeAIUsagePanel: View {
                         }
                     }
                 }
+            }
+            UpdatedStamp(report.updated, staleAfter: aiUsageStaleAfter)
+            if !report.models.isEmpty {
                 SettingsRow(title: "Token Report", detail: "tokscale", action: actions.openReport)
             }
         }
@@ -220,6 +226,9 @@ public struct ForecastAIUsagePanel: View {
                     }
                     costChart
                 }
+            }
+            UpdatedStamp(report.updated, staleAfter: aiUsageStaleAfter)
+            if !report.days.isEmpty {
                 SettingsRow(title: "Token Report", detail: "tokscale", action: actions.openReport)
             }
         }

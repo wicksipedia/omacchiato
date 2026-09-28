@@ -146,6 +146,15 @@ def usage(entry, tokscale):
     return {pid: u["outputs"] for pid, u in seen.items() if NOW - u["at"] < FRESH_S + SERVE_STALE_S}
 
 
+def usage_read_at(entry, pids):
+    """When tokscale actually returned the usage shown for these providers,
+    not when this run of the script happened. The oldest of the group, so a
+    stale provider among them still marks the whole panel stale."""
+    seen = entry.get("usage") or {}
+    ats = [seen[pid]["at"] for pid in pids if pid in seen]
+    return min(ats) if ats else NOW
+
+
 def pick(metrics, want):
     """The metric that --pill names, else the most used one."""
     names = ("5h", "session") if want == "5h" else (want,)
@@ -372,7 +381,7 @@ def panel_health(pid, state):
             "status_page": (PROVIDERS.get(pid) or {}).get("page")}
 
 
-def panel(quotas, states, stats):
+def panel(quotas, states, stats, updated):
     """The data of the bar's SwiftUI panel. Keep in sync with
     AIUsageReport(json:) in helper/ui/Sources/AIUsagePanel."""
     providers = []
@@ -388,7 +397,7 @@ def panel(quotas, states, stats):
                 "metrics": [panel_metric(pid, m) for m in output.get("metrics") or []
                             if not str(m.get("remaining_label") or "").startswith("0/0")],
                 **(panel_health(pid, states.get(pid)) if not n else {})})
-    out = {"kind": "ai-usage", "providers": providers}
+    out = {"kind": "ai-usage", "providers": providers, "updated": updated}
     if stats:
         today = datetime.now().date()
         week = [(today - timedelta(days=n)).isoformat() for n in range(6, -1, -1)]
@@ -558,7 +567,7 @@ def main():
         if stats:
             payload["rows"] += stats_rows(stats)
         payload["rows"] += [{"separator": True, "section": "end"}, tokens_row(tokscale)]
-    payload["panel"] = panel(quotas, states, stats)
+    payload["panel"] = panel(quotas, states, stats, usage_read_at(entry, PANEL))
     if tokscale:
         payload["panel"]["report"] = tokscale
     print(json.dumps(payload))

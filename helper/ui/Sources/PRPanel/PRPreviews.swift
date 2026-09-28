@@ -43,6 +43,9 @@ extension PRReport {
 
     static let offline = PRReport(now: morning, prs: calm.prs,
                                   problem: "error connecting to api.github.com", updated: ago(1.5))
+
+    // GitHub answered, but long ago: an orange stamp, not StaleNote.
+    static let stale = PRReport(now: morning, prs: calm.prs, updated: ago(0.4))
 }
 
 #Preview("Reminders") { Desk { RemindersPRPanel(report: .busy) } }
@@ -77,4 +80,6 @@ extension PRReport {
 }
 
 #Preview("Reminders, dark") { Desk { RemindersPRPanel(report: .busy) }.preferredColorScheme(.dark) }
+
+#Preview("Stale") { Desk { RemindersPRPanel(report: .stale) } }
 #endif

@@ -30,7 +30,7 @@ let package = Package(
     targets: [
         .target(name: "StatusGauge"),
         .target(name: "BarPills"),
-        .target(name: "WeatherPanel"),
+        .target(name: "WeatherPanel", dependencies: ["StatusPanel"]),
         .target(name: "StatusPanel", dependencies: ["StatusGauge"]),
         .target(name: "CalendarPanel", dependencies: ["StatusPanel"]),
         .target(name: "AIUsagePanel", dependencies: ["StatusPanel"]),

@@ -8,6 +8,9 @@ import StatusPanel
 
 let modelPalette: [Color] = [.orange, .purple, .teal, .gray]
 
+// The script reads tokscale at most every 5 minutes: 15 is three missed reads.
+let aiUsageStaleAfter: TimeInterval = 15 * 60
+
 // The provider's logo from the bar's Nerd Font, or its initial without that font.
 struct ProviderMark: View {
     var provider: AIUsageReport.Provider

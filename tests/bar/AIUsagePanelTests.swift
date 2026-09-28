@@ -31,7 +31,7 @@ import Testing
                        {"id": "codex-0", "name": "Codex", "color": "label", "metrics": []}],
          "days": [{"date": "2026-09-28", "models": {"Opus 5.5": 30000000}, "cost": 11.2}],
          "models": [{"name": "Opus 5.5", "tokens": 30000000, "cost": 11.2}],
-         "sessions": 3, "active_hours": 2}
+         "sessions": 3, "active_hours": 2, "updated": 1769000000}
         """
         let json = try #require(JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any])
         let report = try #require(AIUsageReport(json: json))
@@ -41,6 +41,14 @@ import Testing
         #expect(!report.providers[0].healthy && report.providers[1].healthy)
         #expect(report.weekTokens == 30_000_000)
         #expect(report.sessions == 3 && report.activeHours == 2)
+        #expect(report.updated == Date(timeIntervalSince1970: 1769000000))
         #expect(AIUsageReport(json: ["kind": "other"]) == nil)
+    }
+
+    @Test("without an updated field, the panel reads as just read")
+    func decodeWithoutUpdated() throws {
+        let now = Date()
+        let report = try #require(AIUsageReport(json: ["kind": "ai-usage", "providers": []], now: now))
+        #expect(report.updated == now)
     }
 }

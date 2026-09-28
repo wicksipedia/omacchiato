@@ -36,4 +36,12 @@ import Testing
         #expect(clockHour("05:55 PM") == 17 + 55.0 / 60)
         #expect(clockHour("") == nil)
     }
+
+    @Test("a fresh report is not stale; one past staleAfter is")
+    func staleness() {
+        let fresh = WeatherReport.sample(113, updatedAt: Date())
+        let old = WeatherReport.sample(113, updatedAt: Date().addingTimeInterval(-WeatherReport.staleAfter - 1))
+        #expect(Date().timeIntervalSince(fresh.updatedAt) < WeatherReport.staleAfter)
+        #expect(Date().timeIntervalSince(old.updatedAt) > WeatherReport.staleAfter)
+    }
 }

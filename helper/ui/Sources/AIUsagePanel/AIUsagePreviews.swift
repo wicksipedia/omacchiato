@@ -43,8 +43,9 @@ extension AIUsageReport {
         }
     }
 
+    // UpdatedStamp reads the real clock, not this fixed "now".
     static let busy = AIUsageReport(
-        now: morning, providers: [claude, codex, copilot],
+        now: morning, updated: Date().addingTimeInterval(-3 * 60), providers: [claude, codex, copilot],
         days: week([[9_000_000, 3_800_000, 0, 0], [0, 0, 0, 0], [30_100_000, 0, 6_000_000, 3_000_000],
                     [12_400_000, 0, 3_000_000, 0], [0, 0, 0, 0], [28_600_000, 0, 600_000, 2_000_000],
                     [22_000_000, 0, 0, 3_900_000]],
@@ -57,7 +58,7 @@ extension AIUsageReport {
 
     // Ahead of pace, with an outage and an incident.
     static let hot = AIUsageReport(
-        now: morning,
+        now: morning, updated: Date().addingTimeInterval(-90),
         providers: [
             Provider(id: "claude", name: "Claude", plan: "Pro", glyph: "\u{ec82}", color: claude.color,
                      metrics: [Metric(label: "Session", used: 0.93, resetsIn: 3.5 * hour, span: 5 * hour),
@@ -71,11 +72,15 @@ extension AIUsageReport {
 
     // A fresh week: nothing used, and no tokscale.
     static let quiet = AIUsageReport(
-        now: morning,
+        now: morning, updated: Date(),
         providers: [Provider(id: "claude", name: "Claude", plan: "Max 5x", glyph: "\u{ec82}", color: claude.color,
                              metrics: [Metric(label: "Session", used: 0, resetsIn: 5 * hour, span: 5 * hour),
                                        Metric(label: "Weekly", used: 0, resetsIn: 7 * day, span: 7 * day)]),
                     Provider(id: "codex", name: "Codex", plan: "Free", glyph: "\u{ec81}")])
+
+    static let cold = AIUsageReport(
+        now: morning, updated: Date().addingTimeInterval(-40 * 60), providers: [claude, codex, copilot],
+        days: busy.days, models: busy.models, sessions: busy.sessions, activeHours: busy.activeHours)
 }
 
 private let weeks: [AIUsageReport] = [.busy, .hot, .quiet]
@@ -97,6 +102,7 @@ private let weeks: [AIUsageReport] = [.busy, .hot, .quiet]
 }
 
 #Preview("Rings, dark") { Desk { RingsAIUsagePanel(report: .busy) }.preferredColorScheme(.dark) }
+#Preview("Rings: stale") { Desk { RingsAIUsagePanel(report: .cold) } }
 #Preview("Day tooltip") {
     Desk { DayTooltip(day: AIUsageReport.busy.days[2], top: AIUsageReport.busy.topModels, today: AIUsageReport.morning) }
 }

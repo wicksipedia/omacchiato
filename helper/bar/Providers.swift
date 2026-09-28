@@ -738,7 +738,8 @@ func fetchWeather(_ coordinate: CLLocationCoordinate2D?) {
     var request = URLRequest(url: weatherURL(coordinate))
     request.timeoutInterval = 15
     URLSession.shared.dataTask(with: request) { data, _, _ in
-        guard let data, let report = WeatherReport(j1: data) else { return }
+        guard let data, var report = WeatherReport(j1: data) else { return }
+        report.updatedAt = Date()
         DispatchQueue.main.async {
             weatherReport = report
             set("weather") {

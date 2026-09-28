@@ -425,3 +425,37 @@ public struct ControlTile: View {
         .accessibilityAddTraits(on ? [.isButton, .isSelected] : .isButton)
     }
 }
+
+// "Updated 3 minutes ago" at the foot of a panel whose data comes from a
+// cache or a slow fetch, so the reader knows how old it is. It counts on
+// while the panel is open. Past staleAfter it turns orange.
+public struct UpdatedStamp: View {
+    var date: Date
+    var staleAfter: TimeInterval?
+
+    public init(_ date: Date, staleAfter: TimeInterval? = nil) {
+        self.date = date
+        self.staleAfter = staleAfter
+    }
+
+    public var body: some View {
+        TimelineView(.periodic(from: .now, by: 15)) { context in
+            let stale = staleAfter.map { context.date.timeIntervalSince(date) > $0 } ?? false
+            Label(updatedText(date, now: context.date),
+                  systemImage: stale ? "exclamationmark.arrow.circlepath" : "arrow.clockwise")
+                .font(.system(size: 11))
+                .foregroundStyle(stale ? AnyShapeStyle(PanelColors.orange) : AnyShapeStyle(.secondary))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 6)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+public func updatedText(_ date: Date, now: Date) -> String {
+    let age = now.timeIntervalSince(date)
+    if age < 60 { return "Updated just now" }
+    let formatter = RelativeDateTimeFormatter()
+    formatter.unitsStyle = .full
+    return "Updated " + formatter.localizedString(for: date, relativeTo: now)
+}

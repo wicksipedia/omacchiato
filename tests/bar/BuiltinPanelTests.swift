@@ -1,4 +1,6 @@
+import Foundation
 import Testing
+import StatusPanel
 @testable import BluetoothPanel
 @testable import SoundPanel
 
@@ -29,5 +31,15 @@ import Testing
         #expect(D(id: "a", name: "Sony WH-1000XM5", kind: .audio).symbol == "headphones")
         #expect(D(id: "a", name: "Magic Keyboard", kind: .keyboard).symbol == "keyboard.fill")
         #expect(D(id: "a", name: "Pad", kind: .gamepad).symbol == "gamecontroller.fill")
+    }
+}
+
+@Suite struct UpdatedStampTests {
+    @Test("the stamp says just now under a minute, then the age in words")
+    func text() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        #expect(updatedText(now.addingTimeInterval(-20), now: now) == "Updated just now")
+        #expect(updatedText(now.addingTimeInterval(-180), now: now) == "Updated 3 minutes ago")
+        #expect(updatedText(now.addingTimeInterval(-7200), now: now) == "Updated 2 hours ago")
     }
 }

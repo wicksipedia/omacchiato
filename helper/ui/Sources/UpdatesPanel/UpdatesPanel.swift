@@ -14,6 +14,9 @@ public struct UpdatesPanel: View {
         self.actions = actions
     }
 
+    // The plugin fetches every hour: three missed fetches.
+    static let staleAfter: TimeInterval = 3 * 3600
+
     var title: String { report.target.map { "Omacchiato \($0)" } ?? "Omacchiato Update" }
 
     var subtitle: String {
@@ -47,6 +50,9 @@ public struct UpdatesPanel: View {
                         }
                     }
                 }
+            }
+            if let updated = report.updated {
+                UpdatedStamp(updated, staleAfter: Self.staleAfter)
             }
         }
         .statusPanelBackground(width: 320)

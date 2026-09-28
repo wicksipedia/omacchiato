@@ -127,15 +127,17 @@ public struct AIUsageReport {
     }
 
     public var now: Date
+    public var updated: Date                // when tokscale last read these numbers
     public var providers: [Provider]
     public var days: [Day]                  // the last seven, oldest first; empty without tokscale
     public var models: [Model]              // by tokens, most first
     public var sessions: Int
     public var activeHours: Int
 
-    public init(now: Date, providers: [Provider], days: [Day] = [], models: [Model] = [],
+    public init(now: Date, updated: Date? = nil, providers: [Provider], days: [Day] = [], models: [Model] = [],
                 sessions: Int = 0, activeHours: Int = 0) {
         self.now = now
+        self.updated = updated ?? now
         self.providers = providers
         self.days = days
         self.models = models
@@ -239,7 +241,8 @@ extension AIUsageReport {
         let models = list(json["models"]).map {
             Model(name: $0["name"] as? String ?? "", tokens: $0["tokens"] as? Int ?? 0, cost: number($0["cost"]) ?? 0)
         }
-        self.init(now: now, providers: providers, days: days, models: models,
+        self.init(now: now, updated: number(json["updated"]).map { Date(timeIntervalSince1970: $0) },
+                  providers: providers, days: days, models: models,
                   sessions: json["sessions"] as? Int ?? 0, activeHours: json["active_hours"] as? Int ?? 0)
     }
 }

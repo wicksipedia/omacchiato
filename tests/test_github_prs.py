@@ -112,6 +112,13 @@ class Panel(unittest.TestCase):
         self.assertEqual(second["check_counts"], {"failed": 2, "passed": 10})
         self.assertTrue(second["unread"] and not first["unread"])
 
+    def test_panel_updated_is_the_read_time(self):
+        import time
+        before = time.time()
+        after_read = gh.render([pr(1)], [], set())["panel"]["updated"]
+        after = time.time()
+        self.assertTrue(before <= after_read <= after)
+
 
 if __name__ == "__main__":
     unittest.main()

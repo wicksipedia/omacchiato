@@ -21,12 +21,15 @@ public struct UpdatesReport {
     public var commits: [Commit]
     public var more: Int            // commits beyond the ones shown
     public var update: String       // the omacchiato-update command for "Update Now"
+    public var updated: Date?       // when the clone last fetched successfully
 
-    public init(target: String? = nil, commits: [Commit] = [], more: Int = 0, update: String = "") {
+    public init(target: String? = nil, commits: [Commit] = [], more: Int = 0, update: String = "",
+                updated: Date? = nil) {
         self.target = target
         self.commits = commits
         self.more = more
         self.update = update
+        self.updated = updated
     }
 
     public var total: Int { commits.count + more }
@@ -48,6 +51,7 @@ extension UpdatesReport {
                   age: $0["age"] as? String ?? "")
         }
         self.init(target: json["target"] as? String, commits: commits, more: json["more"] as? Int ?? 0,
-                  update: json["update"] as? String ?? "")
+                  update: json["update"] as? String ?? "",
+                  updated: (json["updated"] as? NSNumber).map { Date(timeIntervalSince1970: $0.doubleValue) })
     }
 }

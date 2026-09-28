@@ -1,4 +1,8 @@
+import os
+import tempfile
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
 from loader import load
 
@@ -43,6 +47,32 @@ class Panel(unittest.TestCase):
         out = updates.pill([commit("c%d" % i) for i in range(15)])
         self.assertEqual(len(out["panel"]["commits"]), 10)
         self.assertEqual(out["panel"]["more"], 5)
+
+    def test_carries_the_fetch_time(self):
+        out = updates.pill([commit("Fix a")], fetched=1700000000)
+        self.assertEqual(out["panel"]["updated"], 1700000000)
+
+
+class FetchedAt(unittest.TestCase):
+    def test_reads_the_mtime_of_fetch_head(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fetch_head = Path(tmp) / ".git" / "FETCH_HEAD"
+            fetch_head.parent.mkdir()
+            fetch_head.touch()
+            os.utime(fetch_head, (1700000000, 1700000000))
+            with patch.object(updates, "REPO", Path(tmp)), \
+                 patch.object(updates, "git", lambda *a, **kw: ".git/FETCH_HEAD\n"):
+                self.assertEqual(updates.fetched_at(), 1700000000)
+
+    def test_no_git_path_gives_none(self):
+        with patch.object(updates, "git", lambda *a, **kw: None):
+            self.assertIsNone(updates.fetched_at())
+
+    def test_missing_file_gives_none(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(updates, "REPO", Path(tmp)), \
+                 patch.object(updates, "git", lambda *a, **kw: ".git/FETCH_HEAD\n"):
+                self.assertIsNone(updates.fetched_at())
 
 
 class NewestRelease(unittest.TestCase):

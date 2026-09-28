@@ -140,6 +140,10 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   `RowsPanel`, which draws `popupRows(for:)` as a macOS menu. Only the
   Apple menu, the app menus and plugins with no `panel` use rows. The
   built-in panels take a report from `PopupRows.swift`.
+  A panel whose data comes from a cache or a slow fetch (weather, AI
+  usage, pull requests, updates) ends with `UpdatedStamp`, which shows
+  the time of the last successful read, not of the last run, and turns
+  orange past the panel's `staleAfter`.
   `ControlSlider` and `ControlTile` in `StatusParts.swift` draw the
   Control Center slider and round button, by hand, because a system
   control draws grey in a window that is not key.

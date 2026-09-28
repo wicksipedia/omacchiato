@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(StatusPanel)
+import StatusPanel
+#endif
 
 // The weather popup, in the style of the iOS Weather app. It reads a
 // WeatherReport, which comes from one wttr.in `format=j1` answer.
@@ -33,6 +36,10 @@ public struct WeatherReport: Equatable {
     public var sunrise = ""
     public var sunset = ""
     public var moon = ""
+    public var updatedAt = Date()
+
+    // The bar fetches every 30 minutes: two missed fetches.
+    public static let staleAfter: TimeInterval = 3600
 
     public init() {}
 
@@ -192,6 +199,12 @@ public struct WeatherPanel: View {
             card("HOURLY FORECAST", "clock") { hourly }
             card("\(report.days.count)-DAY FORECAST", "calendar") { daily }
             details
+            // A darker backing than the cards: the orange of a stale stamp
+            // is faint on a pale sky.
+            UpdatedStamp(report.updatedAt, staleAfter: WeatherReport.staleAfter)
+                .colorScheme(.dark)
+                .padding(.vertical, 5)
+                .background(.black.opacity(0.35), in: .rect(cornerRadius: 10))
         }
         .padding(14)
         .frame(width: 340)
@@ -349,8 +362,9 @@ extension WeatherReport {
         return (try? Data(contentsOf: url)).flatMap { WeatherReport(j1: $0, now: noon) } ?? WeatherReport()
     }
 
-    static func sample(_ code: Int, night: Bool = false, temp: Int = 24) -> WeatherReport {
+    static func sample(_ code: Int, night: Bool = false, temp: Int = 24, updatedAt: Date = Date()) -> WeatherReport {
         var r = WeatherReport()
+        r.updatedAt = updatedAt
         r.location = "Springfield"
         r.temp = temp
         r.feels = temp - 2
@@ -382,6 +396,7 @@ extension WeatherReport {
 }
 
 #Preview("wttr.in answer") { WeatherPanel(report: .fixture) }
+#Preview("stale") { WeatherPanel(report: .sample(116, temp: 18, updatedAt: Date().addingTimeInterval(-3 * 3600))) }
 #Preview("sunny") { WeatherPanel(report: .sample(113)) }
 #Preview("clear night") { WeatherPanel(report: .sample(113, night: true, temp: 14)) }
 #Preview("partly cloudy") { WeatherPanel(report: .sample(116, temp: 21)) }

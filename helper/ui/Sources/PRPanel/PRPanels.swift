@@ -46,6 +46,9 @@ public struct RemindersPRPanel: View {
                     }
                 }
             }
+            if let updated = report.updatedStamp {
+                UpdatedStamp(updated, staleAfter: PRReport.staleAfter)
+            }
             SettingsRow(title: "All Pull Requests", detail: "github.com", action: actions.openAll)
         }
         .statusPanelBackground(width: 380)
@@ -102,6 +105,9 @@ public struct InboxPRPanel: View {
                         }
                     }
                 }
+            }
+            if let updated = report.updatedStamp {
+                UpdatedStamp(updated, staleAfter: PRReport.staleAfter)
             }
             SettingsRow(title: "All Pull Requests", detail: "github.com", action: actions.openAll)
         }
@@ -188,6 +194,9 @@ public struct TrackerPRPanel: View {
                         }
                     }
                 }
+            }
+            if let updated = report.updatedStamp {
+                UpdatedStamp(updated, staleAfter: PRReport.staleAfter)
             }
             SettingsRow(title: "All Pull Requests", detail: "github.com", action: actions.openAll)
         }

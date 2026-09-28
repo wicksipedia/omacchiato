@@ -35,4 +35,12 @@ import Testing
         #expect(report.problem == "offline" && report.updated != nil)
         #expect(PRReport(json: ["kind": "ai-usage"]) == nil)
     }
+
+    @Test("the updated stamp hides once StaleNote already gives the age")
+    func updatedStamp() {
+        let now = Date()
+        #expect(PRReport(now: now, prs: [], updated: now).updatedStamp == now)
+        #expect(PRReport(now: now, prs: [], problem: "offline", updated: now).updatedStamp == nil)
+        #expect(PRReport(now: now, prs: []).updatedStamp == nil)
+    }
 }

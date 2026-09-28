@@ -51,14 +51,23 @@ class Panel(unittest.TestCase):
         states = {"claude": {"status": {"indicator": "major", "description": "Claude Code: Partial outage"},
                              "incidents": []},
                   "codex": None}
-        out = ai.panel(quotas, states, None)
+        out = ai.panel(quotas, states, None, 1_700_000_000)
         claude, codex = out["providers"]
         self.assertEqual([m["label"] for m in claude["metrics"]], ["Session"])
         self.assertEqual(claude["metrics"][0]["used"], 0.42)
         self.assertEqual((claude["severity"], claude["status"]), (2, "Claude Code: Partial outage"))
         self.assertEqual((codex["name"], codex["metrics"], codex["severity"]), ("Codex", [], 0))
         self.assertEqual((claude["open"], codex["open"]), (True, False))
+        self.assertEqual(out["updated"], 1_700_000_000)
         self.assertNotIn("days", out)
+
+    def test_usage_read_at_is_the_oldest_shown_provider(self):
+        entry = {"usage": {"claude": {"at": 100, "outputs": []}, "codex": {"at": 200, "outputs": []}}}
+        self.assertEqual(ai.usage_read_at(entry, ["claude", "codex"]), 100)
+        self.assertEqual(ai.usage_read_at(entry, ["codex"]), 200)
+
+    def test_usage_read_at_falls_back_to_now_with_nothing_cached(self):
+        self.assertEqual(ai.usage_read_at({}, ["claude"]), ai.NOW)
 
     def test_each_day_carries_the_same_weekday_a_week_before(self):
         from datetime import date, timedelta
@@ -68,12 +77,13 @@ class Panel(unittest.TestCase):
                  "sessions": 1, "active_ms": 0,
                  "prior": {(today - timedelta(days=7)).isoformat(): {"Opus 5.5": 200, "Sonnet 5": 100},
                            (today - timedelta(days=13)).isoformat(): 40}}
-        days = ai.panel({}, {}, stats)["days"]
+        days = ai.panel({}, {}, stats, ai.NOW)["days"]
         self.assertEqual(len(days), 7)
         self.assertEqual((days[-1]["date"], days[-1]["prior"]), (today.isoformat(), 300))
         self.assertEqual(days[-1]["prior_models"], {"Opus 5.5": 200, "Sonnet 5": 100})
         self.assertEqual((days[0]["prior"], days[0]["prior_models"]), (40, {"Other": 40}))
         self.assertEqual(sum(d["prior"] for d in days), 340)
+
 
 
 class PillIcon(unittest.TestCase):
