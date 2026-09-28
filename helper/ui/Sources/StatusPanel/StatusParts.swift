@@ -31,7 +31,8 @@ extension StatusReport {
     var gauge: StatusGauge {
         StatusGauge(battery: Double(battery?.percent ?? 0) / 100,
                     charging: battery?.onAC ?? false,
-                    wifi: wifi.on ? wifiLevel(rssi: wifi.rssi ?? 0) : nil)
+                    wifi: wifi.on ? wifiLevel(rssi: wifi.rssi ?? 0) : nil,
+                    link: ethernet != nil ? .ethernet : (wifi.hotspot ? .hotspot : .wifi))
     }
 }
 
@@ -105,6 +106,29 @@ public struct HoverRow<Content: View>: View {
             .contentShape(.rect)
             .onHover { hovered = $0 }
             .onTapGesture { action?() }
+    }
+}
+
+// The hover fill of HoverRow, for a click target that keeps its own layout.
+struct HoverFill: ViewModifier {
+    var radius: CGFloat
+    var inset: CGFloat
+    @State private var hovered = false
+
+    func body(content: Content) -> some View {
+        content
+            .background {
+                RoundedRectangle(cornerRadius: radius)
+                    .fill(hovered ? AnyShapeStyle(.fill.tertiary) : AnyShapeStyle(.clear))
+                    .padding(-inset)
+            }
+            .onHover { hovered = $0 }
+    }
+}
+
+extension View {
+    public func hoverFill(radius: CGFloat = 7, inset: CGFloat = 0) -> some View {
+        modifier(HoverFill(radius: radius, inset: inset))
     }
 }
 

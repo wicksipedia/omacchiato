@@ -1829,11 +1829,15 @@ func updateStatus() {
     }
     let interface = CWWiFiClient.shared().interface()
     let wifi = interface?.powerOn() == true ? wifiLevel(rssi: interface?.rssiValue() ?? 0) : nil
-    set("status") { $0.gauge = StatusGauge(battery: battery, charging: charging, wifi: wifi) }
+    let hotspot = wifi != nil && (wifiIPv4().router == "172.20.10.1" || hotspotDevices.contains {
+        $0.value(forKey: "deviceName") as? String == interface?.ssid()
+    })
+    let link: StatusGauge.Link = ethernetInfo() != nil ? .ethernet : (hotspot ? .hotspot : .wifi)
+    set("status") { $0.gauge = StatusGauge(battery: battery, charging: charging, wifi: wifi, link: link) }
 }
 
 func statusReport() -> StatusReport {
-    StatusReport(battery: batteryInfo(), wifi: wifiInfo())
+    StatusReport(battery: batteryInfo(), wifi: wifiInfo(), ethernet: ethernetInfo())
 }
 
 let statusActions: StatusActions = {
@@ -2072,15 +2076,22 @@ final class PanelHost: NSHostingView<AnyView> {
     }
 
     // A tracking area, not a global monitor: a global monitor stops once
-    // this app is active, and a click on the bar makes it active.
+    // this app is active, and a click on the bar makes it active. Remove
+    // only this area: SwiftUI's hover area sits on the same view.
+    private var hullArea: NSTrackingArea?
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
-        trackingAreas.forEach(removeTrackingArea)
-        addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
-                                       owner: self))
+        hullArea.map(removeTrackingArea)
+        let area = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+                                  owner: self)
+        addTrackingArea(area)
+        hullArea = area
     }
 
-    override func mouseExited(with event: NSEvent) { scheduleHullCheck() }
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        scheduleHullCheck()
+    }
 }
 
 func showPanel(_ name: String, _ view: AnyView, under anchor: NSRect, on surface: BarSurface, alignLeft: Bool = false) {
@@ -2376,6 +2387,28 @@ func wifiIPv4() -> (ip: String, router: String) {
         "State:/Network/Interface/\(wifiDevice)/IPv4" as CFString) as? [String: Any]
     return ((iface?["Addresses"] as? [String])?.first ?? "",
             global?["Router"] as? String ?? "")
+}
+
+// The cable the Mac's traffic goes over, if any. A cable counts when
+// it is the primary interface, or when it has an address and wi-fi has
+// none, because a VPN can take the primary slot.
+func ethernetInfo() -> StatusReport.Ethernet? {
+    guard let store = SCDynamicStoreCreate(nil, "omacchiato-bar-ethernet" as CFString, nil, nil),
+          let all = SCNetworkInterfaceCopyAll() as? [SCNetworkInterface] else { return nil }
+    let global = SCDynamicStoreCopyValue(store, "State:/Network/Global/IPv4" as CFString) as? [String: Any]
+    let primary = global?["PrimaryInterface"] as? String
+    func address(_ bsd: String) -> String? {
+        let v = SCDynamicStoreCopyValue(store, "State:/Network/Interface/\(bsd)/IPv4" as CFString) as? [String: Any]
+        return (v?["Addresses"] as? [String])?.first { !$0.hasPrefix("169.254.") }
+    }
+    let wifiUp = address(wifiDevice) != nil
+    for interface in all where SCNetworkInterfaceGetInterfaceType(interface) == kSCNetworkInterfaceTypeEthernet {
+        guard let bsd = SCNetworkInterfaceGetBSDName(interface) as String?, bsd != wifiDevice,
+              let ip = address(bsd), primary == bsd || !wifiUp else { continue }
+        let name = SCNetworkInterfaceGetLocalizedDisplayName(interface) as String? ?? "Ethernet"
+        return .init(name: name, ip: ip, router: primary == bsd ? global?["Router"] as? String : nil)
+    }
+    return nil
 }
 
 // Name only what is certain — the generic personal/enterprise cases

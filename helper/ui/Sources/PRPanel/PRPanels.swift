@@ -69,6 +69,7 @@ public struct RemindersPRPanel: View {
                 .foregroundStyle(on ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
         }
         .padding(10)
+        .hoverFill(radius: 12)
         .background(on ? AnyShapeStyle(stage.tint) : AnyShapeStyle(.fill.quaternary), in: .rect(cornerRadius: 12))
         .contentShape(.rect(cornerRadius: 12))
         .onTapGesture { withAnimation(.snappy(duration: 0.2)) { filter = on ? nil : stage } }

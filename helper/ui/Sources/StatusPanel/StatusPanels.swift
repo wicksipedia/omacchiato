@@ -45,8 +45,21 @@ public struct GaugeStatusPanel: View {
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.secondary)
             }
+            if let e = report.ethernet {
+                HStack(spacing: 6) {
+                    // the "<···>" mark that macOS gives Ethernet, as the gauge draws it
+                    HStack(spacing: 0) {
+                        Image(systemName: "chevron.left")
+                        Image(systemName: "ellipsis").font(.system(size: 11, weight: .black))
+                        Image(systemName: "chevron.right")
+                    }
+                    .font(.system(size: 11, weight: .bold))
+                    Text(e.name).lineLimit(1)
+                }
+                .font(.system(size: 13, weight: .medium))
+            }
             HStack(spacing: 6) {
-                Image(systemName: report.wifi.on ? "wifi" : "wifi.slash",
+                Image(systemName: !report.wifi.on ? "wifi.slash" : (report.wifi.hotspot ? "personalhotspot" : "wifi"),
                       variableValue: report.wifi.rssi.map(signalFill) ?? 0)
                 Text(report.wifi.on ? (report.wifi.ssid ?? "Not connected") : "Wi-Fi off")
                     .lineLimit(1)
@@ -70,7 +83,8 @@ public struct GaugeStatusPanel: View {
             w.rate.map { ("Link", "arrow.up.arrow.down", "\($0) Mbps", w.security) },
             w.channel.map { ("Channel", "antenna.radiowaves.left.and.right", "\($0)",
                              [w.band, w.width].compactMap { $0 }.joined(separator: " · ")) },
-            w.ip.map { ("Address", "network", $0, w.router.map { "Router \($0)" }) },
+            report.ethernet.map { e in ("Address", "network", e.ip, e.router.map { "Router \($0)" }) }
+                ?? w.ip.map { ("Address", "network", $0, w.router.map { "Router \($0)" }) },
         ].compactMap { $0 }
         return LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible())], spacing: 8) {
             ForEach(items, id: \.0) { title, symbol, value, note in
@@ -154,6 +168,7 @@ public struct ControlCenterStatusPanel: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, minHeight: 104, alignment: .topLeading)
+        .hoverFill(radius: 18)
         .background(.fill.quaternary, in: .rect(cornerRadius: 18))
         .contentShape(.rect)
         .onTapGesture(perform: actions.toggleWifi)

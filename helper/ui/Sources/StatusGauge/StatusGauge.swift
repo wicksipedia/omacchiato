@@ -1,18 +1,28 @@
 import AppKit
 
 // The status pill: an open ring for the Mac battery, a wi-fi glyph in the
-// ring, and four dots that close the ring for the wi-fi signal. The bar
+// ring, and four dots that close the ring for the wi-fi signal. On
+// Ethernet the glyph is the Ethernet mark and every dot is lit. On a
+// phone's hotspot the glyph is the hotspot's chain link. The bar
 // builds this file into its own module with swiftc.
 public struct StatusGauge: Equatable {
     public var battery: Double      // 0...1
     public var charging: Bool
     public var wifi: Int?           // nil: wi-fi is off. 0: not joined. 1...4: lit dots
+    public var link: Link
 
-    public init(battery: Double, charging: Bool = false, wifi: Int? = 4) {
+    public enum Link: Equatable {
+        case wifi, ethernet, hotspot
+    }
+
+    public init(battery: Double, charging: Bool = false, wifi: Int? = 4, link: Link = .wifi) {
         self.battery = battery
         self.charging = charging
         self.wifi = wifi
+        self.link = link
     }
+
+    var dots: Int { link == .ethernet ? 4 : (wifi ?? 0) }
 
     public var batteryLow: Bool { battery <= 0.2 && !charging }
 
@@ -66,35 +76,75 @@ public struct StatusGauge: Equatable {
             ring(ringEnd, charging ? colors.charging : (batteryLow ? colors.low : colors.ink))
         }
 
-        let base = p(0.5, 0.33)
-        let joined = (wifi ?? 0) > 0
-        let wedge = arc(base, 0.11, 45, 135)
-        wedge.line(to: base)
-        wedge.close()
-        (joined ? colors.ink : dim).setFill()
-        wedge.fill()
-        for r in [CGFloat(0.21), 0.325] {
-            let path = arc(base, r, 45, 135)
-            path.lineWidth = stroke * 0.8
-            path.lineCapStyle = .round
-            (joined ? colors.ink : dim).setStroke()
-            path.stroke()
+        func drawWifi() {
+            let base = p(0.5, 0.33)
+            let joined = (wifi ?? 0) > 0
+            let wedge = arc(base, 0.11, 45, 135)
+            wedge.line(to: base)
+            wedge.close()
+            (joined ? colors.ink : dim).setFill()
+            wedge.fill()
+            for r in [CGFloat(0.21), 0.325] {
+                let path = arc(base, r, 45, 135)
+                path.lineWidth = stroke * 0.8
+                path.lineCapStyle = .round
+                (joined ? colors.ink : dim).setStroke()
+                path.stroke()
+            }
+            if wifi == nil {
+                let slash = NSBezierPath()
+                slash.move(to: p(0.34, 0.34))
+                slash.line(to: p(0.66, 0.66))
+                slash.lineWidth = stroke * 0.8
+                slash.lineCapStyle = .round
+                colors.ink.setStroke()
+                slash.stroke()
+            }
         }
-        if wifi == nil {
-            let slash = NSBezierPath()
-            slash.move(to: p(0.34, 0.34))
-            slash.line(to: p(0.66, 0.66))
-            slash.lineWidth = stroke * 0.8
-            slash.lineCapStyle = .round
-            colors.ink.setStroke()
-            slash.stroke()
+
+        // the "<···>" mark that macOS gives Ethernet
+        func drawEthernet() {
+            for x in [CGFloat(0.28), 0.72] {
+                let chevron = NSBezierPath()
+                let dx: CGFloat = x < 0.5 ? 0.08 : -0.08
+                chevron.move(to: p(x + dx, 0.62))
+                chevron.line(to: p(x, 0.5))
+                chevron.line(to: p(x + dx, 0.38))
+                chevron.lineWidth = stroke * 0.8
+                chevron.lineCapStyle = .round
+                chevron.lineJoinStyle = .round
+                colors.ink.setStroke()
+                chevron.stroke()
+            }
+            colors.ink.setFill()
+            for x in [CGFloat(0.41), 0.5, 0.59] {
+                let c = p(x, 0.5), r = stroke * 0.45
+                NSBezierPath(ovalIn: NSRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)).fill()
+            }
+        }
+
+        func drawHotspot() {
+            guard let symbol = NSImage(systemSymbolName: "personalhotspot", accessibilityDescription: nil)?
+                .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: side * 0.36, weight: .bold)
+                    .applying(.init(paletteColors: [(wifi ?? 0) > 0 ? colors.ink : dim])))
+            else { return drawWifi() }
+            let size = symbol.size
+            let c = p(0.5, 0.5)
+            symbol.draw(in: NSRect(x: c.x - size.width / 2, y: c.y - size.height / 2, width: size.width, height: size.height),
+                        from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+        }
+
+        switch link {
+        case .wifi: drawWifi()
+        case .ethernet: drawEthernet()
+        case .hotspot: drawHotspot()
         }
 
         for (i, angle) in [CGFloat(240), 260, 280, 300].enumerated() {
             let a = (flipped ? -angle : angle) * .pi / 180
             let c = NSPoint(x: centre.x + cos(a) * radius * side, y: centre.y + sin(a) * radius * side)
             let r = stroke / 2
-            (i < (wifi ?? 0) ? colors.ink : dim).setFill()
+            (i < dots ? colors.ink : dim).setFill()
             NSBezierPath(ovalIn: NSRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)).fill()
         }
     }
@@ -138,6 +188,8 @@ private let states: [(String, StatusGauge)] = [
     ("charging", StatusGauge(battery: 0.4, charging: true, wifi: 2)),
     ("not joined", StatusGauge(battery: 0.8, wifi: 0)),
     ("wi-fi off", StatusGauge(battery: 0.7, wifi: nil)),
+    ("ethernet", StatusGauge(battery: 0.9, charging: true, wifi: 0, link: .ethernet)),
+    ("hotspot", StatusGauge(battery: 0.6, wifi: 3, link: .hotspot)),
 ]
 
 private func grid(side: CGFloat) -> NSView {

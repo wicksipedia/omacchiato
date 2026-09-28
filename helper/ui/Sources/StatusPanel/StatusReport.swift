@@ -103,17 +103,36 @@ public struct StatusReport: Equatable {
             self.phones = phones
         }
 
+        // An iPhone hotspot gives out 172.20.10.x and takes the phone's name.
+        public var hotspot: Bool {
+            router == "172.20.10.1" || phones.contains(where: \.connected)
+        }
+
         public var verdict: String? {
             rssi.map { $0 >= -55 ? "Excellent" : ($0 >= -67 ? "Good" : ($0 >= -75 ? "Fair" : "Weak")) }
         }
     }
 
+    public struct Ethernet: Equatable {
+        public var name: String          // the adapter, such as "USB 10/100/1000 LAN"
+        public var ip: String
+        public var router: String?
+
+        public init(name: String, ip: String, router: String? = nil) {
+            self.name = name
+            self.ip = ip
+            self.router = router
+        }
+    }
+
     public var battery: Battery?        // nil on a Mac with no battery
     public var wifi: WiFi
+    public var ethernet: Ethernet?      // set while the Mac's traffic goes over a cable
 
-    public init(battery: Battery?, wifi: WiFi) {
+    public init(battery: Battery?, wifi: WiFi, ethernet: Ethernet? = nil) {
         self.battery = battery
         self.wifi = wifi
+        self.ethernet = ethernet
     }
 }
 

@@ -79,6 +79,7 @@ struct ProviderSection<Content: View>: View {
                     .foregroundStyle(.tertiary)
                     .rotationEffect(.degrees(open ? 90 : 0))
             }
+            .hoverFill(inset: 5)
             .contentShape(.rect)
             .onTapGesture {
                 withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) { open.toggle() }

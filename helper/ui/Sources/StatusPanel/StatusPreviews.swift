@@ -34,6 +34,20 @@ extension StatusReport {
         battery: Battery(percent: 100, onAC: true, adapterWatts: 96, health: 100, cycles: 3),
         wifi: WiFi(on: false))
 
+    // At a desk: a cable to a dock, with wi-fi on and joined as well.
+    static let wired = StatusReport(
+        battery: Battery(percent: 88, charging: true, onAC: true, minutesLeft: 25, watts: 32.5,
+                         adapterWatts: 96, health: 91, cycles: 212),
+        wifi: onBattery.wifi,
+        ethernet: Ethernet(name: "USB 10/100/1000 LAN", ip: "192.168.1.31", router: "192.168.1.1"))
+
+    // On the road, joined to a phone's hotspot.
+    static let hotspot = StatusReport(
+        battery: Battery(percent: 57, minutesLeft: 2 * 60 + 40, watts: 8.2, health: 91, cycles: 212),
+        wifi: WiFi(ssid: "Alex's iPhone", ip: "172.20.10.4", router: "172.20.10.1", rssi: -58, rate: 573,
+                   security: "WPA3", channel: 149, band: "5 GHz", width: "80 MHz", networks: networks,
+                   phones: [Phone(name: "Alex's iPhone", battery: 71, connected: true)]))
+
     // A Mac mini: no battery, and a scan that has not answered yet.
     static let desktop = StatusReport(battery: nil, wifi: WiFi(scanning: true))
 }
@@ -50,11 +64,13 @@ private struct Desk<Content: View>: View {
     }
 }
 
-private let samples: [StatusReport] = [.onBattery, .charging, .lowPower, .wifiOff, .desktop]
+private let samples: [StatusReport] = [.onBattery, .charging, .lowPower, .wifiOff, .wired, .hotspot, .desktop]
 
 #Preview("Gauge") { Desk { GaugeStatusPanel(report: .onBattery) } }
 #Preview("Control Center") { Desk { ControlCenterStatusPanel(report: .onBattery) } }
 #Preview("Settings") { Desk { SettingsStatusPanel(report: .onBattery) } }
+#Preview("Gauge: Ethernet") { Desk { GaugeStatusPanel(report: .wired) } }
+#Preview("Gauge: hotspot") { Desk { GaugeStatusPanel(report: .hotspot) } }
 
 #Preview("Gauge: every state") {
     Desk {

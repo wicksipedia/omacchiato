@@ -1,5 +1,6 @@
 import Testing
-import StatusGauge
+@testable import StatusGauge
+@testable import StatusPanel
 
 @Suite struct StatusGaugeTests {
     @Test("the battery ring is red at 20 % or less, unless it charges")
@@ -25,4 +26,21 @@ import StatusGauge
         #expect(wifiLevel(rssi: -85) == 1)
     }
 
+    @Test("a cable shows the Ethernet mark with every dot lit, and a phone's hotspot the chain link")
+    func link() {
+        let wifi = StatusReport.WiFi(ssid: "Home", ip: "192.168.1.2", router: "192.168.1.1", rssi: -70)
+        #expect(StatusReport(battery: nil, wifi: wifi).gauge.link == .wifi)
+
+        let wired = StatusReport(battery: nil, wifi: StatusReport.WiFi(), ethernet: .init(name: "LAN", ip: "10.0.0.2"))
+        #expect(wired.gauge.link == .ethernet)
+        #expect(wired.gauge.dots == 4)
+
+        var phone = wifi
+        phone.router = "172.20.10.1"
+        #expect(StatusReport(battery: nil, wifi: phone).gauge.link == .hotspot)
+        #expect(StatusReport(battery: nil, wifi: phone).gauge.dots == 2)
+        phone.router = nil
+        phone.phones = [.init(name: "Home", connected: true)]
+        #expect(StatusReport(battery: nil, wifi: phone).gauge.link == .hotspot)
+    }
 }
