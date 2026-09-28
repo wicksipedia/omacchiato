@@ -18,6 +18,7 @@ let package = Package(
         .library(name: "RowsPanel", targets: ["RowsPanel"]),
         .library(name: "ActivityPanel", targets: ["ActivityPanel"]),
         .library(name: "ThemePanel", targets: ["ThemePanel"]),
+        .library(name: "AirPodsPanel", targets: ["AirPodsPanel"]),
     ],
     targets: [
         .target(name: "StatusGauge"),
@@ -31,6 +32,7 @@ let package = Package(
         .target(name: "RowsPanel", dependencies: ["StatusPanel"]),
         .target(name: "ActivityPanel", dependencies: ["StatusPanel"]),
         .target(name: "ThemePanel", dependencies: ["StatusPanel"]),
+        .target(name: "AirPodsPanel", dependencies: ["StatusPanel"]),
     ],
     swiftLanguageModes: [.v5]
 )

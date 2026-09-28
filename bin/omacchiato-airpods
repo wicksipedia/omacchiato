@@ -100,7 +100,7 @@ def apple_types():
 
 
 def airpods_model(types, info):
-    """(model, icon) of AirPods Pro or AirPods Max, else None."""
+    """(model, icon, type identifier) of AirPods Pro or AirPods Max, else None."""
     try:
         if int(info.get("device_vendorID", ""), 16) != APPLE:
             return None
@@ -109,13 +109,13 @@ def airpods_model(types, info):
         return None
     for prefix, family, icon in FAMILIES:
         if identifier.startswith(prefix):
-            return description or family, icon
+            return description or family, icon, identifier
     return None
 
 
 def connected():
-    """(name, model, icon, {battery name: percent}, on a cable) for each
-    connected AirPods Pro or Max."""
+    """(name, model, icon, type identifier, {battery name: percent}, on a cable)
+    for each connected AirPods Pro or Max."""
     found = []
     report = run_json(["/usr/sbin/system_profiler", "SPBluetoothDataType", "-json"]) or {}
     types, live, cables = None, None, plugged()
@@ -152,7 +152,21 @@ def listening(tool, name):
     return reply.get("listeningMode"), reply.get("supportedListeningModes") or []
 
 
-def device_rows(tool, name, model, icon, battery, cable):
+def panel_device(tool, name, model, kind, battery, cable, modes):
+    """One device in the panel object that the bar's AirPods panel reads.
+    Keep in sync with AirPodsReport(json:) in helper/ui/Sources/AirPodsPanel."""
+    device = {"name": name, "model": model, "type": kind, "battery": battery, "cable": cable}
+    if modes:
+        current, supported = modes
+        device["mode"] = current
+        device["modes"] = [{"id": m, "title": MODES.get(m, m),
+                            "run": " ".join(shlex.quote(a) for a in
+                                            [tool, "--device", name, "listening-mode", "set", m])}
+                           for m in supported]
+    return device
+
+
+def device_rows(tool, name, model, icon, battery, cable, modes):
     # "Matt's AirPods Pro" beside "AirPods Pro" says the same thing twice
     named = model.lower() in name.lower() or name.lower() in model.lower()
     rows = [{"text": name, "detail": "" if named else model, "hero": True, "icon": icon}]
@@ -168,7 +182,6 @@ def device_rows(tool, name, model, icon, battery, cable):
     # that side charging, which nothing here can know
     if cable:
         rows.append({"text": "Plugged into this Mac", "dim": True})
-    modes = listening(tool, name)
     if modes:
         current, supported = modes
         rows.append({"separator": True})
@@ -186,9 +199,11 @@ def main():
         print(json.dumps({"label": "", "icon": ""}))
         return
     tool = shutil.which("airpods-control")
-    rows = []
-    for n, (name, model, icon, battery, cable) in enumerate(devices):
-        section = device_rows(tool, name, model, icon, battery, cable)
+    rows, panel = [], []
+    for n, (name, model, icon, kind, battery, cable) in enumerate(devices):
+        modes = listening(tool, name)
+        panel.append(panel_device(tool, name, model, kind, battery, cable, modes))
+        section = device_rows(tool, name, model, icon, battery, cable, modes)
         if len(devices) > 1:
             section[0]["section"] = "closed"
         rows += ([{"separator": True}] if n else []) + section
@@ -197,10 +212,12 @@ def main():
 
     levels = [pct for *_, battery, _ in devices for part, pct in battery.items() if part != "Case"]
     lowest = min(levels, default=None)
-    payload = {"label": "" if lowest is None else "%d%%" % lowest, "icon": devices[0][2], "rows": rows}
+    payload = {"label": "" if lowest is None else "%d%%" % lowest, "icon": devices[0][2], "rows": rows,
+               "panel": {"kind": "airpods", "devices": panel, "settings": SOUND_SETTINGS}}
     if lowest is not None and lowest <= LOW:
         payload["color"] = "red"
     print(json.dumps(payload))
 
 
-main()
+if __name__ == "__main__":
+    main()

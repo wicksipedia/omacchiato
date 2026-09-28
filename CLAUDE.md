@@ -178,8 +178,9 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   `parts` is a list of `icon`, `icon_color`, `label`, `label_color` and `under` that the pill
   draws after its own icon and label. A `panel` object replaces the
   rows with a SwiftUI panel: `kind = ai-usage` for
-  `helper/ui/Sources/AIUsagePanel` and `kind = github-prs` for
-  `helper/ui/Sources/PRPanel`. `<pill>_panel` in `bar-pills.conf` picks
+  `helper/ui/Sources/AIUsagePanel`, `kind = github-prs` for
+  `helper/ui/Sources/PRPanel` and `kind = airpods` for
+  `helper/ui/Sources/AirPodsPanel`. `<pill>_panel` in `bar-pills.conf` picks
   the design. Plugin commands run with
   the bar's TCC grants.
 - AppKit hit-tests a non-opaque window by alpha, so a pill background
@@ -408,6 +409,10 @@ The design and the test results are in
   private API, and `install.sh` builds it at a pinned version and SHA-256.
   It answers `no-device` while the cable carries the audio, because it
   controls a device only over Bluetooth.
+- The AirPods panel draws Apple's product renders from the private
+  `HeadphoneAssets` and `HeadphoneSettingsUI` frameworks, picked by the
+  CoreTypes type identifier. If an image name goes away, the panel
+  draws an SF Symbol.
 
 ## Security notes
 

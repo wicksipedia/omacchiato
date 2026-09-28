@@ -22,6 +22,7 @@ let package = Package(
                 .product(name: "RowsPanel", package: "ui"),
                 .product(name: "ActivityPanel", package: "ui"),
                 .product(name: "ThemePanel", package: "ui"),
+                .product(name: "AirPodsPanel", package: "ui"),
             ],
             path: "helper/bar",
             linkerSettings: [.unsafeFlags([
@@ -37,6 +38,7 @@ let package = Package(
             .product(name: "PRPanel", package: "ui"),
             .product(name: "ActivityPanel", package: "ui"),
             .product(name: "ThemePanel", package: "ui"),
+            .product(name: "AirPodsPanel", package: "ui"),
         ], path: "tests/bar"),
     ],
     swiftLanguageModes: [.v5]

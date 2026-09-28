@@ -14,6 +14,7 @@ import SwiftUI
 #if canImport(StatusGauge)
 import StatusGauge
 import ActivityPanel
+import AirPodsPanel
 import BarPills
 import AIUsagePanel
 import CalendarPanel
@@ -148,6 +149,9 @@ func panelView(_ name: String) -> AnyView? {
         }
     default:
         guard let json = pluginPanels[name] else { return rowsPanel(popupRows(for: name)) }
+        if let report = AirPodsReport(json: json) {
+            return AnyView(AirPodsPanel(report: report, actions: airPodsActions(plugin: name, settings: report.settings)))
+        }
         if let report = PRReport(json: json) {
             var actions = PRActions()
             actions.open = { url in
@@ -169,6 +173,23 @@ func panelView(_ name: String) -> AnyView? {
         default: return AnyView(RingsAIUsagePanel(report: report, actions: actions))
         }
     }
+}
+
+func airPodsActions(plugin name: String, settings: URL?) -> AirPodsActions {
+    var actions = AirPodsActions()
+    actions.openSettings = {
+        if let settings, settings.scheme == "x-apple.systempreferences" { NSWorkspace.shared.open(settings) }
+        closePopup()
+    }
+    // The same path as a row's "run": argv to sh, then the plugin runs again.
+    actions.setMode = { mode in
+        guard let plugin = barPlugins.first(where: { $0.name == name }), !mode.run.isEmpty else { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            _ = shell("/bin/sh", ["-c", mode.run], env: pluginEnv(plugin))
+            runPlugin(plugin)
+        }
+    }
+    return actions
 }
 
 func aiUsageActions(report command: String?) -> AIUsageActions {
