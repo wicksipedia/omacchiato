@@ -1884,8 +1884,8 @@ func fetchWeather(_ coordinate: CLLocationCoordinate2D?) {
         DispatchQueue.main.async {
             weatherReport = report
             set("weather") {
-                $0.icon = ""
-                $0.label = "\(weatherEmoji(report.code, night: report.night)) \(report.temp)°C"
+                $0.icon = weatherEmoji(report.code, night: report.night)
+                $0.label = "\(report.temp)°C"
             }
             if openPopup == "weather" { refreshPopup() }
         }
@@ -1927,6 +1927,7 @@ final class PopupWindow: NSWindow {
 
 var popupWindow: PopupWindow?
 var openPopup: String? // which bar item owns it
+weak var popupOwner: BarSurface? // the bar that shows its pill lit
 
 func closePopup() {
     if openPopup == "wifi" || openPopup == "status" { stopHotspotBrowse() }
@@ -1937,6 +1938,8 @@ func closePopup() {
     popupShownRows = []
     popupSelection = nil
     openPopup = nil
+    popupOwner?.view.needsDisplay = true
+    popupOwner = nil
 }
 
 // rows are rebuilt, not patched: the content is cheap to regenerate and a
@@ -2103,6 +2106,8 @@ func showPanel(_ name: String, _ view: AnyView, under anchor: NSRect, on surface
     }
     popupWindow = window
     openPopup = name
+    popupOwner = surface
+    surface.view.needsDisplay = true
     setPopupKeys(!popupShownRows.isEmpty)
 }
 
@@ -4178,8 +4183,7 @@ final class BarView: NSView {
         let appleFont = nerdFont("Bold", 15)
         let appleW = inkBox(appleGlyph, appleFont).width + pillPad * 2
         let apple = NSRect(x: padLeft, y: (barHeight - pillHeight) / 2, width: appleW, height: pillHeight)
-        palette.itemBG.setFill()
-        NSBezierPath(roundedRect: apple, xRadius: radius, yRadius: radius).fill()
+        fillPill(apple, "apple")
         drawIcon(appleGlyph, appleFont, palette.accent, centeredIn: apple)
         appleRect = NSRect(x: apple.minX, y: 0, width: appleW, height: barHeight)
 
@@ -4237,8 +4241,7 @@ final class BarView: NSView {
             let textW = advance(model.frontApp, appFont)
             let pill = NSRect(x: bracket.maxX + leftGap, y: (barHeight - pillHeight) / 2,
                               width: textW + pillPad * 2, height: pillHeight)
-            palette.itemBG.setFill()
-            NSBezierPath(roundedRect: pill, xRadius: radius, yRadius: radius).fill()
+            fillPill(pill, "appmenu")
             draw(model.frontApp, appFont, palette.accent, centeredIn: pill)
             appPillRect = pill
             leftEdge = pill.maxX
@@ -4264,16 +4267,17 @@ final class BarView: NSView {
             guard let item = rightItems[name], item.drawing else { continue }
             if let gauge = item.gauge {
                 let side = pillHeight - 2
-                let pill = NSRect(x: cursor - side - pillPad * 2, y: (barHeight - pillHeight) / 2,
-                                  width: side + pillPad * 2, height: pillHeight)
+                // the ring's ink is 0.89 of the gauge's side, so trim the rest from the pill
+                let ink = side * 0.89
+                let pill = NSRect(x: cursor - ink - pillPad * 2, y: (barHeight - pillHeight) / 2,
+                                  width: ink + pillPad * 2, height: pillHeight)
                 let hitMaxX = cursor == bounds.maxX - padLeft ? bounds.maxX : pill.maxX + rightGap / 2
                 let hitArea = NSRect(x: pill.minX - rightGap / 2, y: 0,
                                      width: hitMaxX - pill.minX + rightGap / 2, height: bounds.height)
                 NSColor.clear.clickable.setFill()
                 hitArea.fill()
-                palette.itemBG.setFill()
-                NSBezierPath(roundedRect: pill, xRadius: radius, yRadius: radius).fill()
-                gauge.draw(in: pill.insetBy(dx: pillPad, dy: 1),
+                fillPill(pill, name)
+                gauge.draw(in: pill.insetBy(dx: pillPad - (side - ink) / 2, dy: 1),
                            colors: .init(ink: palette.label, low: palette.red, charging: palette.green))
                 itemRects.append((name, pill, hitArea))
                 cursor = pill.minX - rightGap
@@ -4283,20 +4287,14 @@ final class BarView: NSView {
                 .filter { !($0.icon.isEmpty && $0.label.isEmpty) }
             guard !parts.isEmpty else { continue }
             let labelFont = chipFont
-            // An icon-only pill is sized and centred on the glyph's INK, so
-            // a lopsided side bearing cannot push it off centre. A pill with
-            // a label flows icon-then-text, and the gap between them exists
-            // only when both do — the weather pill has no icon (its glyph
-            // lives in the label) and inherited the gap anyway, which is the
-            // 7 px it sat right of centre by.
+            // Icons and labels are sized by their ink, so a side bearing
+            // cannot change the gap to the next pill.
             let sizes = parts.map { part -> (icon: CGFloat, gap: CGFloat, label: CGFloat) in
                 let hasIcon = !part.icon.isEmpty
-                // icon-only is ignored where there is no icon: the weather pill
-                // keeps its glyph in the label, so suppressing it draws nothing
                 let hasLabel = !part.label.isEmpty && !(hasIcon && iconOnly.contains(name))
                 return (hasIcon ? inkBox(part.icon, iconFont).width : 0,
                         hasIcon && hasLabel ? 7 : 0,
-                        hasLabel ? advance(part.label, labelFont) : 0)
+                        hasLabel ? inkBox(part.label, labelFont).width : 0)
             }
             let partGap: CGFloat = 10
             let width = pillPad * 2 + partGap * CGFloat(parts.count - 1)
@@ -4312,15 +4310,15 @@ final class BarView: NSView {
                                  width: hitMaxX - pill.minX + rightGap / 2, height: bounds.height)
             NSColor.clear.clickable.setFill()
             hitArea.fill()
-            palette.itemBG.setFill()
-            NSBezierPath(roundedRect: pill, xRadius: radius, yRadius: radius).fill()
+            fillPill(pill, name)
             var x = pill.minX + pillPad
             for (part, size) in zip(parts, sizes) {
                 if size.icon > 0 {
                     drawIcon(part.icon, iconFont, part.iconColor ?? palette.label,
                              centeredIn: NSRect(x: x, y: pill.minY, width: size.icon, height: pill.height))
                 }
-                let labelX = x + size.icon + size.gap
+                // a tabular digit such as "1" has empty space on each side
+                let labelX = x + size.icon + size.gap - (size.label > 0 ? inkBox(part.label, labelFont).minX : 0)
                 if size.label > 0, part.label == item.label, !item.tickerText.isEmpty, !tickerShown {
                     ticker.show(item.label, item.tickerText, item.tickerTail, font: labelFont,
                                 colors: (item.labelColor ?? palette.label, palette.yellow),
@@ -4338,6 +4336,15 @@ final class BarView: NSView {
         if !tickerShown { ticker.hide() }
     }
 
+
+    // The pill of the open popup gets a soft fill, as a macOS menu bar item does.
+    private func fillPill(_ pill: NSRect, _ name: String) {
+        palette.itemBG.setFill()
+        NSBezierPath(roundedRect: pill, xRadius: radius, yRadius: radius).fill()
+        guard openPopup == name, popupOwner === surface else { return }
+        palette.label.withAlphaComponent(0.16).setFill()
+        NSBezierPath(roundedRect: pill.insetBy(dx: -2, dy: 0), xRadius: 6, yRadius: 6).fill()
+    }
 
     // Tracking areas, not a poll and not a global monitor: a global
     // monitor stops delivering once this app is itself active, which is

@@ -20,8 +20,7 @@ battery = icon
 
 `hide` also skips the pill's provider, so hiding `weather` stops the
 wttr.in fetches and hiding `bluetooth` never touches the Bluetooth
-grant. `icon` drops the label and keeps the glyph; the weather pill
-ignores it, because its glyph is part of the label. `volume = muted`
+grant. `icon` drops the label and keeps the glyph. `volume = muted`
 draws the volume pill only while the output device is muted or at
 zero, as a red icon, the same way the microphone pill works.
 `battery = time` shows only the battery icon on AC power; on battery
