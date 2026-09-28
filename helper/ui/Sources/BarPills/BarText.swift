@@ -68,3 +68,103 @@ public struct PillColors {
         self.muted = muted
     }
 }
+
+// A plugin pill: its own icon and label, then any parts the plugin adds,
+// each an icon and a label. A part can colour its label, such as a quiet time.
+public struct PillPart {
+    public var icon: String
+    public var iconColor: NSColor?
+    public var label: String
+    public var labelColor: NSColor?
+    public var under: Bool                  // stack the label under the label of the part before
+
+    public init(icon: String = "", iconColor: NSColor? = nil, label: String = "", labelColor: NSColor? = nil,
+                under: Bool = false) {
+        self.icon = icon
+        self.iconColor = iconColor
+        self.label = label
+        self.labelColor = labelColor
+        self.under = under
+    }
+}
+
+public struct PartsPill {
+    // A part, and the label stacked under its own, if any.
+    typealias Slot = (part: PillPart, under: PillPart?)
+    var slots: [Slot] = []
+    public var iconOnly: Bool               // `<pill> = icon` in bar-pills.conf drops the labels
+
+    public static let pad: CGFloat = 6      // each side, inside the pill
+    static let partGap: CGFloat = 10
+    static let iconGap: CGFloat = 7
+
+    public init(parts: [PillPart], iconOnly: Bool = false) {
+        self.iconOnly = iconOnly
+        for part in parts where !(part.icon.isEmpty && part.label.isEmpty) {
+            if part.under, !iconOnly, let last = slots.indices.last, slots[last].under == nil,
+               !slots[last].part.label.isEmpty {
+                slots[last].under = part
+            } else {
+                slots.append((part, nil))
+            }
+        }
+    }
+
+    // Two lines fit in the pill only in smaller type.
+    static func stacked(_ font: NSFont) -> (top: NSFont, bottom: NSFont) {
+        (NSFontManager.shared.convert(font, toSize: 11), NSFontManager.shared.convert(font, toSize: 9))
+    }
+
+    // Icons and labels are sized by their ink, so a side bearing cannot change the gap to the next pill.
+    func sizes(_ iconFont: NSFont, _ labelFont: NSFont) -> [(icon: CGFloat, gap: CGFloat, label: CGFloat)] {
+        let small = Self.stacked(labelFont)
+        return slots.map { slot in
+            let hasIcon = !slot.part.icon.isEmpty
+            let hasLabel = !slot.part.label.isEmpty && !(hasIcon && iconOnly)
+            let label = !hasLabel ? 0 : slot.under.map {
+                max(inkBox(slot.part.label, small.top).width, inkBox($0.label, small.bottom).width)
+            } ?? inkBox(slot.part.label, labelFont).width
+            return (hasIcon ? inkBox(slot.part.icon, iconFont).width : 0, hasIcon && hasLabel ? Self.iconGap : 0, label)
+        }
+    }
+
+    public func width(iconFont: NSFont, labelFont: NSFont) -> CGFloat {
+        guard !slots.isEmpty else { return 0 }
+        return Self.pad * 2 + Self.partGap * CGFloat(slots.count - 1)
+            + sizes(iconFont, labelFont).reduce(0) { $0 + $1.icon + $1.gap + $1.label }
+    }
+
+    // Draw the icons and labels, and return the box of each slot's label, nil for a slot with no label.
+    // `skip` leaves one label undrawn, for a Ticker to draw.
+    @discardableResult
+    public func draw(in pill: NSRect, iconFont: NSFont, labelFont: NSFont, color: NSColor, skip: Int? = nil) -> [NSRect?] {
+        let small = Self.stacked(labelFont)
+        var x = pill.minX + Self.pad
+        var boxes: [NSRect?] = []
+        for (i, (slot, size)) in zip(slots, sizes(iconFont, labelFont)).enumerated() {
+            let part = slot.part
+            if size.icon > 0 {
+                drawIcon(part.icon, iconFont, part.iconColor ?? color,
+                         centeredIn: NSRect(x: x, y: pill.minY, width: size.icon, height: pill.height))
+            }
+            let left = x + size.icon + size.gap
+            if size.label > 0 {
+                boxes.append(NSRect(x: left, y: pill.minY, width: size.label, height: pill.height))
+                // a tabular digit such as "1" has empty space on each side
+                if let under = slot.under {
+                    drawText(part.label, small.top, part.labelColor ?? color,
+                             leftAt: left - inkBox(part.label, small.top).minX, midY: pill.midY + 5)
+                    drawText(under.label, small.bottom, under.labelColor ?? color,
+                             leftAt: left - inkBox(under.label, small.bottom).minX, midY: pill.midY - 6)
+                } else if i != skip {
+                    drawText(part.label, labelFont, part.labelColor ?? color,
+                             leftAt: left - inkBox(part.label, labelFont).minX, midY: pill.midY)
+                }
+            } else {
+                boxes.append(nil)
+            }
+            x += size.icon + size.gap + size.label + Self.partGap
+        }
+        return boxes
+    }
+}

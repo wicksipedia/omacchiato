@@ -164,12 +164,15 @@ or a row with `"section": "end"`. The value sets how the section starts,
 and the bar keeps each click until it restarts. The header shows ▸ when
 the section is closed and ▾ when it is open.
 
-`parts` adds more icons to the pill, each in its own colour, after the
-icon and label:
+`parts` adds more icons and labels to the pill, after the icon and
+label. `icon_color` colours a part's icon, and `label_color` its label,
+such as a quiet time. `"under": true` stacks a part's label under the
+label before it, in smaller type:
 
 ```json
 {"label": "", "color": "green", "parts": [
   {"icon": "\uec82", "icon_color": "#D97757", "label": "27%"},
+  {"label": "2h", "label_color": "muted"},
   {"icon": "\uec81", "icon_color": "label", "label": "0%"}
 ]}
 ```
@@ -200,14 +203,15 @@ glyph the config names.
 
 `omacchiato-ai-usage` shows the plan usage of Claude, Codex and Copilot.
 [tokscale](https://github.com/junhoyeo/tokscale) reads the numbers, and
-`install.sh` installs it. Two settings on the command line choose the
-providers:
+`install.sh` installs it. These settings go on the command line:
 
 - `--pill` sets the providers in the pill label, and the usage window
   for each one: `<id>[:<window>]`, separated by commas. The default is
   `claude`.
 - `--panel` sets the providers in the popup, separated by commas. The
   default is the `--pill` providers.
+- `--inline` puts the time to the first provider's reset beside its
+  percent. By default it sits under the percent, in smaller type.
 
 An id is `claude`, `codex` or `copilot`. A window is the name that the
 popup shows for it, such as `weekly` or `fable`, and case does not

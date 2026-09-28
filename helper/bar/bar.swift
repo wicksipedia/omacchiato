@@ -622,6 +622,8 @@ struct BarPart: Equatable {
     var icon = ""
     var iconColor: NSColor?
     var label = ""
+    var labelColor: NSColor?
+    var under = false
 }
 
 struct BarItem: Equatable {

@@ -163,7 +163,7 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   again) and `section` (`open`, `closed` or `end`). A row `url` may also
   use `x-apple.systempreferences:`. `foldSections`
   keys a section's open state by header text, because the detail changes.
-  `parts` is a list of `icon`, `icon_color` and `label` that the pill
+  `parts` is a list of `icon`, `icon_color`, `label`, `label_color` and `under` that the pill
   draws after its own icon and label. A `panel` object replaces the
   rows with a SwiftUI panel: `kind = ai-usage` for
   `helper/ui/Sources/AIUsagePanel` and `kind = github-prs` for

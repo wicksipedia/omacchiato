@@ -78,14 +78,14 @@ def seconds_until(value):
         return None
 
 
-# thin spaces: a normal space is a whole cell in the bar's monospace font
-LABEL_DOT = " · "
+STACK = True  # the time to the reset goes under the percent; --inline puts it beside
 IDLE_ICON = "\U0001f916"  # every provider at 0%: one glyph, no numbers
 
 
-def clock(left):
-    h, m = divmod(int(left) // 60, 60)
-    return "%dd" % (h // 24) if h >= 24 else "%d:%02d" % (h, m)
+def whole(left):
+    """The time to a reset for the pill, in its largest whole unit: 3d, 2h or 42m."""
+    m = max(1, int(left) // 60)
+    return "%dd" % (m // 1440) if m >= 1440 else "%dh" % (m // 60) if m >= 60 else "%dm" % m
 
 
 def countdown(left):
@@ -496,27 +496,29 @@ def label(quotas):
     if not shown:
         return "", "muted", []
     worst = colour_for(max(m.get("used_percent") or 0 for _, m, _ in shown))
+    # the first provider shown carries the time to its reset, quiet beside its percent
+    left = seconds_until(shown[0][1].get("resets_at"))
+    reset = [{"label": whole(left), "label_color": "muted", "under": STACK}] if left is not None and left > 0 else []
     if len(PILL) > 1:
         # one icon cannot name several providers, so each percent gets its logo
-        return "", worst, [{"label": "%d%%" % pct, **logo(pid)} for pid, _, pct in shown]
-    text = "%d%%" % shown[0][2]
-    left = seconds_until(shown[0][1].get("resets_at"))
-    if left is not None and left > 0:
-        text += LABEL_DOT + clock(left)
-    return text, worst, []
+        parts = [{"label": "%d%%" % pct, **logo(pid)} for pid, _, pct in shown]
+        return "", worst, parts[:1] + reset + parts[1:]
+    return "%d%%" % shown[0][2], worst, reset
 
 
 def main():
     # label(), the rows and panel() read these
-    global PILL, PANEL, OPEN
+    global PILL, PANEL, OPEN, STACK
     parser = argparse.ArgumentParser()
     parser.add_argument("--pill", type=ids, default=["claude"])
     parser.add_argument("--panel", type=ids)
     parser.add_argument("--open", type=ids)
+    parser.add_argument("--inline", action="store_true", help="put the time to the reset beside the percent")
     args = parser.parse_args()
     PILL = [(pid, want or "5h") for pid, _, want in (p.partition(":") for p in args.pill)]
     PANEL = args.panel or [pid for pid, _ in PILL]
     OPEN = args.open or PANEL[:1]
+    STACK = not args.inline
 
     entry = read_cache() or {}
     tokscale = find_tokscale()

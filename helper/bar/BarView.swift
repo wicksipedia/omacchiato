@@ -226,21 +226,11 @@ final class BarView: NSView {
                 continue
             }
             let parts = ([BarPart(icon: item.icon, iconColor: item.iconColor, label: item.label)] + item.parts)
-                .filter { !($0.icon.isEmpty && $0.label.isEmpty) }
-            guard !parts.isEmpty else { continue }
+                .map { PillPart(icon: $0.icon, iconColor: $0.iconColor, label: $0.label, labelColor: $0.labelColor, under: $0.under) }
+            let body = PartsPill(parts: parts, iconOnly: iconOnly.contains(name))
             let labelFont = chipFont
-            // Icons and labels are sized by their ink, so a side bearing
-            // cannot change the gap to the next pill.
-            let sizes = parts.map { part -> (icon: CGFloat, gap: CGFloat, label: CGFloat) in
-                let hasIcon = !part.icon.isEmpty
-                let hasLabel = !part.label.isEmpty && !(hasIcon && iconOnly.contains(name))
-                return (hasIcon ? inkBox(part.icon, iconFont).width : 0,
-                        hasIcon && hasLabel ? 7 : 0,
-                        hasLabel ? inkBox(part.label, labelFont).width : 0)
-            }
-            let partGap: CGFloat = 10
-            let width = pillPad * 2 + partGap * CGFloat(parts.count - 1)
-                + sizes.reduce(0) { $0 + $1.icon + $1.gap + $1.label }
+            let width = body.width(iconFont: iconFont, labelFont: labelFont)
+            guard width > 0 else { continue }
             let pill = NSRect(x: cursor - width, y: (barHeight - pillHeight) / 2,
                               width: width, height: pillHeight)
             // The bar window only catches clicks where it has ink, so a
@@ -253,25 +243,15 @@ final class BarView: NSView {
             NSColor.clear.clickable.setFill()
             hitArea.fill()
             fillPill(pill, name)
-            var x = pill.minX + pillPad
-            for (part, size) in zip(parts, sizes) {
-                if size.icon > 0 {
-                    drawIcon(part.icon, iconFont, part.iconColor ?? palette.label,
-                             centeredIn: NSRect(x: x, y: pill.minY, width: size.icon, height: pill.height))
-                }
-                // a tabular digit such as "1" has empty space on each side
-                let labelX = x + size.icon + size.gap - (size.label > 0 ? inkBox(part.label, labelFont).minX : 0)
-                if size.label > 0, part.label == item.label, !item.tickerText.isEmpty, !tickerShown {
-                    ticker.show(item.label, item.tickerText, item.tickerTail, font: labelFont,
-                                colors: (item.labelColor ?? palette.label, palette.yellow),
-                                in: NSRect(x: labelX, y: pill.minY, width: size.label, height: pill.height),
-                                slide: CFTimeInterval(dur(0.4)))
-                    tickerShown = true
-                } else if size.label > 0 {
-                    drawText(part.label, labelFont, item.labelColor ?? palette.label,
-                             leftAt: labelX, midY: pill.midY)
-                }
-                x += size.icon + size.gap + size.label + partGap
+            // the pill's own label is the first; a Ticker draws it while an alert shows
+            let ticking = !item.tickerText.isEmpty && !tickerShown && !item.label.isEmpty
+            let boxes = body.draw(in: pill, iconFont: iconFont, labelFont: labelFont,
+                                  color: item.labelColor ?? palette.label, skip: ticking ? 0 : nil)
+            if ticking, let box = boxes.first ?? nil {
+                ticker.show(item.label, item.tickerText, item.tickerTail, font: labelFont,
+                            colors: (item.labelColor ?? palette.label, palette.yellow),
+                            in: box, slide: CFTimeInterval(dur(0.4)))
+                tickerShown = true
             }
             itemRects.append((name, pill, hitArea))
             cursor = pill.minX - rightGap

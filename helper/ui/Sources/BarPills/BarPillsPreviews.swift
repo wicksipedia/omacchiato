@@ -94,4 +94,64 @@ private func strips() -> NSView {
 }
 
 #Preview("Bar pills") { strips() }
+
+// The AI usage pill today and with the session countdown, to compare.
+// The time is quiet, so the percentage still reads first.
+private let claude = "\u{ec82}", codex = "\u{ec81}"
+private let claudeOrange = NSColor(srgbRed: 0.85, green: 0.47, blue: 0.34, alpha: 1)
+
+private func aiPills(_ theme: StripTheme) -> [(String, [PillPart])] {
+    let c = theme.colors
+    let green = NSColor.systemGreen, orange = NSColor.systemOrange
+    let claudePart = PillPart(icon: claude, iconColor: claudeOrange, label: "29%", labelColor: green)
+    return [
+        ("Today", [claudePart]),
+        ("2h 5m", [claudePart, PillPart(label: "2h 5m", labelColor: c.muted)]),
+        ("Whole hours", [claudePart, PillPart(label: "2h", labelColor: c.muted)]),
+        ("Clock", [claudePart, PillPart(label: "2:05", labelColor: c.muted)]),
+        ("No space", [claudePart, PillPart(label: "2h5m", labelColor: c.muted)]),
+        ("Stacked", [claudePart, PillPart(label: "2h", labelColor: c.muted, under: true)]),
+        ("Stacked, two", [claudePart, PillPart(label: "2h", labelColor: c.muted, under: true),
+                          PillPart(icon: codex, iconColor: c.label, label: "12%", labelColor: green)]),
+        ("Under an hour", [PillPart(icon: claude, iconColor: claudeOrange, label: "78%", labelColor: orange),
+                           PillPart(label: "42m", labelColor: c.muted)]),
+    ]
+}
+
+private final class AIStrip: NSView {
+    let theme: StripTheme
+
+    init(_ theme: StripTheme) {
+        self.theme = theme
+        super.init(frame: NSRect(x: 0, y: 0, width: 1040, height: 34))
+        widthAnchor.constraint(equalToConstant: 1040).isActive = true
+        heightAnchor.constraint(equalToConstant: 34).isActive = true
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func draw(_ dirtyRect: NSRect) {
+        theme.bar.setFill()
+        bounds.fill()
+        let text = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .medium)
+        let caption = NSFont.systemFont(ofSize: 9, weight: .semibold)
+        var x: CGFloat = 12
+        for (name, parts) in aiPills(theme) {
+            let pill = PartsPill(parts: parts)
+            let width = pill.width(iconFont: nerd(14), labelFont: text)
+            let box = NSRect(x: x, y: 8, width: width, height: 26)
+            theme.colors.background.setFill()
+            NSBezierPath(roundedRect: box, xRadius: 4, yRadius: 4).fill()
+            pill.draw(in: box, iconFont: nerd(14), labelFont: text, color: theme.colors.label)
+            drawText(name, caption, theme.colors.muted, leftAt: x + 6, midY: 4)
+            x += max(width, advance(name, caption) + 12) + 28
+        }
+    }
+}
+
+#Preview("AI pill") {
+    let stack = NSStackView(views: themes.map { AIStrip($0) })
+    stack.orientation = .vertical
+    stack.spacing = 0
+    return stack
+}
 #endif

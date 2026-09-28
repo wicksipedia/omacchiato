@@ -358,7 +358,9 @@ func runPlugin(_ plugin: BarPlugin) {
             let parts = rawParts.map {
                 BarPart(icon: $0["icon"] as? String ?? "",
                         iconColor: pluginColor($0["icon_color"] as? String) ?? color,
-                        label: String(($0["label"] as? String ?? "").prefix(32)))
+                        label: String(($0["label"] as? String ?? "").prefix(32)),
+                        labelColor: pluginColor($0["label_color"] as? String),
+                        under: $0["under"] as? Bool ?? false)
             }
             set(plugin.name) {
                 $0.icon = icon

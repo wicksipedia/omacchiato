@@ -21,6 +21,20 @@ class Label(unittest.TestCase):
         ai.PILL = [("claude", "5h"), ("codex", "5h")]
         self.assertEqual(ai.label({"claude": quota(0), "codex": quota(0.4)}), ("", "muted", []))
 
+    def test_the_first_provider_carries_its_reset_in_whole_units(self):
+        ai.PILL = [("claude", "5h"), ("codex", "5h")]
+        soon = ai.datetime.now(ai.timezone.utc) + ai.timedelta(hours=2, minutes=5, seconds=30)
+        q = quota(29)
+        q[0]["metrics"][0]["resets_at"] = soon.isoformat()
+        _, _, parts = ai.label({"claude": q, "codex": quota(12)})
+        self.assertEqual([p["label"] for p in parts], ["29%", "2h", "12%"])
+        self.assertEqual(parts[1]["label_color"], "muted")
+        self.assertTrue(parts[1]["under"])
+        ai.STACK = False
+        self.assertFalse(ai.label({"claude": q})[2][1]["under"])
+        ai.STACK = True
+        self.assertEqual([ai.whole(s) for s in (30, 42 * 60, 3 * 86400 + 5)], ["1m", "42m", "3d"])
+
     def test_one_provider_reads_as_text(self):
         ai.PILL = [("claude", "5h")]
         self.assertEqual(ai.label({"claude": quota(12)}), ("12%", "green", []))
