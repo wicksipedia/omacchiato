@@ -273,6 +273,12 @@ The design and the test results are in
   overview reads its accent from the same file.
 - `theme-next` (`Super+Shift+T`) calls theme-set with one name, so it
   ends a light/dark pair.
+- Runs of theme-set take turns under `lockf`, and a run that finds a
+  newer switch queued behind it exits, so a burst of switches applies
+  only the last. Every file that another program reloads is written to a
+  temp file and renamed: Ghostty showed its Configuration Errors window
+  when a reload read a half-written theme file. Each run logs to
+  `/tmp/omacchiato-theme.log`.
 - The bar and Karabiner start theme-set with launchd's PATH, where
   `python3` is the system's 3.9. Keep its Python to 3.9: `tomllib` (3.11)
   once stopped it before the `settings.toml` write, so OmniWM never

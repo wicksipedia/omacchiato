@@ -69,3 +69,39 @@ class OmniWMSettings(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Burst(unittest.TestCase):
+    """Quick switches: runs take turns, only the newest applies, and each
+    file lands whole. Runs in a sandbox HOME with a theme that has no
+    wallpaper, so it touches nothing on this Mac."""
+
+    def test_a_burst_of_switches_leaves_whole_files_and_no_temp_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "bin").mkdir()
+            script = root / "bin" / "theme-set"
+            script.write_text((REPO / "bin" / "theme-set").read_text())
+            script.chmod(0o755)
+            theme = root / "themes" / "sandbox"
+            theme.mkdir(parents=True)
+            (theme / "colors.toml").write_text('background = "#101010"\nforeground = "#eeeeee"\ncolor1 = "#ff0000"\n')
+            home = root / "home"
+            home.mkdir()
+            log = root / "theme.log"
+            env = {"HOME": str(home), "PATH": "/usr/bin:/bin", "OMACCHIATO_THEME_LOG": str(log)}
+            runs = [subprocess.Popen([str(script), "sandbox"], env=env, stdout=subprocess.DEVNULL,
+                                     stderr=subprocess.DEVNULL) for _ in range(4)]
+            self.assertEqual([r.wait(timeout=60) for r in runs], [0, 0, 0, 0])
+
+            lines = log.read_text().splitlines()
+            applied = [l for l in lines if "applying sandbox" in l]
+            skipped = [l for l in lines if "skipped sandbox" in l]
+            self.assertGreaterEqual(len(applied), 1)
+            self.assertEqual(len(applied) + len(skipped), 4)
+            config = home / ".config" / "omacchiato"
+            self.assertEqual((config / "theme.conf").read_text(), "theme = sandbox\n")
+            ghostty = (config / "ghostty-theme").read_text()
+            self.assertIn("background = #101010", ghostty)
+            self.assertIn("palette = 1=#ff0000", ghostty)
+            self.assertEqual([p.name for p in config.iterdir() if p.name.startswith(".")], [])

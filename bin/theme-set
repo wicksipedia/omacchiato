@@ -34,8 +34,44 @@ if [ -z "$NAME" ] || [[ "$NAME" == */* || "$NAME" == *..* ]] || [ ! -d "$THEMES_
   exit 1
 fi
 
+LOG="${OMACCHIATO_THEME_LOG:-/tmp/omacchiato-theme.log}"
+log() { printf '%s [%s] %s\n' "$(date '+%F %T')" "$$" "$*" >> "$LOG"; }
+[ "$(wc -c < "$LOG" 2>/dev/null || echo 0)" -lt 200000 ] || : > "$LOG"
+
+# Quick switches start runs that overlap, and a reload that reads another
+# run's half-written file shows Ghostty's Configuration Errors window. So
+# runs take turns under a lock. Each run first records itself as the
+# newest; a run that gets the lock and finds a newer one queued behind it
+# exits, so a burst of switches applies only the last.
+STATE_DIR="$HOME/.local/state/omacchiato"
+mkdir -p "$STATE_DIR"
+if [ -z "${THEME_SET_TOKEN:-}" ]; then
+  export THEME_SET_TOKEN="$$.$RANDOM"
+  printf '%s\n' "$THEME_SET_TOKEN" > "$STATE_DIR/theme-set.newest"
+  log "asked for $SPEC"
+  exec /usr/bin/lockf -k -t 60 "$STATE_DIR/theme-set.lock" "${BASH_SOURCE[0]}" "$@"
+fi
+if [ "$(cat "$STATE_DIR/theme-set.newest" 2>/dev/null)" != "$THEME_SET_TOKEN" ]; then
+  log "skipped $SPEC: a newer switch waits"
+  exit 0
+fi
+STARTED=$SECONDS
+log "applying $NAME ($SPEC)"
+
+# Every file that another program reloads is written to a temp file and
+# renamed into place, so a reader sees the old file or the new one.
+write_atomic() {
+  local target tmp
+  target="$(readlink -f "$1" 2>/dev/null || echo "$1")"
+  tmp="$(mktemp "$(dirname "$target")/.$(basename "$target").XXXXXX")"
+  cat > "$tmp"
+  # mktemp makes the file 600; keep the old file's mode, or the usual 644
+  if [ -e "$target" ]; then chmod "$(stat -f %Lp "$target")" "$tmp"; else chmod 644 "$tmp"; fi
+  mv -f "$tmp" "$target"
+}
+
 mkdir -p "$CURRENT_DIR" "$HOME/.config/omacchiato"
-printf 'theme = %s\n' "$SPEC" > "$HOME/.config/omacchiato/theme.conf"
+printf 'theme = %s\n' "$SPEC" | write_atomic "$HOME/.config/omacchiato/theme.conf"
 PREV="$(readlink "$CURRENT_DIR/theme" 2>/dev/null || true)"
 ln -sfn "$THEMES_DIR/$NAME" "$CURRENT_DIR/theme"
 
@@ -43,7 +79,7 @@ ln -sfn "$THEMES_DIR/$NAME" "$CURRENT_DIR/theme"
 # omacchiato-helper wraps NSWorkspace (System Events wallpaper scripting
 # half-broke on macOS 14+: some desktops return "missing value" and
 # silently keep the old picture); osascript remains as fallback.
-WALL="$(ls "$THEMES_DIR/$NAME"/backgrounds/* 2>/dev/null | head -1)"
+WALL="$(ls "$THEMES_DIR/$NAME"/backgrounds/* 2>/dev/null | head -1 || true)"
 if [ -n "$WALL" ] && [ "${PREV##*/}" != "$NAME" ]; then
   # theme-bg-next cycles through the rest; a theme switch restarts the
   # cycle at the first image, so the remembered position moves with it.
@@ -81,9 +117,9 @@ fi
 GHOSTTY_THEME="$HOME/.config/omacchiato/ghostty-theme"
 if [ -f "$THEMES_DIR/$NAME/colors.toml" ]; then
   mkdir -p "$(dirname "$GHOSTTY_THEME")"
-  python3 - "$THEMES_DIR/$NAME/colors.toml" "$GHOSTTY_THEME" <<'PY'
+  GHOSTTY_TEXT="$(python3 - "$THEMES_DIR/$NAME/colors.toml" <<'PY'
 import re, sys
-colors, out = sys.argv[1], sys.argv[2]
+colors = sys.argv[1]
 t = open(colors).read()
 def val(key):
     m = re.search(r'^%s = "(#[0-9a-fA-F]{6})"' % re.escape(key), t, re.M)
@@ -100,9 +136,11 @@ for key, ghostty in (("background", "background"), ("foreground", "foreground"),
     v = val(key)
     if v:
         lines.append("%s = %s" % (ghostty, v))
-open(out, "w").write("\n".join(lines) + "\n")
+sys.stdout.write("\n".join(lines) + "\n")
 PY
-  "$HOME/.local/bin/omacchiato-helper" ghostty-reload >/dev/null || true
+)"
+  printf '%s\n' "$GHOSTTY_TEXT" | write_atomic "$GHOSTTY_THEME"
+  log "ghostty reloaded $("$HOME/.local/bin/omacchiato-helper" ghostty-reload 2>&1 | tr '\n' ' ' || true)"
 fi
 
 # OmniWM draws the focus border and tints its own chrome from settings.toml.
@@ -231,7 +269,8 @@ for candidate in "$(command -v herdr 2>/dev/null || true)" \
 done
 
 herdr_set_theme() {
-  python3 - "$HERDR_CFG" "$1" <<'@D@'
+  local text
+  text="$(python3 - "$HERDR_CFG" "$1" <<'@D@'
 import re, sys
 cfg, theme = sys.argv[1], sys.argv[2]
 t = open(cfg).read()
@@ -247,15 +286,19 @@ if sec:
     t = t[:sec.start()] + body + t[sec.end():]
 else:
     t = t.rstrip("\n") + '\n\n[theme]\nname = "%s"\n' % theme
-open(cfg, "w").write(t)
+sys.stdout.write(t)
 @D@
+)"
+  printf '%s\n' "$text" | write_atomic "$HERDR_CFG"
   "$HERDR_BIN" server reload-config 2>/dev/null
 }
 
 if [ -f "$HERDR_CFG" ] && [ -n "$HERDR_BIN" ]; then
   case "$(herdr_set_theme "$NAME")" in
-    *"unknown theme name"*) herdr_set_theme terminal >/dev/null ;;
+    *"unknown theme name"*) herdr_set_theme terminal >/dev/null; log "herdr has no $NAME theme: using terminal" ;;
   esac
 fi
+
+log "done in $((SECONDS - STARTED)) s"
 
 echo "theme: $NAME"
