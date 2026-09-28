@@ -1,9 +1,8 @@
 import SwiftUI
 
-// What the activity popup shows: the CPU load and its last minute, the
-// memory in use, the network rates and the processes that use the most
-// CPU. The bar samples it while the popup is open, and the previews build
-// it by hand.
+// What the activity popup shows: CPU load and its last minute, memory in
+// use, network rates, and the busiest processes. The bar samples this
+// while the popup is open; the previews build it by hand.
 public struct ActivityReport {
     public struct Load: Equatable {
         public var user: Double             // 0...1 of all cores

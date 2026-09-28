@@ -73,7 +73,7 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
 - The bar's tests use Swift Testing, in `tests/bar/`. `Package.swift`
   exists only for them, and `install.sh` still builds the bar with
   `swiftc`. The tests `@testable import omacchiato_bar`, which holds
-  `helper/bar/bar.swift`. A test calls a function that takes plain
+  `helper/bar/*.swift`. A test calls a function that takes plain
   values, so move the logic out of the AX, AppKit or subprocess code
   first, as `layoutOrder` and `shortcutText` do. The suite runs serially,
   because some tests set globals.
@@ -112,7 +112,12 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   `panelRow` converts a `PopupRow`. The popup window never becomes key,
   so an event tap (`setPopupKeys`) gives a row popup its arrow keys,
   Return and Esc, and system controls there draw grey: draw them by hand.
-- `dur()` in `bar.swift` and `overview.swift` returns 0 while Reduce
+- The bar itself draws with AppKit, not SwiftUI: it is on screen all
+  the time, and a click lands only where a pill has ink.
+  `helper/ui/Sources/BarPills` holds the workspace chips, the music pill,
+  `Marquee`, `Ticker` and the text routines, as `StatusGauge` holds the
+  gauge. They take plain values and colours, so Xcode previews them.
+- `dur()` in the bar and in `overview.swift` returns 0 while Reduce
   motion is on. Pass every animation duration through it.
 - The wi-fi popup lists the networks in range. A scan blocks for
   seconds, so it runs off the main thread and calls `refreshPopup`, and
@@ -168,9 +173,14 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
 - AppKit hit-tests a non-opaque window by alpha, so a pill background
   with zero alpha takes no clicks. `NSColor.clickable` raises zero alpha
   to 0.01.
-- `main.swift` holds the code that runs at startup, in order, and
-  `bar.swift` holds the declarations. Put a new global in `bar.swift`,
-  where it starts when code first reads it. A global in `main.swift`
+- `main.swift` holds the code that runs at startup, in order. The other
+  files hold the declarations, one topic a file: `bar.swift` (model,
+  theme, plumbing), `Providers.swift` (the right-hand pills),
+  `Plugins.swift`, `Popups.swift`, `PopupRows.swift` (the menus drawn as
+  rows), `Menus.swift` (menu bar apps, app and Apple menus),
+  `Calendar.swift`, `Network.swift`, `Permissions.swift`,
+  `Cheatsheet.swift` and `BarView.swift`. Put a new global in one of
+  them, where it starts when code first reads it. A global in `main.swift`
   starts when its line runs, and one that reads a later global there
   reads zero. `swiftc` accepts startup code only in a file named
   `main.swift`.

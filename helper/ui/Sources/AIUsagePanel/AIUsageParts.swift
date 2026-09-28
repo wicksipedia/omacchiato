@@ -8,8 +8,7 @@ import StatusPanel
 
 let modelPalette: [Color] = [.orange, .purple, .teal, .gray]
 
-// The provider's logo from the bar's Nerd Font, or its first letter
-// on a Mac without that font.
+// The provider's logo from the bar's Nerd Font, or its initial without that font.
 struct ProviderMark: View {
     var provider: AIUsageReport.Provider
     var size: CGFloat = 15
@@ -44,9 +43,8 @@ struct ProviderHeader: View {
     }
 }
 
-// A provider's header folds its windows away on a click. A folded
-// provider shows its fullest window in the header. A service problem
-// stays on screen either way.
+// A click folds a provider's windows away. A folded provider shows its
+// fullest window in the header. A service problem stays on screen either way.
 struct ProviderSection<Content: View>: View {
     var provider: AIUsageReport.Provider
     var actions: AIUsageActions
@@ -72,7 +70,7 @@ struct ProviderSection<Content: View>: View {
                 if !open, let m = provider.headline {
                     Text("\(Int((m.used * 100).rounded()))%")
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundStyle(m.tint == .green ? AnyShapeStyle(.primary) : AnyShapeStyle(m.tint))
+                        .foregroundStyle(m.tint == PanelColors.green ? AnyShapeStyle(.primary) : AnyShapeStyle(m.tint))
                 }
                 Image(systemName: "chevron.right")
                     .font(.system(size: 10, weight: .semibold))
@@ -99,7 +97,7 @@ struct HealthNote: View {
     var actions: AIUsageActions
 
     var body: some View {
-        let tint: Color = provider.severity >= 2 ? .red : .orange
+        let tint: Color = provider.severity >= 2 ? PanelColors.red : PanelColors.orange
         VStack(alignment: .leading, spacing: 0) {
             HoverRow(action: provider.statusPage.map { url in { actions.open(url) } }) {
                 Label(provider.status ?? "\(provider.name) has an incident",
@@ -124,13 +122,11 @@ struct HealthNote: View {
     }
 }
 
-// A colour for each ring, outside in, as the Fitness app gives each of
-// its rings one. The percent text carries the pace.
+// A colour for each ring, outside in, like the Fitness app.
 let ringColors: [Color] = [.blue, .purple, .mint]
 
-// Activity rings, one for each window, outside in. The tick on a ring
-// marks how far through the window the clock is, so a fill past the tick
-// is ahead of an even pace.
+// Activity rings, one per window, outside in. The tick marks the clock's
+// place in the window, so a fill past the tick means ahead of pace.
 struct UsageRings: View {
     var metrics: [AIUsageReport.Metric]
     var lineWidth: CGFloat = 9
@@ -188,7 +184,7 @@ struct PaceTrack: View {
 struct WeekChart: View {
     var report: AIUsageReport
     var height: CGFloat = 110
-    var average = true
+    @State private var hovered: Date?
 
     struct Slice: Identifiable {
         var day: Date
@@ -225,8 +221,17 @@ struct WeekChart: View {
                 BarMark(x: .value("Day", s.day, unit: .day), y: .value("Tokens", s.tokens), width: .ratio(0.6))
                     .foregroundStyle(by: .value("Model", s.model))
                     .clipShape(.rect(cornerRadius: 3))
+                    .opacity(hovered == nil || hovered == s.day ? 1 : 0.35)
             }
-            if average && mean > 0 {
+            if let hovered, let day = report.days.first(where: { $0.date == hovered }) {
+                RuleMark(x: .value("Day", hovered, unit: .day))
+                    .foregroundStyle(.clear)
+                    .annotation(position: .top, spacing: 0,
+                                overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
+                        DayTooltip(day: day, top: report.topModels, today: report.now)
+                    }
+            }
+            if mean > 0 {
                 RuleMark(y: .value("Average", mean))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
                     .foregroundStyle(.secondary)
@@ -253,7 +258,73 @@ struct WeekChart: View {
                 AxisValueLabel { if let n = value.as(Int.self) { Text(tokenText(n)) } }
             }
         }
+        .chartOverlay { proxy in
+            GeometryReader { geo in
+                Rectangle().fill(.clear).contentShape(.rect)
+                    .onContinuousHover { phase in
+                        guard case .active(let point) = phase, let plot = proxy.plotFrame,
+                              let date: Date = proxy.value(atX: point.x - geo[plot].origin.x)
+                        else { hovered = nil; return }
+                        let day = Calendar.current.startOfDay(for: date)
+                        hovered = report.days.contains { $0.date == day } ? day : nil
+                    }
+            }
+        }
         .frame(height: height)
+    }
+}
+
+// A day's tokens by model, beside the same weekday a week earlier.
+struct DayTooltip: View {
+    var day: AIUsageReport.Day
+    var top: [String]
+    var today: Date
+
+    // The chart's own groups: the top models, then the rest as Other.
+    func grouped(_ models: [String: Int]) -> [String: Int] {
+        models.reduce(into: [:]) { out, pair in out[top.contains(pair.key) ? pair.key : "Other", default: 0] += pair.value }
+    }
+
+    // Green for more than last week and red for less, as the week headline shows it.
+    func tint(_ now: Int, _ before: Int) -> Color {
+        now == before ? .primary : (now > before ? PanelColors.green : PanelColors.red)
+    }
+
+    var body: some View {
+        let now = grouped(day.models), before = grouped(day.priorModels)
+        let names = (top + ["Other"]).filter { now[$0] != nil || before[$0] != nil }
+        Grid(alignment: .trailing, horizontalSpacing: 10, verticalSpacing: 3) {
+            GridRow {
+                Text(Calendar.current.isDate(day.date, inSameDayAs: today) ? "Today" : day.date.formatted(.dateTime.weekday(.wide).day().month()))
+                    .font(.system(size: 11, weight: .semibold)).gridColumnAlignment(.leading)
+                Text("This week")
+                Text("Last week")
+            }
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(.secondary)
+            ForEach(names, id: \.self) { name in
+                GridRow {
+                    HStack(spacing: 5) {
+                        Circle().fill(modelPalette[top.firstIndex(of: name) ?? 3]).frame(width: 7, height: 7)
+                        Text(name)
+                    }
+                    Text(now[name].map(tokenText) ?? "–").foregroundStyle(tint(now[name] ?? 0, before[name] ?? 0))
+                    Text(before[name].map(tokenText) ?? "–").foregroundStyle(.secondary)
+                }
+            }
+            Divider().gridCellUnsizedAxes(.horizontal)
+            GridRow {
+                Text("Total").fontWeight(.semibold)
+                Text(tokenText(day.tokens)).fontWeight(.semibold).foregroundStyle(tint(day.tokens, day.prior))
+                Text(tokenText(day.prior)).foregroundStyle(.secondary)
+            }
+        }
+        .font(.system(size: 11))
+        .monospacedDigit()
+        .padding(8)
+        .background(.regularMaterial, in: .rect(cornerRadius: 8))
+        .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
+        .fixedSize()
     }
 }
 
@@ -290,22 +361,6 @@ struct ModelShare: View {
                 }
             }
             .font(.system(size: 11))
-        }
-    }
-}
-
-struct ReportRow: View {
-    var action: () -> Void
-
-    var body: some View {
-        HoverRow(action: action) {
-            HStack {
-                Text("Token Report")
-                Spacer()
-                Text("tokscale").foregroundStyle(.secondary)
-                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
-            }
-            .font(.system(size: 13))
         }
     }
 }

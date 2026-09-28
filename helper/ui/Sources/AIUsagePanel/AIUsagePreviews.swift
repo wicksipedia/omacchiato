@@ -1,5 +1,8 @@
 #if DEBUG
 import SwiftUI
+#if canImport(StatusPanel)
+import StatusPanel
+#endif
 
 // Sample weeks for the previews. Monday 28 September 2026, 10:40.
 extension AIUsageReport {
@@ -35,7 +38,8 @@ extension AIUsageReport {
         return tokens.indices.map { i in
             Day(date: cal.date(byAdding: .day, value: i - 6, to: cal.startOfDay(for: morning)) ?? morning,
                 models: Dictionary(uniqueKeysWithValues: zip(names, tokens[i]).filter { $0.1 > 0 }),
-                cost: costs[i], prior: priors[i % priors.count])
+                cost: costs[i],
+                priorModels: priors[i] == 0 ? [:] : ["Opus 5.5": priors[i] * 3 / 4, "Sonnet 5": priors[i] / 4])
         }
     }
 
@@ -74,17 +78,6 @@ extension AIUsageReport {
                     Provider(id: "codex", name: "Codex", plan: "Free", glyph: "\u{ec81}")])
 }
 
-private struct Desk<Content: View>: View {
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        content
-            .padding(24)
-            .background(LinearGradient(colors: [.teal, .blue, .indigo],
-                                       startPoint: .topLeading, endPoint: .bottomTrailing))
-    }
-}
-
 private let weeks: [AIUsageReport] = [.busy, .hot, .quiet]
 
 #Preview("Rings") { Desk { RingsAIUsagePanel(report: .busy) } }
@@ -104,4 +97,7 @@ private let weeks: [AIUsageReport] = [.busy, .hot, .quiet]
 }
 
 #Preview("Rings, dark") { Desk { RingsAIUsagePanel(report: .busy) }.preferredColorScheme(.dark) }
+#Preview("Day tooltip") {
+    Desk { DayTooltip(day: AIUsageReport.busy.days[2], top: AIUsageReport.busy.topModels, today: AIUsageReport.morning) }
+}
 #endif

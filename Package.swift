@@ -12,6 +12,7 @@ let package = Package(
             name: "omacchiato-bar",
             dependencies: [
                 .product(name: "StatusGauge", package: "ui"),
+                .product(name: "BarPills", package: "ui"),
                 .product(name: "WeatherPanel", package: "ui"),
                 .product(name: "StatusPanel", package: "ui"),
                 .product(name: "CalendarPanel", package: "ui"),
@@ -29,6 +30,7 @@ let package = Package(
         .testTarget(name: "BarTests", dependencies: [
             "omacchiato-bar",
             .product(name: "StatusGauge", package: "ui"),
+            .product(name: "BarPills", package: "ui"),
             .product(name: "WeatherPanel", package: "ui"),
             .product(name: "CalendarPanel", package: "ui"),
             .product(name: "AIUsagePanel", package: "ui"),

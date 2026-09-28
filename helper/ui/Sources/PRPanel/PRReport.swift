@@ -1,8 +1,11 @@
 import SwiftUI
+#if canImport(StatusPanel)
+import StatusPanel
+#endif
 
-// What the pull request popup shows: your open PRs, and the merged or
-// closed ones with an unread notification. The bar decodes it from
-// omacchiato-github-prs, and the previews build it by hand.
+// What the pull request popup shows: open PRs, plus merged or closed
+// ones with an unread notification. The bar decodes this from
+// omacchiato-github-prs; the previews build it by hand.
 public struct PRReport {
     public enum State: String { case open, merged, closed }
     public enum Checks: String { case passed, failed, running }
@@ -38,10 +41,10 @@ public struct PRReport {
 
         public var tint: Color {
             switch self {
-            case .needsYou: return .red
-            case .running: return .orange
+            case .needsYou: return PanelColors.red
+            case .running: return PanelColors.orange
             case .inReview: return .blue
-            case .ready: return .green
+            case .ready: return PanelColors.green
             case .draft: return .gray
             case .done: return .purple
             }

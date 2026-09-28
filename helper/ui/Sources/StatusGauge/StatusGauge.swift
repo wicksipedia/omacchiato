@@ -1,10 +1,8 @@
 import AppKit
 
-// The status pill: an open ring for the Mac battery, a wi-fi glyph in the
-// ring, and four dots that close the ring for the wi-fi signal. On
-// Ethernet the glyph is the Ethernet mark and every dot is lit. On a
-// phone's hotspot the glyph is the hotspot's chain link. The bar
-// builds this file into its own module with swiftc.
+// The status pill: an open ring for battery, with a glyph inside and four
+// dots that close the ring for wi-fi signal. Ethernet lights all four dots.
+// A phone hotspot shows the hotspot glyph in place of wi-fi.
 public struct StatusGauge: Equatable {
     public var battery: Double      // 0...1
     public var charging: Bool
@@ -102,7 +100,7 @@ public struct StatusGauge: Equatable {
             }
         }
 
-        // the "<···>" mark that macOS gives Ethernet
+        // Mimics macOS's Ethernet glyph: chevrons and dots.
         func drawEthernet() {
             for x in [CGFloat(0.28), 0.72] {
                 let chevron = NSBezierPath()

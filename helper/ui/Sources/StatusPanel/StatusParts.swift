@@ -1,4 +1,15 @@
 import SwiftUI
+
+// The accent and status colours of every panel. They start as the system
+// colours, and the bar sets them from the theme. Data colours, such as the
+// usage rings and the model bars, stay on the system palette.
+public enum PanelColors {
+    public static var accent = Color.accentColor
+    public static var red = Color.red
+    public static var green = Color.green
+    public static var orange = Color.orange
+    public static var yellow = Color.yellow
+}
 #if canImport(StatusGauge)
 import StatusGauge
 #endif
@@ -6,12 +17,11 @@ import StatusGauge
 // Pieces that every design of the status panel shares.
 
 extension StatusReport.Battery {
-    // The iOS battery colours: green while charging, yellow in low power
-    // mode, red when low.
+    // iOS battery colors: green while charging, yellow in low power, red when low.
     var tint: Color {
-        if charging { return .green }
-        if mode == "low power" { return .yellow }
-        if low { return .red }
+        if charging { return PanelColors.green }
+        if mode == "low power" { return PanelColors.yellow }
+        if low { return PanelColors.red }
         return .primary
     }
 
@@ -141,12 +151,12 @@ struct NetworkRow: View {
         HoverRow(action: current ? nil : action) {
             HStack(spacing: 8) {
                 Image(systemName: "wifi", variableValue: signalFill(network.rssi))
-                    .foregroundStyle(current ? Color.accentColor : .primary)
+                    .foregroundStyle(current ? PanelColors.accent : .primary)
                     .frame(width: 20)
                 Text(network.ssid).lineLimit(1).truncationMode(.tail)
                 Spacer(minLength: 4)
                 if !network.open { Image(systemName: "lock.fill").font(.caption).foregroundStyle(.secondary) }
-                if current { Image(systemName: "checkmark").font(.caption.weight(.bold)).foregroundStyle(Color.accentColor) }
+                if current { Image(systemName: "checkmark").font(.caption.weight(.bold)).foregroundStyle(PanelColors.accent) }
             }
             .font(.system(size: 13, weight: current ? .semibold : .regular))
         }
@@ -161,7 +171,7 @@ struct PhoneRow: View {
         HoverRow(action: phone.connected ? nil : action) {
             HStack(spacing: 8) {
                 Image(systemName: "personalhotspot")
-                    .foregroundStyle(phone.connected ? Color.accentColor : .primary)
+                    .foregroundStyle(phone.connected ? PanelColors.accent : .primary)
                     .frame(width: 20)
                 Text(phone.name).lineLimit(1)
                 Spacer(minLength: 4)
@@ -178,8 +188,7 @@ struct PhoneRow: View {
     }
 }
 
-// The networks card: the joined network first, then the rest by strength,
-// then the phones that can share a hotspot.
+// Networks card order: the joined network first, then the rest by strength, then hotspot phones.
 struct NetworksList: View {
     var wifi: StatusReport.WiFi
     var actions: StatusActions
@@ -214,15 +223,15 @@ struct NetworksList: View {
     }
 }
 
-// Drawn by hand: the popup window never becomes key, and a system Toggle
-// or ProgressView in a window that is not key draws grey.
+// Drawn by hand. The popup window never becomes key, so a system Toggle
+// or ProgressView here draws grey.
 struct WifiSwitch: View {
     var on: Bool
     var action: () -> Void
 
     var body: some View {
         Capsule()
-            .fill(on ? AnyShapeStyle(Color.green) : AnyShapeStyle(.fill.secondary))
+            .fill(on ? AnyShapeStyle(PanelColors.green) : AnyShapeStyle(.fill.secondary))
             .frame(width: 34, height: 20)
             .overlay(alignment: on ? .trailing : .leading) {
                 Circle().fill(.white).shadow(radius: 1, y: 0.5).padding(2)
@@ -252,15 +261,23 @@ struct LevelBar: View {
     }
 }
 
-struct SettingsRow: View {
+public struct SettingsRow: View {
     var title: String
+    var detail = ""
     var action: () -> Void
 
-    var body: some View {
+    public init(title: String, detail: String = "", action: @escaping () -> Void) {
+        self.title = title
+        self.detail = detail
+        self.action = action
+    }
+
+    public var body: some View {
         HoverRow(action: action) {
             HStack {
                 Text(title)
                 Spacer()
+                if !detail.isEmpty { Text(detail).foregroundStyle(.secondary) }
                 Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
             }
             .font(.system(size: 13))
@@ -268,10 +285,9 @@ struct SettingsRow: View {
     }
 }
 
-// The panel sits on Liquid Glass, as the macOS menus do. The glass is a
-// layer behind the content: glass around the content would bleach the
-// coloured icons and set the text colour from the windows behind.
-// The fill keeps the text legible over any window.
+// Liquid Glass sits behind the content, like macOS menus.
+// Wrapping the content in glass bleaches the icons and tints text from windows behind.
+// A fill instead keeps text legible over any window.
 struct PanelBackground: ViewModifier {
     var width: CGFloat = 320
 
@@ -291,8 +307,8 @@ extension View {
     public func statusPanelBackground(width: CGFloat = 320) -> some View { modifier(PanelBackground(width: width)) }
 }
 
-// A Nerd Font glyph as a template image of its ink box. The glyphs are
-// wider than their advance and sit off centre, so SwiftUI's Text crops them.
+// Renders a glyph as a template image of its ink box.
+// Nerd Font glyphs are wider than their advance and sit off-center, so SwiftUI Text crops them.
 public func glyphImage(_ glyph: String, size: CGFloat) -> NSImage? {
     guard let font = NSFontManager.shared.font(withFamily: "JetBrainsMono Nerd Font",
                                                traits: [], weight: 9, size: size) else { return nil }

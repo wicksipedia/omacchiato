@@ -1,9 +1,9 @@
 import SwiftUI
 import ImageIO
 
-// What the theme picker shows: each theme in `themes/`, read from the
-// same files theme-set reads, so a preview matches what Apply does, and
-// the saved choice from theme.conf: one theme, or one by day and one at night.
+// What the theme picker shows: every theme in `themes/`, read from the
+// same files theme-set reads, so previews match Apply. Also the saved
+// choice from theme.conf: one theme, or one for day and one for night.
 public struct ThemeReport {
     public var themes: [Theme]
     public var light: String?               // the day theme in theme.conf

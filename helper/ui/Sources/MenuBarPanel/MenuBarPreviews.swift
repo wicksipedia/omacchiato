@@ -1,5 +1,8 @@
 #if DEBUG
 import SwiftUI
+#if canImport(StatusPanel)
+import StatusPanel
+#endif
 
 // Sample menu bars for the previews. The icons come from this Mac, and an
 // app it does not have gets the empty icon.
@@ -30,17 +33,6 @@ extension MenuBarReport {
     static let scanning = MenuBarReport(items: nil)
     static let none = MenuBarReport(items: [])
     static let noAccess = MenuBarReport(items: nil, access: false)
-}
-
-private struct Desk<Content: View>: View {
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        content
-            .padding(24)
-            .background(LinearGradient(colors: [.teal, .blue, .indigo],
-                                       startPoint: .topLeading, endPoint: .bottomTrailing))
-    }
 }
 
 #Preview("Grid") { Desk { GridMenuBarPanel(report: .busy) } }

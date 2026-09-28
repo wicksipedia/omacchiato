@@ -3,11 +3,9 @@ import SwiftUI
 import StatusPanel
 #endif
 
-// Three designs of the activity popup, to compare in the previews. Each one
-// shows the same data and offers the same actions.
+// Three designs of the activity popup, to compare in the previews.
 
-// "Monitor": the CPU graph of the last minute over the memory, the network
-// and the processes that use the most CPU, as Activity Monitor shows them.
+// "Monitor": CPU graph, memory, network and top processes, like Activity Monitor.
 public struct MonitorActivityPanel: View {
     var report: ActivityReport
     var actions: ActivityActions
@@ -121,8 +119,8 @@ struct PressureTag: View {
     }
 }
 
-// "Widgets": four square tiles, as iOS widgets sit on the Home Screen, then
-// the next busiest processes.
+// "Widgets": four square tiles, like iOS Home Screen widgets, then the
+// next busiest processes.
 public struct WidgetsActivityPanel: View {
     var report: ActivityReport
     var actions: ActivityActions
@@ -246,15 +244,14 @@ public struct WidgetsActivityPanel: View {
         } else if report.load == nil {
             Measuring()
         } else {
-            Image(systemName: "leaf").font(.system(size: 26)).foregroundStyle(.green)
+            Image(systemName: "leaf").font(.system(size: 26)).foregroundStyle(PanelColors.green)
             Spacer(minLength: 0)
             Text("Nothing is busy").font(.system(size: 12, weight: .medium))
         }
     }
 }
 
-// "Top": the process list first, as top and btop show it, under one strip
-// with the CPU, the memory and the network.
+// "Top": the process list first, like top or btop, under a CPU/memory/network strip.
 public struct TopActivityPanel: View {
     var report: ActivityReport
     var actions: ActivityActions
@@ -302,7 +299,7 @@ public struct TopActivityPanel: View {
                                 .font(.system(size: 12, weight: .semibold, design: .rounded))
                                 .foregroundStyle(process.tint)
                             // one core fills the bar; more cores overflow it in red
-                            ShareBar(share: process.cpu, tint: process.cpu >= 0.9 ? .red : userTint, height: 5)
+                            ShareBar(share: process.cpu, tint: process.cpu >= 0.9 ? PanelColors.red : userTint, height: 5)
                                 .frame(width: 36)
                             Text(byteText(process.memory))
                                 .font(.system(size: 11))

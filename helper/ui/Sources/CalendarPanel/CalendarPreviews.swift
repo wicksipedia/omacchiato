@@ -1,5 +1,8 @@
 #if DEBUG
 import SwiftUI
+#if canImport(StatusPanel)
+import StatusPanel
+#endif
 
 // Sample days for the previews. Monday 28 September 2026, 10:40.
 extension CalendarReport {
@@ -34,17 +37,6 @@ extension CalendarReport {
 
     static let free = CalendarReport(now: morning, access: true, events: [])
     static let noAccess = CalendarReport(now: morning, access: false, events: [])
-}
-
-private struct Desk<Content: View>: View {
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        content
-            .padding(24)
-            .background(LinearGradient(colors: [.teal, .blue, .indigo],
-                                       startPoint: .topLeading, endPoint: .bottomTrailing))
-    }
 }
 
 private let days: [CalendarReport] = [.busy, .holiday, .free, .noAccess]

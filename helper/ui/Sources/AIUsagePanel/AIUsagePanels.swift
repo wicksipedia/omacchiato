@@ -4,8 +4,7 @@ import SwiftUI
 import StatusPanel
 #endif
 
-// Three designs of the AI usage popup, to compare in the previews. Each one
-// shows the same data and offers the same actions.
+// Three designs of the AI usage popup, to compare in the previews.
 
 // "Rings": each provider's windows as Activity rings, then the week.
 public struct RingsAIUsagePanel: View {
@@ -39,13 +38,13 @@ public struct RingsAIUsagePanel: View {
                     WeekChart(report: report)
                     ModelShare(report: report).padding(.top, 4)
                 }
-                ReportRow(action: actions.openReport)
+                SettingsRow(title: "Token Report", detail: "tokscale", action: actions.openReport)
             }
         }
         .statusPanelBackground(width: 340)
     }
 
-    // One row a window, with "Resets in" said once over the time column.
+    // One row per window. "Resets in" shows once, above the time column.
     func legend(_ metrics: [AIUsageReport.Metric]) -> some View {
         Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 7) {
             if metrics.contains(where: { ($0.resetsIn ?? 0) > 0 }) {
@@ -64,7 +63,7 @@ public struct RingsAIUsagePanel: View {
                     // the pace colour only when ahead of pace
                     Text("\(Int((m.used * 100).rounded()))%")
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(m.tint == .green ? AnyShapeStyle(.primary) : AnyShapeStyle(m.tint))
+                        .foregroundStyle(m.tint == PanelColors.green ? AnyShapeStyle(.primary) : AnyShapeStyle(m.tint))
                         .gridColumnAlignment(.trailing)
                     Text(m.resetsIn.flatMap { $0 > 0 ? resetText($0) : nil } ?? "")
                         .font(.system(size: 12, design: .rounded))
@@ -95,13 +94,13 @@ struct WeekHeadline: View {
     }
 }
 
-// How this week compares with the week before, whose bars show faded behind this week's.
+// How this week compares with the week before.
 struct WeekChange: View {
     var change: Double
 
     var body: some View {
         let percent = Int((abs(change) * 100).rounded())
-        let tint = percent == 0 ? Color.secondary : (change > 0 ? Color.green : Color.red)
+        let tint = percent == 0 ? Color.secondary : (change > 0 ? PanelColors.green : PanelColors.red)
         HStack(spacing: 4) {
             Image(systemName: percent == 0 ? "equal" : (change > 0 ? "arrow.up.right" : "arrow.down.right"))
                 .font(.system(size: 9, weight: .bold))
@@ -109,8 +108,7 @@ struct WeekChange: View {
             if percent == 0 {
                 Text("Same as last week")
             } else {
-                Text("\(percent)%").foregroundStyle(tint).fontWeight(.semibold)
-                    + Text(" \(change > 0 ? "more" : "less") than last week")
+                Text("\(Text("\(percent)%").foregroundStyle(tint).fontWeight(.semibold)) \(change > 0 ? "more" : "less") than last week")
             }
         }
         .font(.system(size: 11))
@@ -119,8 +117,8 @@ struct WeekChange: View {
     }
 }
 
-// "Screen Time": the week first, with the daily average as the headline,
-// then the limits as tracks and the models as a most-used list.
+// "Screen Time": the daily average leads. Limits follow as tracks,
+// then models as a most-used list.
 public struct ScreenTimeAIUsagePanel: View {
     var report: AIUsageReport
     var actions: AIUsageActions
@@ -169,7 +167,7 @@ public struct ScreenTimeAIUsagePanel: View {
                         }
                     }
                 }
-                ReportRow(action: actions.openReport)
+                SettingsRow(title: "Token Report", detail: "tokscale", action: actions.openReport)
             }
         }
         .statusPanelBackground(width: 340)
@@ -222,7 +220,7 @@ public struct ForecastAIUsagePanel: View {
                     }
                     costChart
                 }
-                ReportRow(action: actions.openReport)
+                SettingsRow(title: "Token Report", detail: "tokscale", action: actions.openReport)
             }
         }
         .statusPanelBackground(width: 340)
@@ -249,15 +247,15 @@ public struct ForecastAIUsagePanel: View {
         Chart(report.days) { day in
             AreaMark(x: .value("Day", day.date, unit: .day), y: .value("Cost", day.cost))
                 .interpolationMethod(.monotone)
-                .foregroundStyle(.linearGradient(colors: [.green.opacity(0.35), .green.opacity(0.02)],
+                .foregroundStyle(.linearGradient(colors: [PanelColors.green.opacity(0.35), PanelColors.green.opacity(0.02)],
                                                  startPoint: .top, endPoint: .bottom))
             LineMark(x: .value("Day", day.date, unit: .day), y: .value("Cost", day.cost))
                 .interpolationMethod(.monotone)
-                .foregroundStyle(.green)
+                .foregroundStyle(PanelColors.green)
                 .lineStyle(StrokeStyle(lineWidth: 2))
             if Calendar.current.isDate(day.date, inSameDayAs: report.now) {
                 PointMark(x: .value("Day", day.date, unit: .day), y: .value("Cost", day.cost))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(PanelColors.green)
                     .annotation(position: .top) {
                         Text(dollarText(day.cost)).font(.system(size: 10, weight: .semibold))
                     }

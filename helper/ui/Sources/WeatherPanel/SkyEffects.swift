@@ -129,8 +129,8 @@ struct SkyEffects: View {
         }
     }
 
-    // Fog has no cloud shapes: thick bands of mist at every height drift
-    // in turn left and right, over a haze that rises from the bottom.
+    // Fog skips the cloud shapes. Mist bands at each height drift left and right in turn,
+    // over a haze rising from the bottom.
     func fog(_ g: inout GraphicsContext, _ size: CGSize, _ t: Double) {
         g.fill(Path(CGRect(origin: .zero, size: size)),
                with: .linearGradient(Gradient(colors: [.clear, .white.opacity(0.3)]),
@@ -175,8 +175,8 @@ struct SkyEffects: View {
     }
 }
 
-// The same number between 0 and 1 for the same particle every frame, so a
-// drop keeps its lane and speed.
+// Deterministic: the same particle gets the same number, in 0...1, every frame.
+// So a drop keeps its lane and speed.
 func noise(_ i: Int, _ salt: Int) -> Double {
     var h = UInt64(truncatingIfNeeded: i &* 374_761_393 &+ salt &* 668_265_263)
     h = (h ^ (h >> 13)) &* 1_274_126_177

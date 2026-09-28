@@ -8,6 +8,7 @@ let package = Package(
     platforms: [.macOS("26.0")],
     products: [
         .library(name: "StatusGauge", targets: ["StatusGauge"]),
+        .library(name: "BarPills", targets: ["BarPills"]),
         .library(name: "WeatherPanel", targets: ["WeatherPanel"]),
         .library(name: "StatusPanel", targets: ["StatusPanel"]),
         .library(name: "CalendarPanel", targets: ["CalendarPanel"]),
@@ -20,6 +21,7 @@ let package = Package(
     ],
     targets: [
         .target(name: "StatusGauge"),
+        .target(name: "BarPills"),
         .target(name: "WeatherPanel"),
         .target(name: "StatusPanel", dependencies: ["StatusGauge"]),
         .target(name: "CalendarPanel", dependencies: ["StatusPanel"]),

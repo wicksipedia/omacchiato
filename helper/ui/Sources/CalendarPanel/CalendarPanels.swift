@@ -3,8 +3,8 @@ import SwiftUI
 import StatusPanel
 #endif
 
-// Three designs of the clock popup, to compare in the previews. Each one
-// shows the month and what is left of today, and offers the same clicks.
+// Three designs of the same clock popup, to compare in the previews.
+// Each shows the month and what is left of today, with the same actions.
 
 private func timeText(_ date: Date) -> String {
     date.formatted(date: .omitted, time: .shortened)
@@ -45,8 +45,8 @@ struct MonthGrid: View {
     }
 }
 
-// One event: a bar in the calendar's colour, the title, the time and the
-// place. The next event says how long you have.
+// One event: a colored bar, the title, the time, and the place.
+// The next event also shows a countdown.
 struct EventRow: View {
     var event: CalendarReport.Event
     var now: Date
@@ -107,9 +107,7 @@ struct EventsEmpty: View {
     }
 }
 
-// "Up Next": the date large, the next event as the hero, the rest of the
-// day under it, and a small month at the bottom. Like the iOS Calendar
-// widget.
+// "Up Next": big date, next event as hero, rest of today below, small month at bottom, like iOS Calendar's widget.
 public struct UpNextCalendarPanel: View {
     var report: CalendarReport
     var actions: CalendarActions
@@ -156,8 +154,7 @@ public struct UpNextCalendarPanel: View {
     }
 }
 
-// "Month": the month grid first and large, like the iOS Calendar month
-// view, with today's events under it.
+// "Month": the month grid first and large, like the iOS Calendar month view, with today's events below.
 public struct MonthCalendarPanel: View {
     var report: CalendarReport
     var actions: CalendarActions
@@ -200,8 +197,7 @@ public struct MonthCalendarPanel: View {
     }
 }
 
-// "Timeline": the rest of the day as blocks on an hour scale, like the
-// iOS Calendar day view, with the month beside the date at the top.
+// "Timeline": rest of day as blocks on an hour scale, like iOS Calendar's day view, month beside the date.
 public struct TimelineCalendarPanel: View {
     var report: CalendarReport
     var actions: CalendarActions
@@ -316,9 +312,8 @@ public struct TimelineCalendarPanel: View {
     }
 }
 
-// Events that overlap share the width side by side, as in the iOS day
-// view. Each event gets the first free lane, and the number of lanes of
-// the group of overlapping events it belongs to.
+// Overlapping events share the width side by side, like iOS Calendar's day view.
+// Each event gets the first free lane. `of` is the lane count for its group of overlaps.
 public func timelineLanes(_ spans: [(start: Date, end: Date)]) -> [(at: Int, of: Int)] {
     var result = Array(repeating: (at: 0, of: 1), count: spans.count)
     var group: [Int] = []

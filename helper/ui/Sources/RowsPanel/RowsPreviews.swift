@@ -1,7 +1,9 @@
 #if DEBUG
 import SwiftUI
+#if canImport(StatusPanel)
+import StatusPanel
+#endif
 
-// Sample popups for the previews, from the plugins and menus that use rows.
 extension PanelRow {
     static func make(_ text: String, detail: String = "", icon: String = "", hero: Bool = false, dim: Bool = false,
                      highlight: Bool = false, separator: Bool = false, slider: Double? = nil, bar: Double? = nil,
@@ -91,17 +93,6 @@ private let recent: [PanelRow] = [
     .rule,
     .make("Clear Menu"),
 ]
-
-private struct Desk<Content: View>: View {
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        content
-            .padding(24)
-            .background(LinearGradient(colors: [.teal, .blue, .indigo],
-                                       startPoint: .topLeading, endPoint: .bottomTrailing))
-    }
-}
 
 #Preview("Update") { Desk { RowsPanel(rows: update) } }
 #Preview("Keep Awake") { Desk { RowsPanel(rows: keepAwake) } }

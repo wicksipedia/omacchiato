@@ -3,10 +3,9 @@ import SwiftUI
 import StatusPanel
 #endif
 
-// The theme picker: a desktop in the theme under view across the top, the
-// day and night halves of the choice, and the themes as cards. A card
-// sets the half that is selected, and Apply saves both through theme-set.
-// One theme in both halves is one theme all day.
+// The theme picker: a desktop preview, day and night slots, and the themes
+// as cards. A card sets the selected slot; Apply saves both slots through
+// theme-set. One theme in both slots runs all day.
 public struct ThemePanel: View {
     var report: ThemeReport
     var actions: ThemeActions
@@ -56,7 +55,7 @@ public struct ThemePanel: View {
         let on = theme.name == shown
         return VStack(spacing: 4) {
             ThemeMockup(theme: theme)
-                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(on ? Color.accentColor : .clear, lineWidth: 2.5))
+                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(on ? PanelColors.accent : .clear, lineWidth: 2.5))
                 .overlay(alignment: .bottomTrailing) {
                     // which half of the day the theme holds
                     HStack(spacing: 2) {

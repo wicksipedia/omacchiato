@@ -1,8 +1,6 @@
 #if DEBUG
 import SwiftUI
 
-// Sample data for the previews: a working day on battery, and the states
-// that break a layout.
 extension StatusReport {
     static let networks: [Network] = [
         Network(ssid: "Home-5G", rssi: -48),
@@ -34,14 +32,12 @@ extension StatusReport {
         battery: Battery(percent: 100, onAC: true, adapterWatts: 96, health: 100, cycles: 3),
         wifi: WiFi(on: false))
 
-    // At a desk: a cable to a dock, with wi-fi on and joined as well.
     static let wired = StatusReport(
         battery: Battery(percent: 88, charging: true, onAC: true, minutesLeft: 25, watts: 32.5,
                          adapterWatts: 96, health: 91, cycles: 212),
         wifi: onBattery.wifi,
         ethernet: Ethernet(name: "USB 10/100/1000 LAN", ip: "192.168.1.31", router: "192.168.1.1"))
 
-    // On the road, joined to a phone's hotspot.
     static let hotspot = StatusReport(
         battery: Battery(percent: 57, minutesLeft: 2 * 60 + 40, watts: 8.2, health: 91, cycles: 212),
         wifi: WiFi(ssid: "Alex's iPhone", ip: "172.20.10.4", router: "172.20.10.1", rssi: -58, rate: 573,
@@ -52,28 +48,33 @@ extension StatusReport {
     static let desktop = StatusReport(battery: nil, wifi: WiFi(scanning: true))
 }
 
-// A busy desktop behind the panel, so the glass has something to show.
-private struct Desk<Content: View>: View {
-    @ViewBuilder var content: Content
+// The desktop behind a panel in the previews, so the glass has something to show.
+public struct Desk<Content: View>: View {
+    var colors: [Color]
+    var content: Content
 
-    var body: some View {
+    public init(colors: [Color] = [.teal, .blue, .indigo], @ViewBuilder content: () -> Content) {
+        self.colors = colors
+        self.content = content()
+    }
+
+    public var body: some View {
         content
             .padding(24)
-            .background(LinearGradient(colors: [.orange, .pink, .purple, .blue],
-                                       startPoint: .topLeading, endPoint: .bottomTrailing))
+            .background(LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing))
     }
 }
 
 private let samples: [StatusReport] = [.onBattery, .charging, .lowPower, .wifiOff, .wired, .hotspot, .desktop]
 
-#Preview("Gauge") { Desk { GaugeStatusPanel(report: .onBattery) } }
-#Preview("Control Center") { Desk { ControlCenterStatusPanel(report: .onBattery) } }
-#Preview("Settings") { Desk { SettingsStatusPanel(report: .onBattery) } }
-#Preview("Gauge: Ethernet") { Desk { GaugeStatusPanel(report: .wired) } }
-#Preview("Gauge: hotspot") { Desk { GaugeStatusPanel(report: .hotspot) } }
+#Preview("Gauge") { Desk(colors: [.orange, .pink, .purple, .blue]) { GaugeStatusPanel(report: .onBattery) } }
+#Preview("Control Center") { Desk(colors: [.orange, .pink, .purple, .blue]) { ControlCenterStatusPanel(report: .onBattery) } }
+#Preview("Settings") { Desk(colors: [.orange, .pink, .purple, .blue]) { SettingsStatusPanel(report: .onBattery) } }
+#Preview("Gauge: Ethernet") { Desk(colors: [.orange, .pink, .purple, .blue]) { GaugeStatusPanel(report: .wired) } }
+#Preview("Gauge: hotspot") { Desk(colors: [.orange, .pink, .purple, .blue]) { GaugeStatusPanel(report: .hotspot) } }
 
 #Preview("Gauge: every state") {
-    Desk {
+    Desk(colors: [.orange, .pink, .purple, .blue]) {
         HStack(alignment: .top, spacing: 16) {
             ForEach(samples.indices, id: \.self) { GaugeStatusPanel(report: samples[$0]) }
         }
@@ -81,7 +82,7 @@ private let samples: [StatusReport] = [.onBattery, .charging, .lowPower, .wifiOf
 }
 
 #Preview("Control Center: every state") {
-    Desk {
+    Desk(colors: [.orange, .pink, .purple, .blue]) {
         HStack(alignment: .top, spacing: 16) {
             ForEach(samples.indices, id: \.self) { ControlCenterStatusPanel(report: samples[$0]) }
         }
@@ -89,12 +90,12 @@ private let samples: [StatusReport] = [.onBattery, .charging, .lowPower, .wifiOf
 }
 
 #Preview("Settings: every state") {
-    Desk {
+    Desk(colors: [.orange, .pink, .purple, .blue]) {
         HStack(alignment: .top, spacing: 16) {
             ForEach(samples.indices, id: \.self) { SettingsStatusPanel(report: samples[$0]) }
         }
     }
 }
 
-#Preview("Gauge, dark") { Desk { GaugeStatusPanel(report: .onBattery) }.preferredColorScheme(.dark) }
+#Preview("Gauge, dark") { Desk(colors: [.orange, .pink, .purple, .blue]) { GaugeStatusPanel(report: .onBattery) }.preferredColorScheme(.dark) }
 #endif

@@ -36,8 +36,8 @@ public struct WeatherReport: Equatable {
 
     public init() {}
 
-    // wttr.in gives the hourly steps in the local time of the place, and
-    // the bar reads them with the Mac's clock.
+    // wttr.in gives the hourly steps in the local time of the place.
+    // The bar reads them with the Mac's clock.
     public init?(j1 data: Data, now: Date = Date(), calendar: Calendar = .current) {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let current = (root["current_condition"] as? [[String: Any]])?.first,

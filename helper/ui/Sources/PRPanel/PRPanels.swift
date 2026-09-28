@@ -4,10 +4,9 @@ import StatusPanel
 #endif
 
 // Three designs of the pull request popup, to compare in the previews.
-// Each one shows the same data and offers the same actions.
 
-// "Reminders": a tile for each stage with its count, as the Reminders app
-// shows its smart lists. A click on a tile shows only that stage.
+// "Reminders": a tile per stage with its count, like Reminders' smart
+// lists. A tap filters the list to that stage.
 public struct RemindersPRPanel: View {
     var report: PRReport
     var actions: PRActions
@@ -47,7 +46,7 @@ public struct RemindersPRPanel: View {
                     }
                 }
             }
-            AllPRsRow(action: actions.openAll)
+            SettingsRow(title: "All Pull Requests", detail: "github.com", action: actions.openAll)
         }
         .statusPanelBackground(width: 380)
     }
@@ -78,8 +77,8 @@ public struct RemindersPRPanel: View {
     }
 }
 
-// "Inbox": sections by what each PR waits for, as Mail sorts its
-// mailboxes, with the repository on each row.
+// "Inbox": sections by what each PR waits for, like Mail's mailboxes;
+// each row shows its repo.
 public struct InboxPRPanel: View {
     var report: PRReport
     var actions: PRActions
@@ -104,13 +103,13 @@ public struct InboxPRPanel: View {
                     }
                 }
             }
-            AllPRsRow(action: actions.openAll)
+            SettingsRow(title: "All Pull Requests", detail: "github.com", action: actions.openAll)
         }
         .statusPanelBackground(width: 380)
     }
 }
 
-// The open PRs by stage, as one bar, as iPhone Storage shows space by app.
+// The open PRs by stage, as one bar, like iPhone Storage shows space by app.
 struct StageBar: View {
     var report: PRReport
 
@@ -125,7 +124,7 @@ struct StageBar: View {
                     Spacer()
                     let needs = report.count(.needsYou)
                     if needs > 0 {
-                        Text("\(needs) need\(needs == 1 ? "s" : "") you").foregroundStyle(.red)
+                        Text("\(needs) need\(needs == 1 ? "s" : "") you").foregroundStyle(PanelColors.red)
                             .font(.system(size: 12, weight: .semibold))
                     }
                 }
@@ -147,8 +146,7 @@ struct StageBar: View {
     }
 }
 
-// "Tracker": each PR as a delivery on its way, with the three steps a
-// PR takes: checks, review and merge.
+// "Tracker": each PR as a delivery, with three steps: checks, review, merge.
 public struct TrackerPRPanel: View {
     var report: PRReport
     var actions: PRActions
@@ -178,7 +176,7 @@ public struct TrackerPRPanel: View {
                                 Steps(pr: pr)
                                 HStack {
                                     Text(pr.note ?? pr.stage.title)
-                                        .foregroundStyle(pr.stage == .needsYou ? AnyShapeStyle(Color.red)
+                                        .foregroundStyle(pr.stage == .needsYou ? AnyShapeStyle(PanelColors.red)
                                                                                 : AnyShapeStyle(.secondary))
                                     Spacer()
                                     if pr.state == .open { DiffSize(pr: pr) }
@@ -191,22 +189,22 @@ public struct TrackerPRPanel: View {
                     }
                 }
             }
-            AllPRsRow(action: actions.openAll)
+            SettingsRow(title: "All Pull Requests", detail: "github.com", action: actions.openAll)
         }
         .statusPanelBackground(width: 380)
     }
 }
 
-// Checks, review and merge as three segments. A step is green when done,
-// red when it stops the PR, orange while it runs, and grey before.
+// Checks, review and merge as three segments: green when done, red when
+// blocked, orange while running, grey before.
 struct Steps: View {
     var pr: PRReport.PR
 
     var body: some View {
         let steps: [(String, Color?)] = [
-            ("Checks", pr.state != .open ? .green : checkColor),
-            ("Review", pr.state != .open ? .green : reviewColor),
-            ("Merge", pr.state == .merged ? .purple : (pr.state == .closed ? .gray : (pr.conflicts ? .red : nil))),
+            ("Checks", pr.state != .open ? PanelColors.green : checkColor),
+            ("Review", pr.state != .open ? PanelColors.green : reviewColor),
+            ("Merge", pr.state == .merged ? .purple : (pr.state == .closed ? .gray : (pr.conflicts ? PanelColors.red : nil))),
         ]
         HStack(spacing: 4) {
             // the text under the steps names the stage, so the steps carry no labels
@@ -220,16 +218,16 @@ struct Steps: View {
 
     var checkColor: Color? {
         switch pr.checks {
-        case .passed: return .green
-        case .failed: return .red
-        case .running: return .orange
-        case nil: return pr.draft ? nil : .green
+        case .passed: return PanelColors.green
+        case .failed: return PanelColors.red
+        case .running: return PanelColors.orange
+        case nil: return pr.draft ? nil : PanelColors.green
         }
     }
 
     var reviewColor: Color? {
         if pr.draft { return nil }
-        if pr.review == .changes || pr.threads > 0 { return .red }
-        return pr.review == .approved ? .green : .blue
+        if pr.review == .changes || pr.threads > 0 { return PanelColors.red }
+        return pr.review == .approved ? PanelColors.green : .blue
     }
 }

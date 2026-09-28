@@ -3,8 +3,7 @@ import SwiftUI
 import StatusGauge
 #endif
 
-// Three designs of the status popup, to compare in the previews. Each one
-// shows the same data and offers the same actions.
+// Three designs of the same popup, to compare in the previews. Each shows the same data and actions.
 
 // "Gauge": the bar's gauge drawn large, then tiles like the weather panel.
 public struct GaugeStatusPanel: View {
@@ -47,7 +46,7 @@ public struct GaugeStatusPanel: View {
             }
             if let e = report.ethernet {
                 HStack(spacing: 6) {
-                    // the "<···>" mark that macOS gives Ethernet, as the gauge draws it
+                    // Matches the Ethernet glyph the gauge draws.
                     HStack(spacing: 0) {
                         Image(systemName: "chevron.left")
                         Image(systemName: "ellipsis").font(.system(size: 11, weight: .black))
@@ -73,19 +72,27 @@ public struct GaugeStatusPanel: View {
     var tiles: some View {
         let b = report.battery
         let w = report.wifi
-        let items: [(String, String, String, String?)] = [
-            b?.watts.map { ("Power", "bolt.fill", String(format: "%.1f W", $0),
-                            b?.adapterWatts.map { "\($0) W adapter" } ?? (b?.onAC == false ? "Draw" : nil)) },
-            b?.health.map { ("Health", "heart.fill", "\($0)%", b?.cycles.map { "\($0) cycles" }) },
-            b?.mode.map { ("Mode", $0 == "low power" ? "leaf.fill" : "gauge.with.dots.needle.67percent",
-                           $0.capitalized, b?.thermal.map { "Thermal \($0)" }) },
-            w.rssi.map { ("Signal", "wifi", "\($0) dBm", w.verdict) },
-            w.rate.map { ("Link", "arrow.up.arrow.down", "\($0) Mbps", w.security) },
-            w.channel.map { ("Channel", "antenna.radiowaves.left.and.right", "\($0)",
-                             [w.band, w.width].compactMap { $0 }.joined(separator: " · ")) },
-            report.ethernet.map { e in ("Address", "network", e.ip, e.router.map { "Router \($0)" }) }
-                ?? w.ip.map { ("Address", "network", $0, w.router.map { "Router \($0)" }) },
-        ].compactMap { $0 }
+        typealias Tile = (String, String, String, String?)
+        var items: [Tile] = []
+        if let b, let watts = b.watts {
+            let note = b.adapterWatts.map { "\($0) W adapter" } ?? (b.onAC ? nil : "Draw")
+            items.append(("Power", "bolt.fill", String(format: "%.1f W", watts), note))
+        }
+        if let b, let health = b.health { items.append(("Health", "heart.fill", "\(health)%", b.cycles.map { "\($0) cycles" })) }
+        if let b, let mode = b.mode {
+            let symbol = mode == "low power" ? "leaf.fill" : "gauge.with.dots.needle.67percent"
+            items.append(("Mode", symbol, mode.capitalized, b.thermal.map { "Thermal \($0)" }))
+        }
+        if let rssi = w.rssi { items.append(("Signal", "wifi", "\(rssi) dBm", w.verdict)) }
+        if let rate = w.rate { items.append(("Link", "arrow.up.arrow.down", "\(rate) Mbps", w.security)) }
+        if let channel = w.channel {
+            let band = [w.band, w.width].compactMap { $0 }.joined(separator: " · ")
+            items.append(("Channel", "antenna.radiowaves.left.and.right", "\(channel)", band))
+        }
+        if let ip = report.ethernet?.ip ?? w.ip {
+            let router = report.ethernet.map { $0.router } ?? w.router
+            items.append(("Address", "network", ip, router.map { "Router \($0)" }))
+        }
         return LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible())], spacing: 8) {
             ForEach(items, id: \.0) { title, symbol, value, note in
                 VStack(alignment: .leading, spacing: 3) {
@@ -104,8 +111,7 @@ public struct GaugeStatusPanel: View {
     }
 }
 
-// "Control Center": two big toggles side by side, then the network list,
-// with the numbers folded away under Details.
+// "Control Center": two big toggles side by side, then the network list, with the numbers folded away under Details.
 public struct ControlCenterStatusPanel: View {
     var report: StatusReport
     var actions: StatusActions
@@ -160,7 +166,7 @@ public struct ControlCenterStatusPanel: View {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(report.wifi.on ? .white : .primary)
                 .frame(width: 32, height: 32)
-                .background(report.wifi.on ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.fill.tertiary),
+                .background(report.wifi.on ? AnyShapeStyle(PanelColors.accent) : AnyShapeStyle(.fill.tertiary),
                             in: .circle)
             Text("Wi-Fi").font(.system(size: 13, weight: .semibold))
             Text(report.wifi.on ? (report.wifi.ssid ?? "Not connected") : "Off")
@@ -259,20 +265,20 @@ public struct SettingsStatusPanel: View {
                     Text(b.timeText ?? "").foregroundStyle(.secondary)
                 }
                 .font(.system(size: 13))
-                LevelBar(value: Double(b.percent) / 100, tint: b.tint == .primary ? .green : b.tint)
+                LevelBar(value: Double(b.percent) / 100, tint: b.tint == .primary ? PanelColors.green : b.tint)
             }
             .padding(6)
             if let mode = b.mode {
                 row(mode == "low power" ? "leaf.fill" : "gauge.with.dots.needle.67percent",
-                    mode == "low power" ? .yellow : .orange, "Power mode", mode.capitalized)
+                    mode == "low power" ? PanelColors.yellow : PanelColors.orange, "Power mode", mode.capitalized)
             }
             if let w = b.watts {
-                row("bolt.fill", .green, b.onAC ? "Charging at" : "Power draw", String(format: "%.1f W", w))
+                row("bolt.fill", PanelColors.green, b.onAC ? "Charging at" : "Power draw", String(format: "%.1f W", w))
             }
             if let a = b.adapterWatts { row("powerplug.fill", .gray, "Adapter", "\(a) W") }
             if let h = b.health { row("heart.fill", .pink, "Health", "\(h)%") }
             if let c = b.cycles { row("arrow.triangle.2.circlepath", .blue, "Cycles", "\(c)") }
-            if let t = b.thermal { row("thermometer.medium", .red, "Thermal", t.capitalized) }
+            if let t = b.thermal { row("thermometer.medium", PanelColors.red, "Thermal", t.capitalized) }
             SettingsRow(title: "Battery Settings", action: actions.batterySettings)
         }
     }
@@ -294,7 +300,7 @@ public struct SettingsStatusPanel: View {
             .padding(.horizontal, 6)
             .padding(.vertical, 5)
             if w.on {
-                if let rssi = w.rssi { row("cellularbars", .green, "Signal", "\(rssi) dBm · \(w.verdict ?? "")") }
+                if let rssi = w.rssi { row("cellularbars", PanelColors.green, "Signal", "\(rssi) dBm · \(w.verdict ?? "")") }
                 if let rate = w.rate { row("arrow.up.arrow.down", .teal, "Link", "\(rate) Mbps" + (w.security.map { " · \($0)" } ?? "")) }
                 if let ch = w.channel {
                     row("antenna.radiowaves.left.and.right", .purple, "Channel",

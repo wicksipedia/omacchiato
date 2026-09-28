@@ -12,7 +12,7 @@ extension PRReport.PR {
 // Mail's unread dot.
 struct UnreadDot: View {
     var body: some View {
-        Circle().fill(Color.accentColor).frame(width: 8, height: 8)
+        Circle().fill(PanelColors.accent).frame(width: 8, height: 8)
             .accessibilityLabel("Updated")
     }
 }
@@ -26,13 +26,13 @@ struct DiffSize: View {
         let total = pr.additions + pr.deletions
         let green = total == 0 ? 0 : Int((5 * Double(pr.additions) / Double(total)).rounded())
         HStack(spacing: 4) {
-            Text("+\(pr.additions)").foregroundStyle(.green)
-            Text("−\(pr.deletions)").foregroundStyle(.red)
+            Text("+\(pr.additions)").foregroundStyle(PanelColors.green)
+            Text("−\(pr.deletions)").foregroundStyle(PanelColors.red)
             HStack(spacing: 1) {
                 ForEach(0..<5, id: \.self) { i in
                     RoundedRectangle(cornerRadius: 1)
                         .fill(total == 0 ? AnyShapeStyle(.fill.secondary)
-                              : AnyShapeStyle(i < green ? Color.green : Color.red))
+                              : AnyShapeStyle(i < green ? PanelColors.green : PanelColors.red))
                         .frame(width: 5, height: 5)
                 }
             }
@@ -48,7 +48,6 @@ struct PRRow: View {
     var now: Date
     var actions: PRActions
     var showRepo = false
-    var showDiff = true
 
     var body: some View {
         HoverRow(action: pr.url.map { url in { actions.open(url) } }) {
@@ -64,7 +63,7 @@ struct PRRow: View {
                     HStack(spacing: 6) {
                         Text((showRepo ? pr.repo : "") + "#\(pr.number)").truncationMode(.head)
                         Spacer(minLength: 4)
-                        if showDiff && pr.state == .open { DiffSize(pr: pr).fixedSize() }
+                        if pr.state == .open { DiffSize(pr: pr).fixedSize() }
                     }
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
@@ -72,7 +71,7 @@ struct PRRow: View {
                     if let note = pr.note {
                         Text(note)
                             .font(.system(size: 11))
-                            .foregroundStyle(pr.stage == .needsYou ? AnyShapeStyle(Color.red) : AnyShapeStyle(.secondary))
+                            .foregroundStyle(pr.stage == .needsYou ? AnyShapeStyle(PanelColors.red) : AnyShapeStyle(.secondary))
                             .lineLimit(2)
                     }
                 }
@@ -126,11 +125,11 @@ struct StaleNote: View {
                     Text(problem).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(2)
                 }
             } icon: {
-                Image(systemName: "wifi.exclamationmark").foregroundStyle(.orange)
+                Image(systemName: "wifi.exclamationmark").foregroundStyle(PanelColors.orange)
             }
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.orange.opacity(0.12), in: .rect(cornerRadius: 12))
+            .background(PanelColors.orange.opacity(0.12), in: .rect(cornerRadius: 12))
         }
     }
 }
@@ -138,28 +137,12 @@ struct StaleNote: View {
 struct EmptyPRs: View {
     var body: some View {
         VStack(spacing: 6) {
-            Image(systemName: "checkmark.seal.fill").font(.system(size: 28)).foregroundStyle(.green)
+            Image(systemName: "checkmark.seal.fill").font(.system(size: 28)).foregroundStyle(PanelColors.green)
             Text("No Open Pull Requests").font(.system(size: 13, weight: .semibold))
             Text("Your merged and closed ones show here for a week while they are unread.")
                 .font(.system(size: 11)).foregroundStyle(.secondary).multilineTextAlignment(.center)
         }
         .padding(.vertical, 18)
         .frame(maxWidth: .infinity)
-    }
-}
-
-struct AllPRsRow: View {
-    var action: () -> Void
-
-    var body: some View {
-        HoverRow(action: action) {
-            HStack {
-                Text("All Pull Requests")
-                Spacer()
-                Text("github.com").foregroundStyle(.secondary)
-                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
-            }
-            .font(.system(size: 13))
-        }
     }
 }

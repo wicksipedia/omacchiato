@@ -3,8 +3,9 @@ import SwiftUI
 import StatusPanel
 #endif
 
-// A popup made of rows, drawn as a macOS menu: the built-in menus (Apple,
-// the app menus, volume, Bluetooth) and every plugin that prints rows.
+// A popup made of rows, drawn as a macOS menu.
+// Rows come from the built-in menus (Apple, the app menus, volume, Bluetooth)
+// and from any plugin that prints rows.
 public struct PanelRow {
     public var icon = ""                    // a Nerd Font glyph
     public var image: NSImage?
@@ -31,8 +32,9 @@ public struct PanelRow {
     public init() {}
 }
 
-// Menus with submenus, as macOS shows them: each open submenu is a column
-// to the right, with its first item level with the row that opened it.
+// Menus with submenus, as macOS shows them.
+// Each open submenu is a column to the right. Its first item lines up
+// with the row that opened it.
 public struct CascadePanel: View {
     var columns: [[PanelRow]]
     var open: [Int?]                        // per column, the row whose submenu shows
@@ -56,8 +58,8 @@ public struct CascadePanel: View {
         }
     }
 
-    // ponytail: the row heights of RowView, added up. A scrolled column
-    // puts its submenu too low. Measure with an anchor preference if that matters.
+    // ponytail: adds up RowView's row heights. A scrolled column puts its
+    // submenu too low. Measure with an anchor preference if that matters.
     func top(_ i: Int) -> CGFloat {
         guard i > 0, open.indices.contains(i - 1), let row = open[i - 1] else { return 0 }
         return top(i - 1) + columns[i - 1][..<row].reduce(0) { $0 + ($1.separator ? 11 : 24) }
@@ -124,7 +126,7 @@ struct Clamp: Layout {
 }
 
 // A menu item. The item under the pointer, or the one the arrow keys
-// selected, fills with the accent colour and its text turns white.
+// selected, fills with the accent colour. Its text also turns white.
 struct RowView: View {
     var row: PanelRow
     var selected: Bool
@@ -138,7 +140,7 @@ struct RowView: View {
             if let value = row.slider {
                 HStack(spacing: 10) {
                     lead
-                    DrawnSlider(value: value, tint: row.tint ?? .accentColor, marker: row.marker, onSlide: row.onSlide)
+                    DrawnSlider(value: value, tint: row.tint ?? PanelColors.accent, marker: row.marker, onSlide: row.onSlide)
                     Text(row.text).font(.system(size: 12)).monospacedDigit()
                         .foregroundStyle(.secondary).frame(minWidth: 36, alignment: .trailing)
                 }
@@ -155,7 +157,7 @@ struct RowView: View {
                     // one label column, so the bars start together
                     label.frame(width: row.bar == nil ? nil : 84, alignment: .leading)
                     if let bar = row.bar {
-                        Track(value: bar, tint: row.barTint ?? row.tint ?? .accentColor, marker: row.marker)
+                        Track(value: bar, tint: row.barTint ?? row.tint ?? PanelColors.accent, marker: row.marker)
                             .frame(minWidth: 80)
                     } else {
                         Spacer(minLength: 16)
@@ -168,7 +170,7 @@ struct RowView: View {
         .frame(minHeight: 24)
         .frame(maxWidth: .infinity, alignment: .leading)
         .foregroundStyle(lit ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
-        .background(lit ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.clear), in: .rect(cornerRadius: 6))
+        .background(lit ? AnyShapeStyle(PanelColors.accent) : AnyShapeStyle(.clear), in: .rect(cornerRadius: 6))
         .contentShape(.rect)
         .onHover { on in
             hovered = on
@@ -195,7 +197,7 @@ struct RowView: View {
                 }
             }
             .foregroundStyle(lit ? AnyShapeStyle(.white)
-                             : AnyShapeStyle(row.iconTint ?? (row.highlight ? .accentColor : .secondary)))
+                             : AnyShapeStyle(row.iconTint ?? (row.highlight ? PanelColors.accent : .secondary)))
             .frame(width: 18)
         }
     }
@@ -234,7 +236,7 @@ struct RowView: View {
                 .rotationEffect(.degrees(open ? 90 : 0))
         } else if row.highlight && row.icon.isEmpty && row.image == nil && !row.back {
             Image(systemName: "checkmark").font(.system(size: 11, weight: .bold))
-                .foregroundStyle(lit ? AnyShapeStyle(.white) : AnyShapeStyle(Color.accentColor))
+                .foregroundStyle(lit ? AnyShapeStyle(.white) : AnyShapeStyle(PanelColors.accent))
         }
     }
 }
@@ -259,9 +261,9 @@ struct Track: View {
     }
 }
 
-// Drawn by hand: the popup window never becomes key, and a system Slider
-// in a window that is not key draws grey. The knob follows the pointer at
-// once, and the bar sets the value behind it.
+// Drawn by hand. The popup window never becomes key, so a system Slider
+// here draws grey. The knob follows the pointer at once, and the bar
+// sets the value behind it.
 struct DrawnSlider: View {
     var value: Double
     var tint: Color

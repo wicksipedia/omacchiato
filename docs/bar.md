@@ -39,8 +39,9 @@ click turns wi-fi on or off. `wifi` and
 `wifi = icon` or `battery = time`. `status = hide` removes the gauge.
 
 To change the gauge or a panel, open `helper/ui/Package.swift` in Xcode,
-then open `StatusGauge.swift`, `StatusPreviews.swift`,
-`CalendarPreviews.swift`, `ActivityPreviews.swift` or `WeatherPanel.swift` and show the canvas
+then open `StatusGauge.swift`, `BarPillsPreviews.swift` (the workspace
+chips and the music pill), `StatusPreviews.swift`, `CalendarPreviews.swift`,
+`ActivityPreviews.swift`, `ThemePreviews.swift` or `WeatherPanel.swift` and show the canvas
 (Option-Command-Return). Each preview file shows every design. The weather previews read a saved
 wttr.in answer, `tests/fixtures/wttr-j1.json`.
 The previews draw every state at bar size and large, in light and dark.

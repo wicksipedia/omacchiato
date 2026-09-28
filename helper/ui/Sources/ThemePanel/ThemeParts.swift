@@ -3,9 +3,9 @@ import SwiftUI
 import StatusPanel
 #endif
 
-// A small desktop in a theme's colours: its wallpaper, the bar, and two
-// tiled windows, a terminal with focus and an editor without. Every
-// colour comes from the theme's files.
+// A small desktop in a theme's colours: wallpaper, bar, and two tiled
+// windows, a focused terminal and an unfocused editor. Every colour comes
+// from the theme's files.
 struct ThemeMockup: View {
     var theme: Theme
     var top: CGFloat = 8                    // the corner radius at the top, and at the bottom
@@ -168,9 +168,8 @@ struct MockEditor: View {
     }
 }
 
-// Which half of the day the cards set: a segmented control, drawn by hand
-// because a system Picker draws grey in a window that is not key. Each
-// segment names the theme it holds.
+// Which slot the cards set: a segmented control, drawn by hand because a
+// system Picker draws grey in a non-key window. Each segment names its theme.
 enum DaySlot { case day, night }
 
 struct SlotPicker: View {
@@ -225,7 +224,7 @@ struct ApplyButton: View {
         .padding(.horizontal, 16)
         .frame(height: 28)
         .foregroundStyle(enabled ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
-        .background(enabled ? AnyShapeStyle(Color.accentColor.opacity(hovered ? 0.85 : 1)) : AnyShapeStyle(.fill.tertiary),
+        .background(enabled ? AnyShapeStyle(PanelColors.accent.opacity(hovered ? 0.85 : 1)) : AnyShapeStyle(.fill.tertiary),
                     in: .capsule)
         .contentShape(.capsule)
         .onHover { hovered = $0 }

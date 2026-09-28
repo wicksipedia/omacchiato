@@ -10,14 +10,14 @@ public let activityHistoryLimit = 40
 
 // Activity Monitor's colours: blue for user time, red for system time.
 let userTint = Color.blue
-let systemTint = Color.red
+let systemTint = PanelColors.red
 
 extension ActivityReport.Pressure {
     var tint: Color {
         switch self {
-        case .normal: return .green
-        case .warning: return .yellow
-        case .critical: return .red
+        case .normal: return PanelColors.green
+        case .warning: return PanelColors.yellow
+        case .critical: return PanelColors.red
         }
     }
 
@@ -25,8 +25,8 @@ extension ActivityReport.Pressure {
     var textTint: AnyShapeStyle {
         switch self {
         case .normal: return AnyShapeStyle(.secondary)
-        case .warning: return AnyShapeStyle(Color.orange)
-        case .critical: return AnyShapeStyle(Color.red)
+        case .warning: return AnyShapeStyle(PanelColors.orange)
+        case .critical: return AnyShapeStyle(PanelColors.red)
         }
     }
 
@@ -41,11 +41,11 @@ extension ActivityReport.Pressure {
 
 extension ActivityReport.Process {
     // A process that holds most of a core for itself stands out.
-    var tint: Color { cpu >= 0.9 ? .red : (cpu >= 0.5 ? .orange : .primary) }
+    var tint: Color { cpu >= 0.9 ? PanelColors.red : (cpu >= 0.5 ? PanelColors.orange : .primary) }
 }
 
-// A filled line of the last samples. It starts at the right edge and fills
-// to the left, so a new sample always lands in the same place.
+// A filled line of the last samples. It starts at the right edge and
+// fills left, so a new sample always lands in the same spot.
 struct Sparkline: Shape {
     var values: [Double]                    // 0...1
     var slots = activityHistoryLimit
@@ -196,7 +196,7 @@ struct HotNote: View {
     var body: some View {
         Label("The Mac is hot, so macOS slows the CPU.", systemImage: "thermometer.high")
             .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(.orange)
+            .foregroundStyle(PanelColors.orange)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

@@ -1,6 +1,9 @@
 #if DEBUG
 import AppKit
 import SwiftUI
+#if canImport(StatusPanel)
+import StatusPanel
+#endif
 
 // Sample minutes for the previews: a quiet desk, a build, a runaway
 // process, and the states that break a layout.
@@ -82,17 +85,6 @@ extension ActivityReport {
     // The first moment after the popup opens: one sample, no load yet.
     static let measuring = ActivityReport(
         load: nil, memoryUsed: 9 * gib + 400 * mib, memoryTotal: 16 * gib, compressed: 1 * gib)
-}
-
-private struct Desk<Content: View>: View {
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        content
-            .padding(24)
-            .background(LinearGradient(colors: [.teal, .blue, .indigo],
-                                       startPoint: .topLeading, endPoint: .bottomTrailing))
-    }
 }
 
 private let minutes: [ActivityReport] = [.quiet, .building, .runaway, .longNames, .measuring]

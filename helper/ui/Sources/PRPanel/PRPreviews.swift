@@ -1,5 +1,8 @@
 #if DEBUG
 import SwiftUI
+#if canImport(StatusPanel)
+import StatusPanel
+#endif
 
 // Sample lists for the previews. Monday 28 September 2026, 10:40.
 extension PRReport {
@@ -40,17 +43,6 @@ extension PRReport {
 
     static let offline = PRReport(now: morning, prs: calm.prs,
                                   problem: "error connecting to api.github.com", updated: ago(1.5))
-}
-
-private struct Desk<Content: View>: View {
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        content
-            .padding(24)
-            .background(LinearGradient(colors: [.teal, .blue, .indigo],
-                                       startPoint: .topLeading, endPoint: .bottomTrailing))
-    }
 }
 
 #Preview("Reminders") { Desk { RemindersPRPanel(report: .busy) } }

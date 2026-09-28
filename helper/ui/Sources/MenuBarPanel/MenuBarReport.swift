@@ -1,8 +1,8 @@
 import SwiftUI
 
-// What the menu bar apps popup shows: the status icons of the apps that
-// run, read over Accessibility. The notch hides an icon that does not fit,
-// and a click on a hidden icon opens its app instead.
+// What the menu bar apps popup shows: status icons of running apps, read
+// over Accessibility. The notch hides icons with no room; a click on one
+// opens its app instead.
 public struct MenuBarReport {
     public struct Item: Identifiable {
         public var id: Int                  // the bar's index of the scanned icon

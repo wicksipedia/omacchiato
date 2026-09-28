@@ -4,7 +4,6 @@ import StatusPanel
 #endif
 
 // Three designs of the menu bar apps popup, to compare in the previews.
-// Each one shows the same data and offers the same actions.
 
 struct AppIcon: View {
     var item: MenuBarReport.Item
@@ -22,13 +21,12 @@ struct AppIcon: View {
     }
 }
 
-// The badge on an icon that macOS hides, because it does not fit next to
-// the camera notch.
+// The badge on an icon that macOS hides for lack of room next to the notch.
 struct NotchBadge: View {
     var body: some View {
         Image(systemName: "arrow.up.forward.app.fill")
             .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(.white, .orange)
+            .foregroundStyle(.white, PanelColors.orange)
             .accessibilityLabel("Hidden by the notch. Opens the app.")
     }
 }
@@ -162,8 +160,7 @@ public struct ListMenuBarPanel: View {
     }
 }
 
-// "Dock": the icons on one shelf, as the Dock holds apps. The name shows
-// under the pointer.
+// "Dock": the icons on one shelf, like the Dock. The name shows under the pointer.
 public struct DockMenuBarPanel: View {
     var report: MenuBarReport
     var actions: MenuBarActions

@@ -2,6 +2,7 @@ import AppKit
 import CoreLocation
 import Testing
 @testable import omacchiato_bar
+import BarPills
 import CalendarPanel
 import WeatherPanel
 

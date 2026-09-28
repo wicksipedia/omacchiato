@@ -1,8 +1,7 @@
-// The bar's startup: the code that runs, in order, when the bar starts.
-// The declarations live in bar.swift. A global there starts when code
-// first reads it, so the tests can import it without starting the bar.
-// A global here starts when its line runs, and one that reads a later
-// global here reads zero.
+// The bar's startup code, run in order. Declarations live in bar.swift; a
+// global there starts on first read, so tests can import it without
+// starting the bar. A global here starts when its line runs, so it
+// cannot read a later global in this file.
 
 import ApplicationServices
 import AppKit
@@ -15,6 +14,9 @@ import IOBluetooth
 import IOKit.ps
 import SystemConfiguration
 import UniformTypeIdentifiers
+#if canImport(BarPills)
+import BarPills
+#endif
 
 if CommandLine.arguments.contains("--request-permissions") { requestPermissions() }
 
@@ -23,20 +25,19 @@ if CommandLine.arguments.contains("--request-permissions") { requestPermissions(
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
 
-// AppKit pushes an ordinary window down out of the menu-bar strip, which
-// is exactly where a bar belongs — 32 px lower than asked for, measured.
-// Opting out of the constraint is the supported way to sit in it.
+// AppKit pushes an ordinary window down out of the menu bar strip, 32 px
+// lower than asked, which is exactly where a bar belongs. Opting out of
+// the constraint is the supported way to sit there.
 final class BarWindow: NSWindow {
     override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect { frameRect }
 }
 
-// The bar owns the top strip. OMACCHIATO_BAR_STACK=1 drops it one bar-height
-// so it can run alongside another bar for comparison, which is how this
-// was built.
-// Breathing room above the pills. The window grows DOWNWARD by this much
-// while its top edge stays on the screen edge, and every pill is placed
-// from the bottom of the view, so the extra height lands above them and
-// no drawing constant has to change.
+// The bar owns the top strip. OMACCHIATO_BAR_STACK=1 drops it by one bar
+// height, to run alongside another bar for comparison.
+// Breathing room above the pills. The window grows downward by this much
+// while its top edge stays on the screen edge. Every pill is placed from
+// the bottom of the view, so the extra height lands above them and no
+// drawing constant changes.
 let barTopPad: CGFloat = 3
 
 let stackOffset: CGFloat = ProcessInfo.processInfo.environment["OMACCHIATO_BAR_STACK"] == nil ? 0 : barHeight
@@ -53,8 +54,7 @@ final class BarSurface {
     let view: BarView
 
     // A notched display has no usable centre, so the media capsule joins
-    // the left cluster there — the same rule the shell bar applies, but
-    // read from the screen itself instead of asked of a helper.
+    // the left cluster there.
     var notched: Bool { screen.safeAreaInsets.top > 0 }
 
     init(screen: NSScreen, monitorID: String) {
@@ -67,18 +67,16 @@ final class BarSurface {
         window.isOpaque = false
         window.backgroundColor = .clear
         window.hasShadow = false
-        // Below normal windows, where sketchybar's own windows sat. Verified:
-        // the bar still renders there and still receives clicks — AppKit
-        // honours a negative level, and OmniWM's top outer gap keeps
-        // tiled windows off the strip (a tiled window measures y=42 here
-        // against the bar's 0..34).
+        // AppKit honours a negative window level: the bar still renders
+        // and receives clicks below normal windows. OmniWM's top outer
+        // gap keeps tiled windows off the strip (measured: a tiled
+        // window sits at y=42, the bar at 0..34).
         //
-        // This does NOT make the fullscreen check redundant, which was the
-        // hope. On a notched display a fullscreen window starts BELOW the
-        // notch — measured at y=32 — so it cannot cover a bar drawn from
-        // y=0 by z-order alone. Being below windows is still worth it: the
-        // bar can never float over an app, and on a flat display fullscreen
-        // covers it for free.
+        // This does not replace the fullscreen check. On a notched
+        // display a fullscreen window starts below the notch, at y=32,
+        // so z-order alone cannot hide the bar there. Being below
+        // windows still helps: the bar never floats over an app, and on
+        // a flat display fullscreen covers it for free.
         window.level = NSWindow.Level(rawValue: -20)
         window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
         window.acceptsMouseMovedEvents = true // tracking areas need the moves
@@ -103,12 +101,12 @@ func screenID(_ screen: NSScreen) -> CGDirectDisplayID {
     (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value ?? 0
 }
 
-// Monitor ids are resolved by display NAME every time the screens change,
-// never cached: a stale id makes the snapshot come back empty, which
-// renders as the last set the bar knew, stale and silent. OmniWM names
-// monitors with NSScreen.localizedName (Monitor.current() in its source),
-// so the name join works; its ids stay opaque ("display:…") and only ever
-// meet the query payloads they came from.
+// Monitor ids are resolved by display name every time the screens change,
+// never cached. A stale id returns an empty snapshot, which renders as
+// the last known set, stale and silent. OmniWM names monitors with
+// NSScreen.localizedName (Monitor.current() in its source), so the name
+// join works; its ids stay opaque and meet only the query payloads they
+// came from.
 func monitorIDs() -> [String: String] { // display name -> OmniWM display id
     guard omniwmActive() else { return [:] }
     var map: [String: String] = [:]
@@ -160,15 +158,9 @@ func repaint() {
 }
 
 // --- fullscreen ------------------------------------------------------------
-// sketchybar gets this for free: its windows sit at layer -20, below
-// normal windows, so a fullscreen window simply covers them while the
-// window manager's outer gap keeps tiled windows off the strip. This bar
-// sits above windows (it has to, to be visible while stacked under
-// sketchybar for comparison), so it has to decide for itself.
-//
-// A window manager's fullscreen and macOS native fullscreen look the same
-// from out here, and both should take the strip. A managed window never
-// starts at the display's top edge — the bar owns it.
+// A window manager's fullscreen and native macOS fullscreen look the same
+// from here, and both should take the strip. A managed window never
+// starts at the display's top edge, so a window that does is fullscreen.
 
 func safeTop(for display: CGRect) -> CGFloat {
     let primaryH = NSScreen.screens.first?.frame.height ?? 0
@@ -183,13 +175,12 @@ func safeTop(for display: CGRect) -> CGFloat {
 
 func fullscreenDisplays() -> Set<CGDirectDisplayID> {
     var covered: Set<CGDirectDisplayID> = []
-    // Under OmniWM the width test below cannot separate a tiled window
-    // from a fullscreen one: its 0.6.3 dwindle applies no outer gaps
-    // (resolved settings say 42, layout applies 0 — upstream bug, see
-    // docs/omniwm-port.md), so ordinary tiles take the side gaps too
-    // and EVERYTHING reads as fullscreen — the bar lived in
-    // hover-reveal permanently. Until the gap bug is fixed the bar
-    // stays visible under OmniWM, accepting that it overlaps a real
+    // Under OmniWM the width test below cannot tell a tiled window from
+    // a fullscreen one. Its 0.6.3 dwindle applies no outer gaps (an
+    // upstream bug: resolved settings say 42, layout applies 0; see
+    // docs/omniwm-port.md), so an ordinary tile takes the side gaps too
+    // and reads as fullscreen. Skip the check under OmniWM until that
+    // bug is fixed, and accept that the bar can overlap a real
     // fullscreen window instead of ducking away.
     if omniwmActive() { return covered }
     guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]]
@@ -206,12 +197,12 @@ func fullscreenDisplays() -> Set<CGDirectDisplayID> {
             let display = CGDisplayBounds(ids[i])
             guard display.intersects(rect) else { continue }
             let inset = safeTop(for: display)
-            // Height and top edge alone are NOT enough, measured: on a
-            // notched display the notch inset (32) and the gap a tiled
-            // window leaves for the bar (33) are the same edge, so an
-            // ordinary tiled Arc reads as fullscreen. WIDTH is what
+            // Height and top edge alone are not enough. On a notched
+            // display, the notch inset (32) and the gap a tiled window
+            // leaves for the bar (33) sit at the same edge, so an
+            // ordinary tiled window can read as fullscreen. Width
             // separates them: a fullscreen window takes the side gaps
-            // too, and a tiled one never does.
+            // too, a tiled one never does.
             if rect.origin.y - display.origin.y < inset + 3,
                rect.height >= display.height - inset - 6,
                rect.width >= display.width - 2 {
@@ -222,13 +213,10 @@ func fullscreenDisplays() -> Set<CGDirectDisplayID> {
     return covered
 }
 
-// Hidden by fullscreen, but reachable: put the pointer at the very top of
-// the screen and the bar comes back, the way the menu bar does. Watching a
-// film and wanting the brightness slider should not mean leaving the film.
-//
-// While revealed the bar has to climb ABOVE the fullscreen window — its
-// resting level of -20 is what hides it in the first place — and it drops
-// back down when the pointer leaves.
+// Hidden by fullscreen but reachable: putting the pointer at the very top
+// of the screen brings the bar back, like the native menu bar. While
+// revealed, the bar climbs above the fullscreen window (its resting
+// level of -20 is what hides it), and drops back when the pointer leaves.
 let barBaseLevel = NSWindow.Level(rawValue: -20)
 // above .screenSaver (1000), so an overlay at that level cannot cover it
 let barRevealLevel = NSWindow.Level(rawValue: 1002)
@@ -248,17 +236,18 @@ func setRevealed(_ show: Bool) {
 // nothing more.
 func pointerAtScreenTop() {
     let p = NSEvent.mouseLocation
-    // The rect has to be grown, not just used: CGRect.contains treats maxY
-    // as exclusive, so the pointer sitting on the very top row of pixels —
-    // exactly the gesture this listens for — counts as being on NO screen.
+    // Grow the rect before testing. CGRect.contains treats maxY as
+    // exclusive, so a pointer on the top row of pixels, which is the
+    // gesture this listens for, would otherwise count as being on no
+    // screen.
     guard let screen = NSScreen.screens.first(where: { $0.frame.insetBy(dx: 0, dy: -2).contains(p) })
     else { return }
     let fromTop = screen.frame.maxY - p.y
     if fromTop <= revealEdge {
-        // Climb only when fullscreen actually hides the bar. Otherwise stay
-        // at the -20 resting level so the auto-hidden native menu bar can
-        // slide in ABOVE the bar and stay clickable — app menus are
-        // unreachable by mouse without this.
+        // Climb only when fullscreen actually hides the bar. Otherwise
+        // stay at the -20 resting level, so the auto-hidden native menu
+        // bar can slide in above the bar and stay clickable. Without
+        // this, app menus are unreachable by mouse.
         if fullscreenDisplays().contains(screenID(screen)) {
             setRevealed(true)
         }
@@ -285,10 +274,10 @@ func updateBarVisibility() {
 
 // --- signals --------------------------------------------------------------
 
-// Pokes arrive as writes to a regular file. A regular file, deliberately:
-// a FIFO with no reader would block the writer if this daemon died.
-// .attrib catches a symlink swap that .write alone misses, and a
-// delete/rename re-arms instead of going deaf for the rest of the
+// Pokes arrive as writes to a regular file, not a FIFO: a FIFO with no
+// reader would block the writer if this daemon died. Watching .attrib
+// catches a symlink swap that .write alone misses. Watching delete and
+// rename lets it re-arm, instead of going deaf for the rest of the
 // daemon's life.
 func watch(_ path: String, create: Bool, handler: @escaping () -> Void) {
     if create, !FileManager.default.fileExists(atPath: path) {
@@ -313,12 +302,11 @@ func watch(_ path: String, create: Bool, handler: @escaping () -> Void) {
     src.resume()
 }
 
-// A window sent from one HIDDEN workspace to another moves nothing on
-// screen, so SkyLight reports nothing at all — measured with a probe:
-// not an order change, not a visibility change, no event of any kind.
-// No publisher exists for it, so the commands that do the moving say so
-// themselves (omacchiato-ws, and the overview's drag-reorder).
-// Super+K writes this; the bar has no key tap and should not grow one
+// A window sent from one hidden workspace to another moves nothing on
+// screen, so SkyLight reports no event at all, measured with a probe. No
+// publisher exists for this, so the commands that move windows announce
+// it themselves (omacchiato-ws, and the overview's drag-reorder).
+// Super+K writes this file. The bar has no key tap, and should not grow one.
 let cheatPath = "/tmp/omacchiato-bar-cheatsheet"
 watch(cheatPath, create: true) { toggleCheatsheet() }
 
@@ -352,25 +340,24 @@ watch(movedPath, create: true) {
 }
 
 // --- omniwm fast path -------------------------------------------------------
-// A switch between two EMPTY workspaces moves no windows, so SkyLight says
-// nothing. OmniWM publishes instead: its active-workspace
-// channel emits one event per change. `watch … --exec /bin/cat` rather
-// than `subscribe` because subscribe pretty-prints multi-line JSON while
-// watch hands its child exactly one NDJSON line per event, and the child
-// inherits this pipe (OmniWM docs/IPC-CLI.md, "watch") — so the stream
-// arrives line-delimited and the bar's side never forks anything.
+// A switch between two empty workspaces moves no windows, so SkyLight
+// says nothing. OmniWM publishes instead: its active-workspace channel
+// emits one event per change. Use `watch … --exec /bin/cat`, not
+// `subscribe`: subscribe pretty-prints multi-line JSON, while watch hands
+// its child one NDJSON line per event over an inherited pipe (OmniWM
+// docs/IPC-CLI.md, watch). The stream arrives line-delimited, and the bar
+// forks nothing.
 
 var omniWatch: Process?
 var omniWatchBuffer = Data()
 
 func omniWorkspaceBarEvent(_ line: Data) {
-    // The workspace-bar channel, not active-workspace: measured 2026-08-29,
-    // active-workspace (and focus) only fire when the FOCUSED WINDOW
-    // changes, so every switch to or from an EMPTY workspace is silent —
-    // OmniWM's own Super+8/9 left the pill frozen. Their bar highlights
-    // empties, so its scene channel fires on every switch, and carries
-    // per-monitor active flags plus each workspace's windows (occupancy
-    // and the app icons come free, no windows query).
+    // Use the workspace-bar channel, not active-workspace. Measured
+    // 2026-08-29: active-workspace and focus fire only when the focused
+    // window changes, so a switch to or from an empty workspace stays
+    // silent. workspace-bar fires on every switch and carries each
+    // workspace's windows, so occupancy and app icons come free, with no
+    // windows query.
     guard let root = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
           root["channel"] as? String == "workspace-bar",
           let payload = (root["result"] as? [String: Any])?["payload"] as? [String: Any],
@@ -422,9 +409,10 @@ func omniWorkspaceBarEvent(_ line: Data) {
 
 func startOmniWatch() {
     guard omniWatch == nil, omniwmActive() else { return }
-    // a bar killed by launchd (kickstart -k is SIGKILL) leaves its
-    // stream child alive under pid 1, one per restart — reap orphans
-    // before spawning ours; -P 1 cannot touch a living bar's child
+    // A bar killed by launchd (kickstart -k sends SIGKILL) leaves its
+    // stream child alive under pid 1, one per restart. Reap orphans
+    // before spawning a new one; -P 1 cannot touch a living bar's own
+    // child.
     let reap = Process()
     reap.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
     reap.arguments = ["-P", "1", "-f", "omniwmctl watch workspace-bar"]
@@ -513,21 +501,18 @@ NSWorkspace.shared.notificationCenter.addObserver(
     tlog(String(format: "frontapp %@ %.2f ms", name, ms))
 }
 
-// Displays come and go: re-resolve which OmniWM display this screen is
-// now, move the window onto it, and rebuild. Screen parameters arrive
-// before the arrangement settles, so give it a beat.
+// Displays come and go. Re-resolve which OmniWM display this screen is
+// now, move the window onto it, and rebuild. Give screen parameters a
+// beat to settle before reading them.
 //
-// This is also where a second display's set gets folded and unfolded.
-// Undocked, OmniWM moves that set's workspaces to the one display, but
-// their windows stay on two-digit workspaces that Super+N does not reach
-// from there. omacchiato-ws-collapse moves those windows into the empty 1-9
-// slots and remembers where they came from.
+// This is also where a second display's set folds and unfolds. Undocked,
+// OmniWM moves that set's workspaces to the one display, but their
+// windows stay on two-digit workspaces that Super+N cannot reach from
+// there. omacchiato-ws-collapse moves those windows into the empty 1-9
+// slots and remembers where they came from. The bar is the only
+// long-lived process already watching for this, so it owns folding.
 //
-// It used to be driven by sketchybar's display_change.sh, which went
-// out with sketchybar; nothing has called it since, so the first undock
-// after that stranded a workspace's worth of apps. The bar is the only
-// long-lived process already watching for this, so it owns it now.
-// Guarded on the COUNT changing: this notification also fires for
+// Guard on the count changing: this notification also fires for
 // resolution and arrangement changes, and re-folding on those would
 // shuffle windows for no reason.
 var monitorCount = NSScreen.screens.count
@@ -539,10 +524,10 @@ NotificationCenter.default.addObserver(
         rebuildSurfaces()
         applyShade() // a new display arrives at full output
         kickRebuild()
-        // the 1 s grace can still lose the race with the WM adopting
-        // the new display — its monitor id resolves to nothing and the
-        // screen stays barless (the Dell did, on replug). Same retry
-        // ladder the OmniWM launch observer uses.
+        // The 1 s grace can still lose the race with the WM adopting the
+        // new display: its monitor id resolves to nothing and the
+        // screen stays barless (measured on a Dell, on replug). Use the
+        // same retry ladder as the OmniWM launch observer.
         for delay in [3.0, 8.0] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                 rebuildSurfaces()
@@ -586,16 +571,16 @@ func kickRebuild() {
         }
     }
     pending = w
-    // 0.3s was priced against a snapshot that cost four subprocesses;
-    // one call later the coalescing window can be the part a person
-    // actually waits through
+    // This delay was sized for a snapshot that cost four subprocesses.
+    // Now that a snapshot is cheaper, this delay itself can be what a
+    // person notices most.
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: w)
 }
 
 let cid = SLSMainConnectionID()
-// move and resize only fire for SUBSCRIBED windows, and going fullscreen
-// is a resize — so the subscription set is kept equal to every normal
-// window, refreshed whenever one is created or destroyed.
+// Move and resize events fire only for subscribed windows, and going
+// fullscreen is a resize. Keep the subscription set equal to every
+// normal window, refreshed on create or destroy.
 var subscribed: Set<UInt32> = []
 func rebuildSubscriptions() {
     guard let list = CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID) as? [[String: Any]]
@@ -658,6 +643,7 @@ watch(FileManager.default.homeDirectoryForCurrentUser
     .appendingPathComponent(".config/omarchy/current").path, create: false) {
     let t0 = DispatchTime.now().uptimeNanoseconds
     palette = loadPalette()
+    applyPanelColors()
     iconCache.removeAll()
     repaint()
     if cheatWindow != nil { hideCheatsheet(); toggleCheatsheet() } // repaint in the new palette
@@ -695,16 +681,19 @@ func followAppearance() {
     }
 }
 followAppearance()
-let appearanceWatch = app.observe(\.effectiveAppearance) { _, _ in followAppearance() }
+applyPanelColors()
+let appearanceWatch = app.observe(\.effectiveAppearance) { _, _ in
+    followAppearance()
+    applyPanelColors()
+}
 
 // --- popup guard -----------------------------------------------------------
-// popup_guard.sh polls the cursor on a loop and greps item names to decide
-// whether a popup should still be open. Here the cursor is a published
-// event and the geometry is already known, so the rule is exact: a popup
-// closes when the pointer is in neither the bar nor the popup — which is
-// what "don't close it while I'm still in the bar" actually means.
+// A popup closes when the pointer sits in neither the bar nor the popup:
+// that is what "don't close it while I'm still in the bar" means. The
+// cursor is a published event and the geometry is already known, so the
+// rule can be exact.
 // The check runs a beat after the pointer leaves either surface, because
-// travelling from the bar to its popup crosses the gap between them and
+// moving from the bar to its popup crosses the gap between them, which
 // must not read as leaving.
 func scheduleHullCheck() {
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
@@ -723,8 +712,8 @@ func pointerLeftTheHull() -> Bool {
     return true
 }
 
-// the monitor must be RETAINED — dropping the returned token deregisters
-// it immediately, and the popup then never closes on its own
+// The monitor must be retained. Dropping the returned token deregisters
+// it at once, and the popup then never closes on its own.
 var popupGuardToken: Any?
 var revealToken: Any?
 revealToken = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { _ in pointerAtScreenTop() }
@@ -775,7 +764,7 @@ func attachVolumeListeners() {
     updateVolume()
 }
 
-// the microphone: same shape, on the default INPUT device
+// the microphone: same shape, on the default input device
 var micListeners: [(AudioObjectID, AudioObjectPropertyAddress, AudioObjectPropertyListenerBlock)] = []
 
 func attachMicListeners() {
@@ -830,8 +819,8 @@ if DSRegisterBrightnessNotifications(builtinDisplayID(), nil, brightnessProc) !=
     tlog("brightness notifications unavailable — pill updates on scroll only")
 }
 
-// night shift: same idea one layer up — the schedule flipping it is a
-// change nobody else would tell an open popup about
+// night shift: same idea, one layer up. The schedule flipping it is a
+// change nobody else would tell an open popup about.
 watchNightShift()
 
 // network: the same SCDynamicStore keys the watcher uses
@@ -866,9 +855,9 @@ NSWorkspace.shared.notificationCenter.addObserver(
     forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
 ) { _ in applyShade() }
 
-// media: Music broadcasts every state change itself, and the payload
-// already carries the track — so the pill repaints without asking anyone
-// anything. Launch and quit are the one pair it cannot announce.
+// media: Music broadcasts every state change, and the payload carries
+// the track, so the pill repaints without asking. Launch and quit are
+// the one pair it cannot announce.
 DistributedNotificationCenter.default().addObserver(
     forName: NSNotification.Name(musicNotification), object: nil, queue: .main
 ) { note in updateMedia(from: note.userInfo) }
@@ -896,7 +885,7 @@ func scheduleClock() {
 scheduleClock()
 
 if rightOrder.contains("weather") {
-    Timer.scheduledTimer(withTimeInterval: 1800, repeats: true) { _ in updateWeather() }
+    Timer.scheduledTimer(withTimeInterval: 1800, repeats: true) { _ in if !screenLocked { updateWeather() } }
 }
 
 // --- go -------------------------------------------------------------------
