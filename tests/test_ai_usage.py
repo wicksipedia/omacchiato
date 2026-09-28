@@ -51,12 +51,13 @@ class Panel(unittest.TestCase):
         today = date.today()
         stats = {"days": {today.isoformat(): [500, 1.0]}, "day_models": {}, "models": [],
                  "sessions": 1, "active_ms": 0,
-                 "prior": {(today - timedelta(days=7)).isoformat(): 300,
+                 "prior": {(today - timedelta(days=7)).isoformat(): {"Opus 5.5": 200, "Sonnet 5": 100},
                            (today - timedelta(days=13)).isoformat(): 40}}
         days = ai.panel({}, {}, stats)["days"]
         self.assertEqual(len(days), 7)
         self.assertEqual((days[-1]["date"], days[-1]["prior"]), (today.isoformat(), 300))
-        self.assertEqual(days[0]["prior"], 40)
+        self.assertEqual(days[-1]["prior_models"], {"Opus 5.5": 200, "Sonnet 5": 100})
+        self.assertEqual((days[0]["prior"], days[0]["prior_models"]), (40, {"Other": 40}))
         self.assertEqual(sum(d["prior"] for d in days), 340)
 
 
