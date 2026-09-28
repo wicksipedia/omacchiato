@@ -171,7 +171,10 @@ Left to right:
   Mac, System Settings, Recent Items (with app and file-type icons
   resolved locally, because AX exposes none), Force Quit and the power
   verbs, plus Omacchiato's theme row at the bottom, which names the
-  theme you are on and moves to the next one.
+  theme you are on and opens the theme picker. The picker shows each
+  theme on a small desktop with its wallpaper, bar and window borders.
+  Pick one theme, or one for the day and one for the night, and Apply
+  saves the choice to `theme.conf`.
 - **Workspaces**: one capsule per display, showing only that display's
   workspaces. A chip shows the icons of up to three apps on the
   workspace, fanned like a hand of cards, or the workspace's digit when

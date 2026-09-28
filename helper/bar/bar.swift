@@ -46,6 +46,7 @@ import MenuBarPanel
 import PRPanel
 import RowsPanel
 import StatusPanel
+import ThemePanel
 import WeatherPanel
 #endif
 
@@ -1944,6 +1945,7 @@ func closePopup() {
     popupSelection = nil
     popupColumns = []
     cascadeWork?.cancel()
+    appleShowsThemes = false
     openPopup = nil
     popupOwner?.view.needsDisplay = true
     popupOwner = nil
@@ -2008,6 +2010,9 @@ func panelView(_ name: String) -> AnyView? {
         case "top": return AnyView(TopActivityPanel(report: report, actions: activityActions))
         default: return AnyView(MonitorActivityPanel(report: report, actions: activityActions))
         }
+    case "apple" where appleShowsThemes:
+        popupShownRows = []
+        return AnyView(ThemePanel(report: themeReport(), actions: themeActions))
     case "apple", "appmenu":
         return cascadePanel(name)
     case "clock":
@@ -3418,13 +3423,40 @@ func appleMenuRows() -> [PopupRow] {
     guard !rows.isEmpty else { return appleRows() }
     if rows.last?.separator != true { rows.append(PopupRow(separator: true)) }
     rows.append(PopupRow(text: "Theme", detail: currentThemeName(), dim: true, action: {
-        closePopup()
-        DispatchQueue.global(qos: .userInitiated).async {
-            _ = shell("\(NSHomeDirectory())/.local/bin/theme-next", [])
-        }
+        cascadeWork?.cancel()
+        appMenuStack = []
+        popupSelection = nil
+        appleShowsThemes = true
+        refreshPopup()
     }, hover: { openSubmenu(nil, depth: 0, after: 0.2) }))
     return rows
 }
+
+// The Theme row of the Apple menu turns the popup into the theme picker.
+var appleShowsThemes = false
+
+// theme-set lives in the clone, next to the themes: follow its link there.
+let themesDir = URL(fileURLWithPath: NSHomeDirectory() + "/.local/bin/theme-set")
+    .resolvingSymlinksInPath().deletingLastPathComponent().deletingLastPathComponent()
+    .appendingPathComponent("themes")
+
+func themeReport() -> ThemeReport {
+    ThemeReport(directory: themesDir, spec: readConf("theme.conf")["theme"] ?? "",
+                darkNow: app.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua)
+}
+
+// theme-set writes theme.conf, so the choice outlives a restart.
+let themeActions: ThemeActions = {
+    var actions = ThemeActions()
+    actions.apply = { light, dark in
+        closePopup()
+        let spec = ThemeReport.spec(light: light, dark: dark)
+        DispatchQueue.global(qos: .userInitiated).async {
+            _ = shell(NSHomeDirectory() + "/.local/bin/theme-set", [spec])
+        }
+    }
+    return actions
+}()
 
 func appMenuRows() -> [PopupRow] {
     let opts = ["AXTrustedCheckOptionPrompt": true] as CFDictionary

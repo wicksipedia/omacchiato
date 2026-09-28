@@ -20,6 +20,7 @@ let package = Package(
                 .product(name: "MenuBarPanel", package: "ui"),
                 .product(name: "RowsPanel", package: "ui"),
                 .product(name: "ActivityPanel", package: "ui"),
+                .product(name: "ThemePanel", package: "ui"),
             ],
             path: "helper/bar",
             linkerSettings: [.unsafeFlags([
@@ -33,6 +34,7 @@ let package = Package(
             .product(name: "AIUsagePanel", package: "ui"),
             .product(name: "PRPanel", package: "ui"),
             .product(name: "ActivityPanel", package: "ui"),
+            .product(name: "ThemePanel", package: "ui"),
         ], path: "tests/bar"),
     ],
     swiftLanguageModes: [.v5]

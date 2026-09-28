@@ -16,6 +16,7 @@ let package = Package(
         .library(name: "MenuBarPanel", targets: ["MenuBarPanel"]),
         .library(name: "RowsPanel", targets: ["RowsPanel"]),
         .library(name: "ActivityPanel", targets: ["ActivityPanel"]),
+        .library(name: "ThemePanel", targets: ["ThemePanel"]),
     ],
     targets: [
         .target(name: "StatusGauge"),
@@ -27,6 +28,7 @@ let package = Package(
         .target(name: "MenuBarPanel", dependencies: ["StatusPanel"]),
         .target(name: "RowsPanel", dependencies: ["StatusPanel"]),
         .target(name: "ActivityPanel", dependencies: ["StatusPanel"]),
+        .target(name: "ThemePanel", dependencies: ["StatusPanel"]),
     ],
     swiftLanguageModes: [.v5]
 )
