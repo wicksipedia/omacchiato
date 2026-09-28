@@ -76,5 +76,23 @@ class Panel(unittest.TestCase):
         self.assertEqual(sum(d["prior"] for d in days), 340)
 
 
+class PillIcon(unittest.TestCase):
+    def test_one_provider_shows_the_icon_from_the_settings(self):
+        ai.PILL = [("claude", "5h")]
+        self.assertEqual(ai.pill_icon("20%", [{"label": "0:50"}], "", "X"), "X")
+
+    def test_one_provider_with_no_icon_set_shows_its_logo(self):
+        ai.PILL = [("claude", "5h")]
+        self.assertEqual(ai.pill_icon("20%", [], "", ""), ai.PROVIDERS["claude"]["glyph"])
+
+    def test_several_providers_leave_the_logos_to_the_parts(self):
+        ai.PILL = [("claude", "5h"), ("codex", "5h")]
+        self.assertEqual(ai.pill_icon("", [{"label": "20%"}], "!", "X"), "!")
+
+    def test_nothing_used_shows_the_idle_icon(self):
+        ai.PILL = [("claude", "5h")]
+        self.assertEqual(ai.pill_icon("", [], "", "X"), ai.IDLE_ICON)
+
+
 if __name__ == "__main__":
     unittest.main()

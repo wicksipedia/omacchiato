@@ -506,6 +506,16 @@ def label(quotas):
     return "%d%%" % shown[0][2], worst, reset
 
 
+def pill_icon(text, parts, mark, configured):
+    """The pill's own icon: the one in the settings, else the provider's logo.
+    With several providers each percent carries its logo, so the pill has none."""
+    if not text and not parts:
+        return IDLE_ICON + mark
+    if len(PILL) > 1:
+        return mark
+    return (configured or PROVIDERS.get(PILL[0][0], {}).get("glyph", "")) + mark
+
+
 def main():
     # label(), the rows and panel() read these
     global PILL, PANEL, OPEN, STACK
@@ -537,14 +547,10 @@ def main():
 
     text, colour, parts = label(quotas)
     payload = {"label": text, "color": colour, "rows": rows}
-    mark = health_mark([states[pid] for pid, _ in PILL])
     if parts:
         payload["parts"] = parts
-        payload["icon"] = mark
-    elif not text:
-        payload["icon"] = IDLE_ICON + mark
-    elif mark:
-        payload["icon"] = os.environ.get("OMACCHIATO_PILL_ICON", "") + mark
+    payload["icon"] = pill_icon(text, parts, health_mark([states[pid] for pid, _ in PILL]),
+                                os.environ.get("OMACCHIATO_PILL_ICON", ""))
     stats = None
     if tokscale:
         clients = [pid for pid in PANEL if pid in PROVIDERS]
