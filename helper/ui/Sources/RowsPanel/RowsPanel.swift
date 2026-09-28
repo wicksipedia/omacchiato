@@ -25,9 +25,43 @@ public struct PanelRow {
     public var submenu = false              // opens a menu of its own
     public var back = false                 // goes back to the menu above
     public var action: (() -> Void)?
+    public var onHover: (() -> Void)?       // the pointer came onto the row
     public var onSlide: ((Double) -> Void)?
 
     public init() {}
+}
+
+// Menus with submenus, as macOS shows them: each open submenu is a column
+// to the right, with its first item level with the row that opened it.
+public struct CascadePanel: View {
+    var columns: [[PanelRow]]
+    var open: [Int?]                        // per column, the row whose submenu shows
+    var selected: Int?                      // in the last column, from the arrow keys
+    var maxHeight: CGFloat
+
+    public init(columns: [[PanelRow]], open: [Int?], selected: Int? = nil, maxHeight: CGFloat = 800) {
+        self.columns = columns
+        self.open = open
+        self.selected = selected
+        self.maxHeight = maxHeight
+    }
+
+    public var body: some View {
+        HStack(alignment: .top, spacing: 2) {
+            ForEach(columns.indices, id: \.self) { i in
+                let last = i == columns.count - 1
+                RowsPanel(rows: columns[i], selected: last ? selected : open[i], maxHeight: maxHeight - top(i))
+                    .padding(.top, top(i))
+            }
+        }
+    }
+
+    // ponytail: the row heights of RowView, added up. A scrolled column
+    // puts its submenu too low. Measure with an anchor preference if that matters.
+    func top(_ i: Int) -> CGFloat {
+        guard i > 0, open.indices.contains(i - 1), let row = open[i - 1] else { return 0 }
+        return top(i - 1) + columns[i - 1][..<row].reduce(0) { $0 + ($1.separator ? 11 : 24) }
+    }
 }
 
 public struct RowsPanel: View {
@@ -136,7 +170,10 @@ struct RowView: View {
         .foregroundStyle(lit ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
         .background(lit ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.clear), in: .rect(cornerRadius: 6))
         .contentShape(.rect)
-        .onHover { hovered = $0 }
+        .onHover { on in
+            hovered = on
+            if on { row.onHover?() }
+        }
         .onTapGesture { action?() }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(action == nil ? [] : .isButton)

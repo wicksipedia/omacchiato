@@ -1918,6 +1918,7 @@ struct PopupRow {
     var inlineBar: Double? // 0...1 draws a track between the text and the detail
     var onSlide: ((Double) -> Void)?
     var action: (() -> Void)?
+    var hover: (() -> Void)? // the pointer came onto the row
     var tint: NSColor? // overrides the hero/dim colour for one row
     var barTint: NSColor? // colours the inline bar alone, leaving the label
     var iconTint: NSColor? // overrides the accent colour of the icon
@@ -1941,6 +1942,8 @@ func closePopup() {
     popupWindow = nil
     popupShownRows = []
     popupSelection = nil
+    popupColumns = []
+    cascadeWork?.cancel()
     openPopup = nil
     popupOwner?.view.needsDisplay = true
     popupOwner = nil
@@ -2005,6 +2008,8 @@ func panelView(_ name: String) -> AnyView? {
         case "top": return AnyView(TopActivityPanel(report: report, actions: activityActions))
         default: return AnyView(MonitorActivityPanel(report: report, actions: activityActions))
         }
+    case "apple", "appmenu":
+        return cascadePanel(name)
     case "clock":
         let report = calendarReport()
         switch pillModes["clock_panel"] {
@@ -2149,6 +2154,7 @@ func panelRow(_ row: PopupRow) -> PanelRow {
     out.iconTint = row.iconTint.map { Color(nsColor: $0) }
     out.open = row.open
     out.action = row.action
+    out.onHover = row.hover
     out.onSlide = row.onSlide
     return out
 }
@@ -2172,6 +2178,14 @@ func popupKey(_ code: Int) -> Bool {
             popupShownRows[$0].action != nil && popupShownRows[$0].slider == nil
         }
         popupSelection = nextSelection(clickable, from: popupSelection, by: code == 125 ? 1 : -1)
+        refreshPopup()
+    case 124: // →, into the selected submenu
+        guard let i = popupSelection, popupShownRows.indices.contains(i),
+              popupShownRows[i].icon == "›", let action = popupShownRows[i].action else { return false }
+        action()
+    case 123: // ←, out of a submenu
+        guard popupColumns.count > 1, let top = appMenuStack.popLast() else { return false }
+        popupSelection = popupColumns[popupColumns.count - 2].firstIndex { $0.icon == "›" && $0.text == top.title }
         refreshPopup()
     case 36, 76: // Return, Enter
         // with no row selected, Return still reaches the front app
@@ -3327,7 +3341,7 @@ func recentItemIcon(_ title: String, section: String) -> NSImage? {
     return nil
 }
 
-func rowsForMenu(_ element: AXUIElement, context: String = "",
+func rowsForMenu(_ element: AXUIElement, context: String = "", depth: Int,
                  collapseAlternates: Bool = false) -> [PopupRow] {
     let container = axChildren(element).first ?? element
     var rows: [PopupRow] = []
@@ -3360,10 +3374,7 @@ func rowsForMenu(_ element: AXUIElement, context: String = "",
             continue
         }
         if !axChildren(item).isEmpty {
-            rows.append(PopupRow(icon: "›", text: title, action: {
-                appMenuStack.append((title, item))
-                refreshPopup()
-            }))
+            rows.append(submenuRow(title, item, depth: depth))
         } else {
             rows.append(PopupRow(image: recents ? recentItemIcon(title, section: section) : nil,
                                  text: title, detail: menuShortcut(item), action: {
@@ -3371,7 +3382,7 @@ func rowsForMenu(_ element: AXUIElement, context: String = "",
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                     AXUIElementPerformAction(item, "AXPress" as CFString)
                 }
-            }))
+            }, hover: { openSubmenu(nil, depth: depth, after: 0.2) }))
         }
     }
     return rows
@@ -3403,10 +3414,7 @@ func appleMenuRows() -> [PopupRow] {
           let menubar = frontAppAXMenuBar(),
           let apple = axChildren(menubar).first
     else { return appleRows() }
-    if !appMenuStack.isEmpty {
-        return appMenuRows()
-    }
-    var rows = rowsForMenu(apple, collapseAlternates: true)
+    var rows = rowsForMenu(apple, depth: 0, collapseAlternates: true)
     guard !rows.isEmpty else { return appleRows() }
     if rows.last?.separator != true { rows.append(PopupRow(separator: true)) }
     rows.append(PopupRow(text: "Theme", detail: currentThemeName(), dim: true, action: {
@@ -3414,7 +3422,7 @@ func appleMenuRows() -> [PopupRow] {
         DispatchQueue.global(qos: .userInitiated).async {
             _ = shell("\(NSHomeDirectory())/.local/bin/theme-next", [])
         }
-    }))
+    }, hover: { openSubmenu(nil, depth: 0, after: 0.2) }))
     return rows
 }
 
@@ -3424,15 +3432,6 @@ func appMenuRows() -> [PopupRow] {
         return [PopupRow(text: "Grant Accessibility to omacchiato-bar", hero: true),
                 PopupRow(text: "System Settings opened the pane — toggle the bar on,", dim: true),
                 PopupRow(text: "Then click the app name again", dim: true)]
-    }
-    // drilled into a menu: its items, behind a back row
-    if let top = appMenuStack.last {
-        var rows = [PopupRow(icon: "‹", text: top.title, highlight: true, action: {
-            appMenuStack.removeLast()
-            refreshPopup()
-        })]
-        rows.append(contentsOf: rowsForMenu(top.element, context: top.title))
-        return rows
     }
     // NOT frontmostApplication: the click that opens this popup makes
     // the bar itself frontmost for a beat, and the popup bailed empty.
@@ -3447,13 +3446,62 @@ func appMenuRows() -> [PopupRow] {
     for item in axChildren(menubar).dropFirst() {
         let title = axString(item, "AXTitle")
         guard !title.isEmpty else { continue }
-        rows.append(PopupRow(icon: "›", text: title, action: {
-            appMenuStack.append((title, item))
-            refreshPopup()
-        }))
+        rows.append(submenuRow(title, item, depth: 0))
     }
-    if !rows.isEmpty { rows[0].highlight = true }
     return rows
+}
+
+// A row that opens a submenu: at once on a click or →, and after a short
+// hover, so a pointer that crosses other rows on its way into an open
+// submenu does not close it.
+func submenuRow(_ title: String, _ item: AXUIElement, depth: Int) -> PopupRow {
+    PopupRow(icon: "›", text: title,
+             action: { openSubmenu((title, item), depth: depth, after: 0) },
+             hover: { openSubmenu((title, item), depth: depth, after: 0.2) })
+}
+
+var cascadeWork: DispatchWorkItem?
+
+// Keep the submenus above `depth` open, and open `menu` after them.
+func openSubmenu(_ menu: (title: String, element: AXUIElement)?, depth: Int, after delay: Double) {
+    cascadeWork?.cancel()
+    let work = DispatchWorkItem {
+        let kept = Array(appMenuStack.prefix(depth))
+        let next = kept + (menu.map { [$0] } ?? [])
+        let same = next.count == appMenuStack.count
+            && zip(next, appMenuStack).allSatisfy { CFEqual($0.element, $1.element) }
+        guard !same else { return }
+        appMenuStack = next
+        popupSelection = nil
+        refreshPopup()
+        // → and a click select the first item of the new submenu, as macOS does
+        if menu != nil, delay == 0 {
+            popupSelection = popupShownRows.indices.first { popupShownRows[$0].action != nil }
+            refreshPopup()
+        }
+    }
+    cascadeWork = work
+    if delay == 0 { work.perform() } else { DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work) }
+}
+
+// The columns of an open Apple menu or app menu: the menu, then each open submenu.
+var popupColumns: [[PopupRow]] = []
+
+func cascadePanel(_ name: String) -> AnyView? {
+    var columns = [popupRows(for: name)]
+    guard !columns[0].isEmpty else { return nil }
+    for (i, level) in appMenuStack.enumerated() {
+        columns.append(rowsForMenu(level.element, context: level.title, depth: i + 1))
+    }
+    popupColumns = columns
+    popupShownRows = columns.last ?? []
+    if let i = popupSelection, !popupShownRows.indices.contains(i) { popupSelection = nil }
+    let open = columns.indices.map { i in
+        i < appMenuStack.count ? columns[i].firstIndex { $0.icon == "›" && $0.text == appMenuStack[i].title } : nil
+    }
+    let limit = (NSScreen.main?.visibleFrame.height ?? 800) - 40
+    return AnyView(CascadePanel(columns: columns.map { $0.map(panelRow) }, open: open,
+                                selected: popupSelection, maxHeight: limit))
 }
 
 // --- cheatsheet (Super+K) --------------------------------------------------

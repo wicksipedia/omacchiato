@@ -75,6 +75,23 @@ private let appMenu: [PanelRow] = [
     .make("Close All Windows and Quit the App With a Very Long Name", detail: "⌥⇧⌘W"),
 ]
 
+private let menus: [PanelRow] = ["Ghostty", "File", "Edit", "View", "Window", "Help"].map { .make($0, submenu: true) }
+
+private let file: [PanelRow] = [
+    .make("New Window", detail: "⌘N"),
+    .make("New Tab", detail: "⌘T"),
+    .make("Open Recent", submenu: true),
+    .rule,
+    .make("Close Window", detail: "⇧⌘W"),
+]
+
+private let recent: [PanelRow] = [
+    .make("omacchiato"),
+    .make("wicksipedia.com"),
+    .rule,
+    .make("Clear Menu"),
+]
+
 private struct Desk<Content: View>: View {
     @ViewBuilder var content: Content
 
@@ -91,6 +108,9 @@ private struct Desk<Content: View>: View {
 #Preview("Volume") { Desk { RowsPanel(rows: volume) } }
 #Preview("AirPods") { Desk { RowsPanel(rows: airpods) } }
 #Preview("App Menu, keys") { Desk { RowsPanel(rows: appMenu, selected: 2) } }
+#Preview("Submenus") {
+    Desk { CascadePanel(columns: [menus, file, recent], open: [1, 2, nil], selected: 1) }
+}
 #Preview("Long, scrolls") { Desk { RowsPanel(rows: Array(repeating: appMenu, count: 8).flatMap { $0 }, maxHeight: 400) } }
 #Preview("Volume, dark") { Desk { RowsPanel(rows: volume) }.preferredColorScheme(.dark) }
 #endif

@@ -179,9 +179,10 @@ Left to right:
   app wears a ring in the theme accent. Click a chip to jump. Scroll on
   the chips to step to the next or previous workspace.
 - **App menus**: click the front app's name and its menu bar drops into
-  a popup. File, Edit and the rest drill into their real items, nested
-  submenus included, and clicking a leaf performs it over AX without a
-  native menu appearing. Shortcuts sit right-aligned, and a menu taller
+  a popup. File, Edit and the rest open their real items to the side,
+  as macOS menus do, nested submenus included. Hover or click to open a
+  submenu, or use the arrow keys. Clicking an item performs it over AX
+  without a native menu appearing. Shortcuts sit right-aligned, and a menu taller
   than the screen scrolls.
 - **Media**: album art with artist and track from Apple Music. A title
   too long for the pill scrolls, moved by Core Animation so the bar
