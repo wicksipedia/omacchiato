@@ -83,9 +83,9 @@ IDLE_ICON = "\U0001f916"  # every provider at 0%: one glyph, no numbers
 
 
 def whole(left):
-    """The time to a reset for the pill, in its largest whole unit: 3d, 2h or 42m."""
+    """The time to a reset for the pill: 4:46 or 0:42, or 3d from one day up."""
     m = max(1, int(left) // 60)
-    return "%dd" % (m // 1440) if m >= 1440 else "%dh" % (m // 60) if m >= 60 else "%dm" % m
+    return "%dd" % (m // 1440) if m >= 1440 else "%d:%02d" % divmod(m, 60)
 
 
 def countdown(left):
