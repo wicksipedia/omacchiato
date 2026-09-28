@@ -56,14 +56,15 @@ def holders():
     found = []
     for line in out.stdout.splitlines():
         m = ASSERTION.match(line)
-        if not m or any(m.group(2) == name for name, _ in found):
+        if not m or any(name == m.group(2) for name, _, _ in found):
             continue
+        pid = int(m.group(1))
         executable, parent = process(m.group(1))
         if executable.startswith(SYSTEM_PREFIXES):
             continue
         if process(parent)[0].rsplit("/", 1)[-1] in AGENT_PARENTS:
             continue
-        found.append((m.group(2), m.group(3)))
+        found.append((m.group(2), pid, m.group(3)))
     return found
 
 
@@ -83,6 +84,12 @@ def duration(age):
     return f"{minutes}m" if minutes else "<1m"
 
 
+def panel_holder(name, pid, age):
+    """One holder in the panel object that the bar's keep-awake panel reads.
+    Keep in sync with KeepAwakeReport(json:) in helper/ui/Sources/KeepAwakePanel."""
+    return {"name": name, "pid": pid, "duration": duration(age)}
+
+
 def main():
     # nothing holding it is the ordinary state, and a pill for the ordinary
     # state is one more thing to read past
@@ -92,9 +99,10 @@ def main():
         return
 
     rows = [{"text": "Keeping Awake", "hero": True}]
-    rows += [{"text": name, "detail": duration(held)} for name, held in awake]
+    rows += [{"text": name, "detail": duration(age)} for name, _, age in awake]
+    panel = {"kind": "keep-awake", "holders": [panel_holder(*h) for h in awake]}
     print(json.dumps({"label": "", "icon": AWAKE_ICON, "color": "accent",
-                      "rows": rows}, ensure_ascii=False))
+                      "rows": rows, "panel": panel}, ensure_ascii=False))
 
 
 if __name__ == "__main__":

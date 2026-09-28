@@ -18,7 +18,7 @@ public struct GaugeStatusPanel: View {
     public var body: some View {
         VStack(spacing: 10) {
             hero
-            tiles
+            StatusTiles(report: report)
             if report.wifi.on {
                 PanelCard(title: "Networks", symbol: "wifi") {
                     NetworksList(wifi: report.wifi, actions: actions)
@@ -68,9 +68,17 @@ public struct GaugeStatusPanel: View {
         }
         .padding(.vertical, 6)
     }
+}
 
-    var tiles: some View {
-        let b = report.battery
+// The numbers as tiles, like the weather panel: power, health and mode,
+// then signal, link, channel and address.
+struct StatusTiles: View {
+    var report: StatusReport
+    var showBattery = true
+    var showWifi = true
+
+    var body: some View {
+        let b = showBattery ? report.battery : nil
         let w = report.wifi
         typealias Tile = (String, String, String, String?)
         var items: [Tile] = []
@@ -83,13 +91,13 @@ public struct GaugeStatusPanel: View {
             let symbol = mode == "low power" ? "leaf.fill" : "gauge.with.dots.needle.67percent"
             items.append(("Mode", symbol, mode.capitalized, b.thermal.map { "Thermal \($0)" }))
         }
-        if let rssi = w.rssi { items.append(("Signal", "wifi", "\(rssi) dBm", w.verdict)) }
-        if let rate = w.rate { items.append(("Link", "arrow.up.arrow.down", "\(rate) Mbps", w.security)) }
-        if let channel = w.channel {
+        if showWifi, let rssi = w.rssi { items.append(("Signal", "wifi", "\(rssi) dBm", w.verdict)) }
+        if showWifi, let rate = w.rate { items.append(("Link", "arrow.up.arrow.down", "\(rate) Mbps", w.security)) }
+        if showWifi, let channel = w.channel {
             let band = [w.band, w.width].compactMap { $0 }.joined(separator: " · ")
             items.append(("Channel", "antenna.radiowaves.left.and.right", "\(channel)", band))
         }
-        if let ip = report.ethernet?.ip ?? w.ip {
+        if showWifi, let ip = report.ethernet?.ip ?? w.ip {
             let router = report.ethernet.map { $0.router } ?? w.router
             items.append(("Address", "network", ip, router.map { "Router \($0)" }))
         }

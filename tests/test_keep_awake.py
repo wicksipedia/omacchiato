@@ -23,5 +23,11 @@ class Assertion(unittest.TestCase):
         self.assertEqual(m.groups(), ("812", "Vorssaint", "08:29:13"))
 
 
+class PanelHolder(unittest.TestCase):
+    def test_carries_the_pid_and_a_read_duration(self):
+        self.assertEqual(ka.panel_holder("Steam", 812, "01:26:17"),
+                         {"name": "Steam", "pid": 812, "duration": "1h 26m"})
+
+
 if __name__ == "__main__":
     unittest.main()

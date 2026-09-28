@@ -98,4 +98,18 @@ private let samples: [StatusReport] = [.onBattery, .charging, .lowPower, .wifiOf
 }
 
 #Preview("Gauge, dark") { Desk(colors: [.orange, .pink, .purple, .blue]) { GaugeStatusPanel(report: .onBattery) }.preferredColorScheme(.dark) }
+#Preview("Battery") { Desk(colors: [.orange, .pink, .purple, .blue]) { BatteryPanel(report: .onBattery) } }
+#Preview("Battery: charging") { Desk(colors: [.orange, .pink, .purple, .blue]) { BatteryPanel(report: .charging) } }
+#Preview("Battery: Low Power") { Desk(colors: [.orange, .pink, .purple, .blue]) { BatteryPanel(report: .lowPower) } }
+#Preview("Battery: no battery") { Desk(colors: [.orange, .pink, .purple, .blue]) { BatteryPanel(report: .desktop) } }
+#Preview("Battery: light") {
+    Desk(colors: [.mint, .cyan, .teal]) { BatteryPanel(report: .onBattery) }.preferredColorScheme(.light)
+}
+#Preview("Wi-Fi") { Desk(colors: [.orange, .pink, .purple, .blue]) { WifiPanel(report: .onBattery) } }
+#Preview("Wi-Fi: off") { Desk(colors: [.orange, .pink, .purple, .blue]) { WifiPanel(report: .wifiOff) } }
+#Preview("Wi-Fi: hotspot") { Desk(colors: [.orange, .pink, .purple, .blue]) { WifiPanel(report: .hotspot) } }
+#Preview("Wi-Fi: scanning") { Desk(colors: [.orange, .pink, .purple, .blue]) { WifiPanel(report: .desktop) } }
+#Preview("Wi-Fi: light") {
+    Desk(colors: [.mint, .cyan, .teal]) { WifiPanel(report: .onBattery) }.preferredColorScheme(.light)
+}
 #endif

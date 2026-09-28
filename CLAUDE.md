@@ -120,7 +120,12 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   once at startup.
 - Every popup is a SwiftUI view in a `PanelHost`. `panelView(name)`
   picks it: a panel of its own, a plugin's `panel` object, or
-  `RowsPanel`, which draws `popupRows(for:)` as a macOS menu.
+  `RowsPanel`, which draws `popupRows(for:)` as a macOS menu. Only the
+  Apple menu, the app menus and plugins with no `panel` use rows. The
+  built-in panels take a report from `PopupRows.swift`.
+  `ControlSlider` and `ControlTile` in `StatusParts.swift` draw the
+  Control Center slider and round button, by hand, because a system
+  control draws grey in a window that is not key.
   `panelRow` converts a `PopupRow`. The popup window never becomes key,
   so an event tap (`setPopupKeys`) gives a row popup its arrow keys,
   Return and Esc, and system controls there draw grey: draw them by hand.
@@ -179,8 +184,9 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   draws after its own icon and label. A `panel` object replaces the
   rows with a SwiftUI panel: `kind = ai-usage` for
   `helper/ui/Sources/AIUsagePanel`, `kind = github-prs` for
-  `helper/ui/Sources/PRPanel` and `kind = airpods` for
-  `helper/ui/Sources/AirPodsPanel`. `<pill>_panel` in `bar-pills.conf` picks
+  `helper/ui/Sources/PRPanel`, and `airpods`, `keep-awake`, `updates`
+  and `stats` for the panels of the same names. A plugin's panel calls
+  back through `runPluginCommand` or `runInTerminal` in `Popups.swift`. `<pill>_panel` in `bar-pills.conf` picks
   the design. Plugin commands run with
   the bar's TCC grants.
 - AppKit hit-tests a non-opaque window by alpha, so a pill background

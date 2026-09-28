@@ -15,7 +15,13 @@ import SwiftUI
 import StatusGauge
 import ActivityPanel
 import AirPodsPanel
+import BluetoothPanel
 import BarPills
+import DisplayPanel
+import KeepAwakePanel
+import SoundPanel
+import StatsPanel
+import UpdatesPanel
 import AIUsagePanel
 import CalendarPanel
 import MenuBarPanel
@@ -105,7 +111,8 @@ func showPopup(_ name: String, under anchor: NSRect, on surface: BarSurface, ali
 func hasPopup(_ name: String) -> Bool {
     switch name {
     case "weather": return weatherReport != nil
-    case "status", "clock", "menubar", "activity": return true
+    case "status", "clock", "menubar", "activity", "battery", "wifi", "bluetooth", "brightness": return true
+    case "volume": return readVolume() != nil
     default: return pluginPanels[name] != nil || !popupRows(for: name).isEmpty
     }
 }
@@ -135,6 +142,11 @@ func panelView(_ name: String) -> AnyView? {
         case "top": return AnyView(TopActivityPanel(report: report, actions: activityActions))
         default: return AnyView(MonitorActivityPanel(report: report, actions: activityActions))
         }
+    case "volume": return soundReport().map { AnyView(SoundPanel(report: $0, actions: soundActions)) }
+    case "brightness": return AnyView(DisplayPanel(report: displayReport(), actions: displayActions))
+    case "bluetooth": return AnyView(BluetoothPanel(report: bluetoothReport(), actions: bluetoothActions))
+    case "battery": return AnyView(BatteryPanel(report: statusReport(), actions: statusActions))
+    case "wifi": return AnyView(WifiPanel(report: statusReport(), actions: statusActions))
     case "apple" where appleShowsThemes:
         popupShownRows = []
         return AnyView(ThemePanel(report: themeReport(), actions: themeActions))
@@ -149,6 +161,24 @@ func panelView(_ name: String) -> AnyView? {
         }
     default:
         guard let json = pluginPanels[name] else { return rowsPanel(popupRows(for: name)) }
+        if let report = StatsReport(json: json) {
+            var actions = StatsActions()
+            actions.open = { url in
+                if url.scheme == "x-apple.systempreferences" { NSWorkspace.shared.open(url) }
+                closePopup()
+            }
+            return AnyView(StatsPanel(report: report, actions: actions))
+        }
+        if let report = KeepAwakeReport(json: json) {
+            var actions = KeepAwakeActions()
+            actions.openSettings = openBatterySettings
+            return AnyView(KeepAwakePanel(report: report, actions: actions))
+        }
+        if let report = UpdatesReport(json: json) {
+            var actions = UpdatesActions()
+            actions.update = { closePopup(); runInTerminal($0) }
+            return AnyView(UpdatesPanel(report: report, actions: actions))
+        }
         if let report = AirPodsReport(json: json) {
             return AnyView(AirPodsPanel(report: report, actions: airPodsActions(plugin: name, settings: report.settings)))
         }
@@ -181,15 +211,27 @@ func airPodsActions(plugin name: String, settings: URL?) -> AirPodsActions {
         if let settings, settings.scheme == "x-apple.systempreferences" { NSWorkspace.shared.open(settings) }
         closePopup()
     }
-    // The same path as a row's "run": argv to sh, then the plugin runs again.
-    actions.setMode = { mode in
-        guard let plugin = barPlugins.first(where: { $0.name == name }), !mode.run.isEmpty else { return }
-        DispatchQueue.global(qos: .userInitiated).async {
-            _ = shell("/bin/sh", ["-c", mode.run], env: pluginEnv(plugin))
-            runPlugin(plugin)
-        }
-    }
+    actions.setMode = { runPluginCommand(name, $0.run) }
     return actions
+}
+
+// A plugin's command in a terminal window, as a row's "terminal" runs it.
+func runInTerminal(_ command: String) {
+    guard !command.isEmpty else { return }
+    DispatchQueue.global(qos: .userInitiated).async {
+        _ = shell("/usr/bin/open", ["-na", terminalApp, "--args",
+                                    "--title=omacchiato-plugin", "--command=\(command)"])
+    }
+}
+
+// A panel button that runs a plugin's command: the same path as a row's
+// "run". The command is argv to sh, and the plugin runs again after it.
+func runPluginCommand(_ name: String, _ command: String) {
+    guard let plugin = barPlugins.first(where: { $0.name == name }), !command.isEmpty else { return }
+    DispatchQueue.global(qos: .userInitiated).async {
+        _ = shell("/bin/sh", ["-c", command], env: pluginEnv(plugin))
+        runPlugin(plugin)
+    }
 }
 
 func aiUsageActions(report command: String?) -> AIUsageActions {
@@ -200,11 +242,7 @@ func aiUsageActions(report command: String?) -> AIUsageActions {
     }
     actions.openReport = {
         closePopup()
-        guard let command, !command.isEmpty else { return }
-        DispatchQueue.global(qos: .userInitiated).async {
-            _ = shell("/usr/bin/open", ["-na", terminalApp, "--args",
-                                        "--title=omacchiato-plugin", "--command=\(command)"])
-        }
+        if let command { runInTerminal(command) }
     }
     return actions
 }

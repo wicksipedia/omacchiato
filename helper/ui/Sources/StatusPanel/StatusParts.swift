@@ -325,3 +325,103 @@ public func glyphImage(_ glyph: String, size: CGFloat) -> NSImage? {
     image.isTemplate = true
     return image
 }
+
+// A thick slider with its symbol inside, as Control Center draws volume and
+// brightness. Drawn by hand, as DrawnSlider is, because the popup window
+// never becomes key. A click on the symbol calls onSymbolTap, as a click
+// on the speaker mutes in Control Center.
+public struct ControlSlider: View {
+    var value: Double
+    var symbol: String
+    var tint: Color
+    var onSlide: (Double) -> Void
+    var onSymbolTap: (() -> Void)?
+    @State private var dragging: Double?
+
+    static let height: CGFloat = 26
+
+    public init(value: Double, symbol: String, tint: Color = PanelColors.accent,
+                onSlide: @escaping (Double) -> Void, onSymbolTap: (() -> Void)? = nil) {
+        self.value = value
+        self.symbol = symbol
+        self.tint = tint
+        self.onSlide = onSlide
+        self.onSymbolTap = onSymbolTap
+    }
+
+    public var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = Self.height
+            let shown = Swift.min(1, Swift.max(0, dragging ?? value))
+            ZStack(alignment: .leading) {
+                Capsule().fill(.fill.tertiary)
+                Capsule().fill(tint).frame(width: h + (w - h) * shown)
+                Image(systemName: symbol)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: h, height: h)
+            }
+            .contentShape(.capsule)
+            .gesture(DragGesture(minimumDistance: 0)
+                .onChanged { g in
+                    if onSymbolTap != nil, g.startLocation.x < h { return }
+                    let f = Swift.min(1, Swift.max(0, (g.location.x - h / 2) / (w - h)))
+                    dragging = f
+                    onSlide(f)
+                }
+                .onEnded { g in
+                    if let onSymbolTap, g.startLocation.x < h, abs(g.translation.width) < 4 { onSymbolTap() }
+                    dragging = nil
+                })
+        }
+        .frame(height: Self.height)
+        .accessibilityElement()
+        .accessibilityValue("\(Int((value * 100).rounded()))%")
+        .accessibilityAdjustableAction { direction in
+            onSlide(Swift.min(1, Swift.max(0, value + (direction == .increment ? 0.05 : -0.05))))
+        }
+    }
+}
+
+// A round button with a title beside it, as Control Center draws Night
+// Shift or a Bluetooth device. The circle fills with the tint while on.
+public struct ControlTile: View {
+    var title: String
+    var subtitle: String?
+    var symbol: String
+    var on: Bool
+    var tint: Color
+    var action: (() -> Void)?
+
+    public init(title: String, subtitle: String? = nil, symbol: String, on: Bool,
+                tint: Color = PanelColors.accent, action: (() -> Void)?) {
+        self.title = title
+        self.subtitle = subtitle
+        self.symbol = symbol
+        self.on = on
+        self.tint = tint
+        self.action = action
+    }
+
+    public var body: some View {
+        HoverRow(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: symbol)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(on ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+                    .frame(width: 28, height: 28)
+                    .background(on ? AnyShapeStyle(tint) : AnyShapeStyle(.fill.tertiary), in: .circle)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title).font(.system(size: 13)).lineLimit(1)
+                    if let subtitle {
+                        Text(subtitle).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(on ? [.isButton, .isSelected] : .isButton)
+    }
+}

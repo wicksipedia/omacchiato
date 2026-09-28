@@ -32,6 +32,10 @@ class Cpu(unittest.TestCase):
         self.assertEqual(stats.cpu_percent(" 150.0 a\n 50.0 b\n", 4), 50.0)
         self.assertEqual(stats.cpu_percent(" 900.0 a\n", 4), 100.0)
 
+    def test_top_values_keep_names_with_spaces(self):
+        self.assertEqual(stats.top_values(" 30.2 Microsoft Outlook\n 7.6 claude\n"),
+                         [("Microsoft Outlook", 30.2), ("claude", 7.6)])
+
     def test_top_rows_keep_names_with_spaces(self):
         rows = stats.top_rows(" 30.2 Microsoft Outlook\n 7.6 claude\n", lambda v: "%.0f%%" % v)
         self.assertEqual([(r["text"], r["detail"]) for r in rows],
@@ -41,6 +45,18 @@ class Cpu(unittest.TestCase):
 class Level(unittest.TestCase):
     def test_colour_turns_at_75_and_90(self):
         self.assertEqual([stats.level(p) for p in (74, 75, 89, 90)], [None, "yellow", "yellow", "red"])
+
+
+class Panel(unittest.TestCase):
+    def test_percent_is_a_share_not_a_percentage(self):
+        self.assertEqual(stats.panel("cpu", 42.0, cores=8)["percent"], 0.42)
+
+    def test_carries_the_metric_and_extra_fields(self):
+        obj = stats.panel("disk", 28.3, used=1, total=2, free=3, settings="x-apple.systempreferences:foo")
+        self.assertEqual(obj["kind"], "stats")
+        self.assertEqual(obj["metric"], "disk")
+        self.assertEqual((obj["used"], obj["total"], obj["free"]), (1, 2, 3))
+        self.assertEqual(obj["settings"], "x-apple.systempreferences:foo")
 
 
 if __name__ == "__main__":

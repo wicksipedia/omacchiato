@@ -19,6 +19,12 @@ let package = Package(
         .library(name: "ActivityPanel", targets: ["ActivityPanel"]),
         .library(name: "ThemePanel", targets: ["ThemePanel"]),
         .library(name: "AirPodsPanel", targets: ["AirPodsPanel"]),
+        .library(name: "SoundPanel", targets: ["SoundPanel"]),
+        .library(name: "DisplayPanel", targets: ["DisplayPanel"]),
+        .library(name: "BluetoothPanel", targets: ["BluetoothPanel"]),
+        .library(name: "UpdatesPanel", targets: ["UpdatesPanel"]),
+        .library(name: "KeepAwakePanel", targets: ["KeepAwakePanel"]),
+        .library(name: "StatsPanel", targets: ["StatsPanel"]),
     ],
     targets: [
         .target(name: "StatusGauge"),
@@ -33,6 +39,12 @@ let package = Package(
         .target(name: "ActivityPanel", dependencies: ["StatusPanel"]),
         .target(name: "ThemePanel", dependencies: ["StatusPanel"]),
         .target(name: "AirPodsPanel", dependencies: ["StatusPanel"]),
+        .target(name: "SoundPanel", dependencies: ["StatusPanel"]),
+        .target(name: "DisplayPanel", dependencies: ["StatusPanel"]),
+        .target(name: "BluetoothPanel", dependencies: ["StatusPanel"]),
+        .target(name: "UpdatesPanel", dependencies: ["StatusPanel"]),
+        .target(name: "KeepAwakePanel", dependencies: ["StatusPanel"]),
+        .target(name: "StatsPanel", dependencies: ["StatusPanel", "ActivityPanel"]),
     ],
     swiftLanguageModes: [.v5]
 )

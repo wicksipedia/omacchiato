@@ -14,7 +14,10 @@ import SwiftUI
 #if canImport(StatusGauge)
 import StatusGauge
 import ActivityPanel
+import BluetoothPanel
 import BarPills
+import DisplayPanel
+import SoundPanel
 import AIUsagePanel
 import CalendarPanel
 import MenuBarPanel
@@ -25,66 +28,122 @@ import ThemePanel
 import WeatherPanel
 #endif
 
-// --- row popups: the menus drawn by RowsPanel ------------------------------
+// --- built-in popups: the reports behind their panels ----------------------
 
-func brightnessRows() -> [PopupRow] {
+func displayReport() -> DisplayReport {
     var value: Float = 0
-    guard DSGetBrightness(builtinDisplayID(), &value) == 0 else { return [] }
-    var rows = [
-        PopupRow(icon: "󰃟", text: "\(Int((value * 100).rounded()))%",
-                 slider: Double(value),
-                 onSlide: { fraction in
-                     _ = DSSetBrightness(builtinDisplayID(), Float(fraction))
-                     updateBrightness()
-                 }),
-        PopupRow(icon: "\u{F0594}", text: "\(Int((shade * 100).rounded()))%",
-                 slider: shade,
-                 onSlide: { setShade($0) }),
-    ]
-    // Read fresh on each build: the row shows what CoreBrightness says now.
-    // A Mac without Night Shift gets no row, not a wrong one.
-    if let ns = blueLightStatus(), ns.available.boolValue {
-        let on = ns.enabled.boolValue
-        rows.append(PopupRow(text: "Night Shift \(on ? "On" : "Off")", action: {
-            setNightShift(!on)
-            refreshPopup()
-        }))
+    let brightness = DSGetBrightness(builtinDisplayID(), &value) == 0 ? Double(value) : nil
+    // Read fresh on each build: the tile shows what CoreBrightness says now.
+    // A Mac without Night Shift gets no tile, not a wrong one.
+    let ns = blueLightStatus()
+    return DisplayReport(brightness: brightness, shade: shade,
+                         nightShift: ns?.available.boolValue == true ? ns?.enabled.boolValue : nil)
+}
+
+let displayActions: DisplayActions = {
+    var actions = DisplayActions()
+    actions.setBrightness = { fraction in
+        _ = DSSetBrightness(builtinDisplayID(), Float(fraction))
+        updateBrightness()
     }
-    rows.append(PopupRow(text: "Display Settings…", dim: true, action: {
+    actions.setShade = { setShade($0) }
+    actions.toggleNightShift = {
+        setNightShift(!(blueLightStatus()?.enabled.boolValue ?? false))
+        refreshPopup()
+    }
+    actions.openSettings = {
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Displays-Settings.extension")!)
         closePopup()
-    }))
-    return rows
+    }
+    return actions
+}()
+
+func audioTransport(_ id: AudioDeviceID) -> SoundReport.Transport {
+    var addr = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyTransportType,
+                                          mScope: kAudioObjectPropertyScopeGlobal,
+                                          mElement: kAudioObjectPropertyElementMain)
+    var kind: UInt32 = 0
+    var size = UInt32(MemoryLayout<UInt32>.size)
+    guard AudioObjectGetPropertyData(id, &addr, 0, nil, &size, &kind) == noErr else { return .other }
+    switch kind {
+    case kAudioDeviceTransportTypeBuiltIn: return .builtIn
+    case kAudioDeviceTransportTypeBluetooth, kAudioDeviceTransportTypeBluetoothLE: return .bluetooth
+    case kAudioDeviceTransportTypeHDMI, kAudioDeviceTransportTypeDisplayPort: return .display
+    case kAudioDeviceTransportTypeAirPlay: return .airPlay
+    case kAudioDeviceTransportTypeUSB: return .usb
+    case kAudioDeviceTransportTypeVirtual, kAudioDeviceTransportTypeAggregate: return .virtual
+    default: return .other
+    }
 }
 
-func volumeRows() -> [PopupRow] {
-    guard let v = readVolume() else { return [] }
-    var rows: [PopupRow] = [
-        PopupRow(icon: v.muted ? "󰝟" : "󰕾", text: v.muted ? "mute" : "\(v.percent)%",
-                 slider: Double(v.percent) / 100,
-                 onSlide: { fraction in
-                     writeVolume(Int((fraction * 100).rounded()))
-                     updateVolume()
-                 }),
-    ]
-    // Lists output devices with the current one marked. `omacchiato-helper
-    // audio` offers the same list; this reads it in process instead.
+func soundReport() -> SoundReport? {
+    guard let v = readVolume() else { return nil }
     let current = defaultOutputDevice()
-    for device in audioOutputDevices() {
-        rows.append(PopupRow(icon: device.id == current ? "󰄬" : " ", text: device.name,
-                             highlight: device.id == current,
-                             action: {
-                                 setDefaultOutputDevice(device.id)
-                                 updateVolume()
-                                 refreshPopup()
-                             }))
+    return SoundReport(volume: Double(v.percent) / 100, muted: v.muted,
+                       outputs: audioOutputDevices().map {
+                           .init(id: $0.id, name: $0.name, transport: audioTransport($0.id), current: $0.id == current)
+                       })
+}
+
+let soundActions: SoundActions = {
+    var actions = SoundActions()
+    actions.setVolume = { fraction in
+        writeVolume(Int((fraction * 100).rounded()))
+        updateVolume()
     }
-    rows.append(PopupRow(text: "Sound Settings…", dim: true, action: {
+    actions.toggleMute = { toggleMute(); updateVolume(); refreshPopup() }
+    actions.selectOutput = { id in
+        setDefaultOutputDevice(id)
+        updateVolume()
+        refreshPopup()
+    }
+    actions.openSettings = {
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Sound-Settings.extension")!)
         closePopup()
-    }))
-    return rows
+    }
+    return actions
+}()
+
+func bluetoothKind(_ device: IOBluetoothDevice) -> BluetoothReport.Kind {
+    let minor = device.deviceClassMinor
+    switch device.deviceClassMajor {
+    case 0x01: return .computer
+    case 0x02: return .phone
+    case 0x04: return .audio
+    case 0x05:
+        // Peripheral minor class: 0x10 keyboard, 0x20 pointing, low bits 0x01 joystick, 0x02 gamepad.
+        if minor & 0x0F == 0x01 || minor & 0x0F == 0x02 { return .gamepad }
+        if minor & 0x10 != 0 { return .keyboard }
+        if minor & 0x20 != 0 { return (device.name ?? "").contains("Trackpad") ? .trackpad : .mouse }
+        return .other
+    default: return .other
+    }
 }
+
+func bluetoothReport() -> BluetoothReport {
+    guard CBCentralManager.authorization == .allowedAlways else { return BluetoothReport(allowed: false) }
+    let devices = ((IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice]) ?? []).map { d in
+        BluetoothReport.Device(id: d.addressString ?? "", name: d.name ?? d.addressString ?? "Device",
+                               kind: bluetoothKind(d), connected: d.isConnected())
+    }
+    return BluetoothReport(devices: devices)
+}
+
+let bluetoothActions: BluetoothActions = {
+    var actions = BluetoothActions()
+    actions.toggle = { address in
+        guard let device = IOBluetoothDevice(addressString: address) else { return }
+        // Connecting is async; a device out of range can block for seconds.
+        if device.isConnected() { device.closeConnection() } else { device.openConnection(bluetoothWatcher) }
+        updateBluetooth()
+        refreshPopup()
+    }
+    actions.openSettings = {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.BluetoothSettings")!)
+        closePopup()
+    }
+    return actions
+}()
 
 func batteryInfo() -> StatusReport.Battery? {
     guard let blob = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
@@ -134,99 +193,6 @@ func openBatterySettings() {
     closePopup()
 }
 
-func batteryRows() -> [PopupRow] {
-    var rows: [PopupRow] = []
-    let b = batteryInfo()
-    if let b {
-        rows.append(PopupRow(text: "Battery", detail: "\(b.percent)%", hero: true,
-                             inlineBar: Double(b.percent) / 100, tint: b.low ? .systemRed : nil))
-        rows.append(PopupRow(text: b.charging ? "charging" : (b.onAC ? "charged, on AC" : "on battery"),
-                             detail: b.timeText ?? ""))
-    }
-    rows.append(PopupRow(separator: true))
-    if let mode = b?.mode { rows.append(PopupRow(text: "Mode", detail: mode)) }
-    if let thermal = b?.thermal { rows.append(PopupRow(text: "Thermal", detail: thermal)) }
-    if let watts = b?.watts {
-        rows.append(PopupRow(text: b?.charging == true ? "charging at" : "draw", detail: String(format: "%.1f W", watts)))
-    }
-    if let adapter = b?.adapterWatts { rows.append(PopupRow(text: "Adapter", detail: "\(adapter) W")) }
-    rows.append(PopupRow(separator: true))
-    if let health = b?.health {
-        let verdict = health >= 90 ? "" : (health >= 80 ? "  fair" : "  worn")
-        rows.append(PopupRow(text: "Health", detail: "\(health)%\(verdict)"))
-    }
-    if let cycles = b?.cycles { rows.append(PopupRow(text: "Cycles", detail: "\(cycles)")) }
-    rows.append(PopupRow(separator: true))
-    rows.append(PopupRow(text: "Battery Settings…", dim: true, action: openBatterySettings))
-    return rows
-}
-
-func wifiRows() -> [PopupRow] {
-    let w = wifiInfo()
-    var rows: [PopupRow] = [PopupRow(text: w.ssid ?? "wi-fi", hero: true)]
-    rows.append(PopupRow(text: "IP \(w.ip ?? "none")"))
-    if let router = w.router { rows.append(PopupRow(text: "Router \(router)")) }
-    if let rssi = w.rssi {
-        let verdict = rssi >= -55 ? "excellent" : (rssi >= -67 ? "good" : (rssi >= -75 ? "fair" : "weak"))
-        rows.append(PopupRow(text: "Signal \(rssi) dBm  \(verdict)"))
-    }
-    // The Link row answers two questions: how fast, and how safe.
-    let link = [w.rate.map { "\($0) Mbps" }, w.security].compactMap { $0 }
-    if !link.isEmpty { rows.append(PopupRow(text: "Link " + link.joined(separator: "  "))) }
-    if let channel = w.channel {
-        rows.append(PopupRow(text: (["channel \(channel)"] + [w.band, w.width].compactMap { $0 }).joined(separator: "  ")))
-    }
-    rows.append(PopupRow(separator: true))
-    rows.append(PopupRow(text: "Networks", dim: true))
-    // The current network leads the list with a tick, matching the macOS
-    // menu. A lock on every row would say nothing, so only an open
-    // network gets a label.
-    if let current = w.ssid, !current.isEmpty {
-        rows.append(PopupRow(icon: "\u{F012C}", text: current, highlight: true, iconTint: palette.accent))
-    }
-    for network in w.networks {
-        rows.append(PopupRow(icon: wifiStrengthGlyph(network.rssi), text: network.ssid,
-                             detail: network.open ? "open" : "", action: { joinWifi(network.ssid) }))
-    }
-    if w.networks.isEmpty, w.scanning { rows.append(PopupRow(text: "Looking…", dim: true)) }
-    if !w.phones.isEmpty {
-        rows.append(PopupRow(separator: true))
-        rows.append(PopupRow(text: "Phones", dim: true))
-        for phone in w.phones {
-            rows.append(PopupRow(icon: "\u{F011C}", text: phone.name,
-                                 detail: phone.connected ? "connected" : phone.battery.map { "\($0)%" } ?? "",
-                                 highlight: phone.connected,
-                                 action: phone.connected ? nil : { startHotspot(named: phone.name) }))
-        }
-    }
-    rows.append(PopupRow(text: "Network Settings…", dim: true, action: openNetworkSettings))
-    return rows
-}
-
-func bluetoothRows() -> [PopupRow] {
-    var rows: [PopupRow] = [PopupRow(text: "Bluetooth", hero: true)]
-    guard CBCentralManager.authorization == .allowedAlways else {
-        rows.append(PopupRow(text: "No permission in this launch context", dim: true))
-        return rows
-    }
-    for device in (IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice]) ?? [] {
-        let name = device.name ?? device.addressString ?? "device"
-        rows.append(PopupRow(icon: device.isConnected() ? "󰂱" : "󰂯", text: name,
-                             highlight: device.isConnected(),
-                             action: {
-                                 // Connecting is async; a device out of range can block for seconds.
-                                 if device.isConnected() { device.closeConnection() } else { device.openConnection(bluetoothWatcher) }
-                                 updateBluetooth()
-                                 refreshPopup()
-                             }))
-    }
-    rows.append(PopupRow(text: "Bluetooth Settings…", dim: true, action: {
-        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.BluetoothSettings")!)
-        closePopup()
-    }))
-    return rows
-}
-
 // The system menu that the hidden native menu bar carries, plus the two
 // omacchiato actions. "Reload Bar" has no counterpart on purpose: there
 // is no config to reread, the theme is watched, and a row that does
@@ -263,11 +229,6 @@ func appleRows() -> [PopupRow] {
 func popupRows(for name: String) -> [PopupRow] {
     switch name {
     case "apple": return appleMenuRows()
-    case "battery": return batteryRows()
-    case "brightness": return brightnessRows()
-    case "volume": return volumeRows()
-    case "wifi": return wifiRows()
-    case "bluetooth": return bluetoothRows()
     case "appmenu": return appMenuRows()
     default:
         return foldSections(name, pluginRows[name] ?? [])

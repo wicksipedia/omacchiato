@@ -41,14 +41,25 @@ def gib(n):
     return gb(n, 1 << 30)
 
 
-def top_rows(ps_out, fmt):
-    """Rows for the first TOP lines of `ps -Aceo <value>=,comm=`."""
-    rows = []
+def top_values(ps_out):
+    """(name, value) pairs for the first TOP lines of `ps -Aceo <value>=,comm=`."""
+    values = []
     for line in ps_out.splitlines()[:TOP]:
         value, _, name = line.strip().partition(" ")
         if name:
-            rows.append({"text": name.strip(), "detail": fmt(float(value)), "dim": True})
-    return rows
+            values.append((name.strip(), float(value)))
+    return values
+
+
+def top_rows(ps_out, fmt):
+    """Rows for the first TOP lines of `ps -Aceo <value>=,comm=`."""
+    return [{"text": name, "detail": fmt(value), "dim": True} for name, value in top_values(ps_out)]
+
+
+def panel(metric, pct, **extra):
+    """The data of the bar's SwiftUI panel. Keep in sync with
+    StatsReport(json:) in helper/ui/Sources/StatsPanel/StatsReport.swift."""
+    return {"kind": "stats", "metric": metric, "percent": pct / 100, **extra}
 
 
 def cpu_percent(ps_out, cores):
@@ -58,13 +69,16 @@ def cpu_percent(ps_out, cores):
 
 
 def cpu():
+    cores = os.cpu_count() or 1
     out = run("/bin/ps", "-Aceo", "pcpu=,comm=", "-r")
-    pct = cpu_percent(out, os.cpu_count() or 1)
+    pct = cpu_percent(out, cores)
     rows = [{"text": "CPU", "hero": True, "detail": "%.0f%%" % pct},
-            {"text": "In Use", "bar": pct / 100, "detail": "%d cores" % (os.cpu_count() or 1)},
+            {"text": "In Use", "bar": pct / 100, "detail": "%d cores" % cores},
             {"separator": True}]
     rows += top_rows(out, lambda v: "%.0f%%" % v)
-    return pct, rows
+    # ps reports pcpu as a percent of one core, matching StatsReport.Process's cpu share
+    top = [{"name": name, "value": value / 100} for name, value in top_values(out)]
+    return pct, rows, panel("cpu", pct, cores=cores, top=top)
 
 
 def parse_vm_stat(text):
@@ -93,8 +107,10 @@ def ram():
             {"text": "Compressed", "detail": gib(compressed), "dim": True},
             {"separator": True}]
     # ps reports rss in KB
-    rows += top_rows(run("/bin/ps", "-Aceo", "rss=,comm=", "-m"), lambda v: gib(v * 1024))
-    return pct, rows
+    ps_out = run("/bin/ps", "-Aceo", "rss=,comm=", "-m")
+    rows += top_rows(ps_out, lambda v: gib(v * 1024))
+    top = [{"name": name, "value": value * 1024} for name, value in top_values(ps_out)]
+    return pct, rows, panel("ram", pct, used=used, total=total, app=app, wired=wired, compressed=compressed, top=top)
 
 
 def disk():
@@ -102,12 +118,12 @@ def disk():
     usage = shutil.disk_usage("/")
     used = usage.total - usage.free
     pct = 100.0 * used / usage.total
+    settings = "x-apple.systempreferences:com.apple.settings.Storage"
     rows = [{"text": "Disk", "hero": True, "detail": "%s free" % gb(usage.free)},
             {"text": "In Use", "bar": pct / 100, "detail": "%s of %s" % (gb(used), gb(usage.total))},
             {"separator": True},
-            {"text": "Storage Settings…", "dim": True,
-             "url": "x-apple.systempreferences:com.apple.settings.Storage"}]
-    return pct, rows
+            {"text": "Storage Settings…", "dim": True, "url": settings}]
+    return pct, rows, panel("disk", pct, used=used, total=usage.total, free=usage.free, settings=settings)
 
 
 def main():
@@ -115,8 +131,8 @@ def main():
     source = {"cpu": cpu, "ram": ram, "disk": disk}.get(kind)
     if not source:
         sys.exit("usage: omacchiato-stats cpu|ram|disk")
-    pct, rows = source()
-    out = {"icon": ICONS[kind], "label": "%.0f%%" % pct, "rows": rows}
+    pct, rows, panel_obj = source()
+    out = {"icon": ICONS[kind], "label": "%.0f%%" % pct, "rows": rows, "panel": panel_obj}
     if level(pct):
         out["color"] = level(pct)
     print(json.dumps(out))
