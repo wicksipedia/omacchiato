@@ -337,8 +337,10 @@ func showPluginProblem(_ plugin: BarPlugin, _ problem: (what: String, detail: St
 func runPlugin(_ plugin: BarPlugin) {
     guard Thread.isMainThread else { DispatchQueue.main.async { runPlugin(plugin) }; return }
     guard pluginIsActive(plugin), pluginGate.start(plugin.name) else { return }
+    let force = forcedRefresh.remove(plugin.name) != nil
     DispatchQueue.global(qos: .utility).async {
-        let env = pluginEnv(plugin)
+        var env = pluginEnv(plugin)
+        if force { env["OMACCHIATO_REFRESH"] = "1" }
         let limit = max(plugin.interval, 30)
         let result = execute("/bin/sh", ["-c", plugin.command], env: env, timeout: limit)
         if let problem = pluginProblem(result, limit: limit) {
@@ -396,6 +398,17 @@ func runPlugin(_ plugin: BarPlugin) {
 var screenLocked = false
 
 var pluginTimers: [String: Timer] = [:]
+
+// Plugins whose next run skips the script's cache, from a click on a
+// panel's "Updated" stamp. A run already under way keeps the mark for the
+// run after it, which the gate folds the request into.
+var forcedRefresh: Set<String> = []
+
+func refreshPlugin(_ name: String) {
+    guard let plugin = barPlugins.first(where: { $0.name == name }) else { return }
+    forcedRefresh.insert(name)
+    runPlugin(plugin)
+}
 
 func activePlugins() -> [BarPlugin] { barPlugins.filter { rightOrder.contains($0.name) } }
 

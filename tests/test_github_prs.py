@@ -32,6 +32,15 @@ class Cache(unittest.TestCase):
             self.assertIsNone(gh.fresh("-repo:a/b", 1000 + gh.FRESH_S))
             self.assertIsNone(gh.fresh("", 1001))
 
+    def test_a_refresh_skips_an_answer_older_than_the_floor(self):
+        import json, os, tempfile
+        with tempfile.TemporaryDirectory() as d:
+            gh.CACHE = os.path.join(d, "cache.json")
+            with open(gh.CACHE, "w") as f:
+                json.dump({"at": 1000, "key": "", "payload": {"label": "2"}}, f)
+            self.assertIsNone(gh.fresh("", 1000 + gh.REFRESH_FLOOR_S, gh.REFRESH_FLOOR_S))
+            self.assertEqual(gh.fresh("", 1000 + gh.REFRESH_FLOOR_S - 1, gh.REFRESH_FLOOR_S), {"label": "2"})
+
 
 class Render(unittest.TestCase):
     def test_list(self):

@@ -86,6 +86,18 @@ class Panel(unittest.TestCase):
 
 
 
+class Refresh(unittest.TestCase):
+    def test_a_refresh_request_shortens_the_cache_to_the_floor(self):
+        import os
+        os.environ.pop("OMACCHIATO_REFRESH", None)
+        self.assertEqual(ai.max_age(), ai.FRESH_S)
+        os.environ["OMACCHIATO_REFRESH"] = "1"
+        try:
+            self.assertEqual(ai.max_age(), ai.REFRESH_FLOOR_S)
+        finally:
+            del os.environ["OMACCHIATO_REFRESH"]
+
+
 class PillIcon(unittest.TestCase):
     def test_one_provider_shows_the_icon_from_the_settings(self):
         ai.PILL = [("claude", "5h")]

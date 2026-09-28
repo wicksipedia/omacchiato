@@ -21,7 +21,7 @@ public struct RemindersPRPanel: View {
 
     public var body: some View {
         VStack(spacing: 10) {
-            StaleNote(report: report)
+            StaleNote(report: report, refresh: actions.refresh)
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible())], spacing: 8) {
                 ForEach(Self.tiles, id: \.self) { tile($0) }
             }
@@ -47,7 +47,7 @@ public struct RemindersPRPanel: View {
                 }
             }
             if let updated = report.updatedStamp {
-                UpdatedStamp(updated, staleAfter: PRReport.staleAfter)
+                UpdatedStamp(updated, staleAfter: PRReport.staleAfter, refresh: actions.refresh)
             }
             SettingsRow(title: "All Pull Requests", detail: "github.com", action: actions.openAll)
         }
@@ -93,7 +93,7 @@ public struct InboxPRPanel: View {
 
     public var body: some View {
         VStack(spacing: 10) {
-            StaleNote(report: report)
+            StaleNote(report: report, refresh: actions.refresh)
             StageBar(report: report)
             if report.prs.isEmpty { PanelCard { EmptyPRs() } }
             ForEach(PRReport.Stage.allCases, id: \.self) { stage in
@@ -107,7 +107,7 @@ public struct InboxPRPanel: View {
                 }
             }
             if let updated = report.updatedStamp {
-                UpdatedStamp(updated, staleAfter: PRReport.staleAfter)
+                UpdatedStamp(updated, staleAfter: PRReport.staleAfter, refresh: actions.refresh)
             }
             SettingsRow(title: "All Pull Requests", detail: "github.com", action: actions.openAll)
         }
@@ -164,7 +164,7 @@ public struct TrackerPRPanel: View {
 
     public var body: some View {
         VStack(spacing: 10) {
-            StaleNote(report: report)
+            StaleNote(report: report, refresh: actions.refresh)
             if report.prs.isEmpty { PanelCard { EmptyPRs() } }
             ForEach(report.repos, id: \.name) { repo in
                 PanelCard {
@@ -196,7 +196,7 @@ public struct TrackerPRPanel: View {
                 }
             }
             if let updated = report.updatedStamp {
-                UpdatedStamp(updated, staleAfter: PRReport.staleAfter)
+                UpdatedStamp(updated, staleAfter: PRReport.staleAfter, refresh: actions.refresh)
             }
             SettingsRow(title: "All Pull Requests", detail: "github.com", action: actions.openAll)
         }

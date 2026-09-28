@@ -114,6 +114,8 @@ struct RepoHeader: View {
 // The list is old: GitHub was out of reach on the last run.
 struct StaleNote: View {
     var report: PRReport
+    var refresh: (() -> Void)?
+    @State private var retrying = false
 
     var body: some View {
         if let problem = report.problem {
@@ -123,6 +125,19 @@ struct StaleNote: View {
                          ?? "Could not read GitHub")
                         .font(.system(size: 12, weight: .semibold))
                     Text(problem).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(2)
+                    if let refresh {
+                        Text(retrying ? "Trying again…" : "Try Again")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(PanelColors.accent)
+                            .padding(.top, 3)
+                            .contentShape(.rect)
+                            .onTapGesture {
+                                guard !retrying else { return }
+                                retrying = true
+                                refresh()
+                            }
+                            .accessibilityAddTraits(.isButton)
+                    }
                 }
             } icon: {
                 Image(systemName: "wifi.exclamationmark").foregroundStyle(PanelColors.orange)
@@ -130,6 +145,12 @@ struct StaleNote: View {
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(PanelColors.orange.opacity(0.12), in: .rect(cornerRadius: 12))
+            .onChange(of: report.updated) { retrying = false }
+            .task(id: retrying) {
+                guard retrying else { return }
+                try? await Task.sleep(for: .seconds(30))
+                retrying = false
+            }
         }
     }
 }

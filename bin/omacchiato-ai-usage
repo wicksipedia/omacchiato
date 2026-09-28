@@ -53,6 +53,7 @@ COMPONENT_INDICATOR = {"operational": "none", "degraded_performance": "minor",
                        "major_outage": "critical"}
 
 FRESH_S = 300          # run tokscale usage and read status pages at most this often
+REFRESH_FLOOR_S = 30   # a click on the panel's "Updated" stamp reads sooner, but not more often than this
 SERVE_STALE_S = 900    # keep a provider that a run did not return this long past FRESH_S
 TIMEOUT_S = 5          # the pill must not hang on a slow network
 USAGE_TIMEOUT_S = 20   # tokscale usage asks every provider it knows
@@ -125,12 +126,18 @@ def find_tokscale():
 
 
 # --- quotas ----------------------------------------------------------------
+def max_age():
+    """How old the cached usage and status may be. The bar sets
+    OMACCHIATO_REFRESH=1 when the user asks for a refresh."""
+    return REFRESH_FLOOR_S if os.environ.get("OMACCHIATO_REFRESH") == "1" else FRESH_S
+
+
 def usage(entry, tokscale):
     """The tokscale usage entries of each provider id. A Codex id can have
     one entry for each account."""
     seen = entry.get("usage") or {}
     # a failed run waits too, so a broken tokscale does not run on every refresh
-    if tokscale and NOW - entry.get("usage_at", 0) >= FRESH_S:
+    if tokscale and NOW - entry.get("usage_at", 0) >= max_age():
         entry["usage_at"] = NOW
         try:
             r = subprocess.run([tokscale, "usage", "--json"],
@@ -209,7 +216,7 @@ def health(entry, pid):
     page, prefix = PROVIDERS[pid]["page"], PROVIDERS[pid]["component"]
     known = entry.setdefault("health", {})
     cached = known.get(pid)
-    if cached is None or NOW - cached["at"] >= FRESH_S:
+    if cached is None or NOW - cached["at"] >= max_age():
         try:
             summary = get_json(page + "/api/v2/summary.json")
             cached = {"status": component_status(summary, prefix),

@@ -52,7 +52,7 @@ public struct UpdatesPanel: View {
                 }
             }
             if let updated = report.updated {
-                UpdatedStamp(updated, staleAfter: Self.staleAfter)
+                UpdatedStamp(updated, staleAfter: Self.staleAfter, refresh: actions.refresh)
             }
         }
         .statusPanelBackground(width: 320)

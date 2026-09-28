@@ -119,7 +119,8 @@ func hasPopup(_ name: String) -> Bool {
 // Every case returns a SwiftUI panel. The default case draws plugin and built-in rows as a menu.
 func panelView(_ name: String) -> AnyView? {
     switch name {
-    case "weather": return weatherReport.map { AnyView(WeatherPanel(report: $0).clipShape(.rect(cornerRadius: 16))) }
+    case "weather":
+        return weatherReport.map { AnyView(WeatherPanel(report: $0, refresh: updateWeather).clipShape(.rect(cornerRadius: 16))) }
     case "status":
         return statusPanel(pillModes["status_panel"], statusReport(), statusActions)
     case "menubar":
@@ -153,6 +154,7 @@ func panelView(_ name: String) -> AnyView? {
         if let report = UpdatesReport(json: json) {
             var actions = UpdatesActions()
             actions.update = { closePopup(); runInTerminal($0) }
+            actions.refresh = { refreshPlugin(name) }
             return AnyView(UpdatesPanel(report: report, actions: actions))
         }
         if let report = AirPodsReport(json: json) {
@@ -165,10 +167,13 @@ func panelView(_ name: String) -> AnyView? {
                 closePopup()
             }
             actions.openAll = { actions.open(URL(string: "https://github.com/pulls")!) }
+            actions.refresh = { refreshPlugin(name) }
             return prPanel(pillModes[name + "_panel"], report, actions)
         }
         guard let report = AIUsageReport(json: json) else { return nil }
-        return aiUsagePanel(pillModes[name + "_panel"], report, aiUsageActions(report: json["report"] as? String))
+        var actions = aiUsageActions(report: json["report"] as? String)
+        actions.refresh = { refreshPlugin(name) }
+        return aiUsagePanel(pillModes[name + "_panel"], report, actions)
     }
 }
 

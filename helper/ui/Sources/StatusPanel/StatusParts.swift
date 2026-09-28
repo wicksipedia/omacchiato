@@ -428,27 +428,71 @@ public struct ControlTile: View {
 
 // "Updated 3 minutes ago" at the foot of a panel whose data comes from a
 // cache or a slow fetch, so the reader knows how old it is. It counts on
-// while the panel is open. Past staleAfter it turns orange.
+// while the panel is open. Past staleAfter it turns orange. With a
+// refresh action, a click reads the data again; "Refreshing…" shows until
+// the new date arrives, or for 30 s if the read fails.
 public struct UpdatedStamp: View {
     var date: Date
     var staleAfter: TimeInterval?
+    var refresh: (() -> Void)?
+    @State private var refreshing = false
 
-    public init(_ date: Date, staleAfter: TimeInterval? = nil) {
+    public init(_ date: Date, staleAfter: TimeInterval? = nil, refresh: (() -> Void)? = nil) {
         self.date = date
         self.staleAfter = staleAfter
+        self.refresh = refresh
     }
 
     public var body: some View {
         TimelineView(.periodic(from: .now, by: 15)) { context in
             let stale = staleAfter.map { context.date.timeIntervalSince(date) > $0 } ?? false
-            Label(updatedText(date, now: context.date),
-                  systemImage: stale ? "exclamationmark.arrow.circlepath" : "arrow.clockwise")
-                .font(.system(size: 11))
-                .foregroundStyle(stale ? AnyShapeStyle(PanelColors.orange) : AnyShapeStyle(.secondary))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 6)
+            HStack(spacing: 5) {
+                Image(systemName: stale && !refreshing ? "exclamationmark.arrow.circlepath" : "arrow.clockwise")
+                    .symbolEffect(.rotate, isActive: refreshing)
+                Text(refreshing ? "Refreshing…" : updatedText(date, now: context.date))
+                if refresh != nil && !refreshing {
+                    Spacer(minLength: 4)
+                    Text("Refresh").opacity(0.8)
+                }
+            }
+            .font(.system(size: 11))
+            .foregroundStyle(stale && !refreshing ? AnyShapeStyle(PanelColors.orange) : AnyShapeStyle(.secondary))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 6)
+            .padding(.vertical, refresh == nil ? 0 : 3)
+        }
+        .modifier(StampButton(enabled: refresh != nil && !refreshing) {
+            refreshing = true
+            refresh?()
+        })
+        .onChange(of: date) { refreshing = false }
+        .task(id: refreshing) {
+            guard refreshing else { return }
+            try? await Task.sleep(for: .seconds(30))
+            refreshing = false
         }
         .accessibilityElement(children: .combine)
+    }
+}
+
+// A click target with the hover fill of a row. The popup window never
+// becomes key, so a tap gesture, not a Button, as HoverRow does.
+struct StampButton: ViewModifier {
+    var enabled: Bool
+    var action: () -> Void
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content
+                .hoverFill()
+                .contentShape(.rect)
+                .onTapGesture(perform: action)
+                .help("Read the data again now")
+                .accessibilityAddTraits(.isButton)
+                .accessibilityHint("Reads the data again now")
+        } else {
+            content
+        }
     }
 }
 

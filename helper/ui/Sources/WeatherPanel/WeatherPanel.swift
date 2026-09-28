@@ -190,8 +190,12 @@ extension Color {
 
 public struct WeatherPanel: View {
     var report: WeatherReport
+    var refresh: (() -> Void)?
 
-    public init(report: WeatherReport) { self.report = report }
+    public init(report: WeatherReport, refresh: (() -> Void)? = nil) {
+        self.report = report
+        self.refresh = refresh
+    }
 
     public var body: some View {
         VStack(spacing: 10) {
@@ -201,7 +205,7 @@ public struct WeatherPanel: View {
             details
             // A darker backing than the cards: the orange of a stale stamp
             // is faint on a pale sky.
-            UpdatedStamp(report.updatedAt, staleAfter: WeatherReport.staleAfter)
+            UpdatedStamp(report.updatedAt, staleAfter: WeatherReport.staleAfter, refresh: refresh)
                 .colorScheme(.dark)
                 .padding(.vertical, 5)
                 .background(.black.opacity(0.35), in: .rect(cornerRadius: 10))

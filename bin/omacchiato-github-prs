@@ -21,6 +21,7 @@ HOME = os.path.expanduser("~")
 CACHE = os.path.join(HOME, ".config/omacchiato/github-prs-cache.json")
 # The bar runs this every two minutes. GitHub changes slower, so one answer serves five.
 FRESH_S = 300
+REFRESH_FLOOR_S = 10   # a click on the panel's "Updated" stamp reads sooner, but not more often than this
 CLOSED_DAYS = 7
 TITLE_MAX = 80
 TIMEOUT_S = 30
@@ -283,12 +284,12 @@ def fallback(reason):
              "rows": [{"text": "GitHub pull requests", "hero": True}, {"text": reason[:60], "dim": True}]})
 
 
-def fresh(key, now):
-    """The last payload for these search qualifiers, if it is younger than FRESH_S."""
+def fresh(key, now, max_age=FRESH_S):
+    """The last payload for these search qualifiers, if it is younger than max_age."""
     try:
         with open(CACHE) as f:
             cached = json.load(f)
-        if cached.get("key") == key and 0 <= now - cached["at"] < FRESH_S:
+        if cached.get("key") == key and 0 <= now - cached["at"] < max_age:
             return cached["payload"]
     except (OSError, ValueError, KeyError, TypeError):
         pass
@@ -297,7 +298,9 @@ def fresh(key, now):
 
 def main():
     key = " ".join(sys.argv[1:])
-    cached = fresh(key, time.time())
+    # the bar sets OMACCHIATO_REFRESH=1 when the user asks for a refresh
+    refresh = os.environ.get("OMACCHIATO_REFRESH") == "1"
+    cached = fresh(key, time.time(), REFRESH_FLOOR_S if refresh else FRESH_S)
     if cached is not None:
         out(cached)
         return

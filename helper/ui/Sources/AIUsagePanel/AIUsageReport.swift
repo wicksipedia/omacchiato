@@ -162,6 +162,8 @@ public struct AIUsageReport {
 public struct AIUsageActions {
     public var open: (URL) -> Void = { _ in }
     public var openReport: () -> Void = {}
+    // Reads the data again, from a click on the "Updated" stamp. nil keeps the stamp plain.
+    public var refresh: (() -> Void)?
 
     public init() {}
 }

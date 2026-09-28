@@ -150,7 +150,10 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   A panel whose data comes from a cache or a slow fetch (weather, AI
   usage, pull requests, updates) ends with `UpdatedStamp`, which shows
   the time of the last successful read, not of the last run, and turns
-  orange past the panel's `staleAfter`.
+  orange past the panel's `staleAfter`. A click on it reads the data
+  again: `updateWeather`, or `refreshPlugin`, whose next run sets
+  `OMACCHIATO_REFRESH=1` so the script skips its cache down to a short
+  floor (30 s for tokscale, 10 s for GitHub).
   `ControlSlider` and `ControlTile` in `StatusParts.swift` draw the
   Control Center slider and round button, by hand, because a system
   control draws grey in a window that is not key.

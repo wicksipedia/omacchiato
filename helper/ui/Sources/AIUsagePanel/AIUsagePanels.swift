@@ -39,7 +39,7 @@ public struct RingsAIUsagePanel: View {
                     ModelShare(report: report).padding(.top, 4)
                 }
             }
-            UpdatedStamp(report.updated, staleAfter: aiUsageStaleAfter)
+            UpdatedStamp(report.updated, staleAfter: aiUsageStaleAfter, refresh: actions.refresh)
             if !report.days.isEmpty {
                 SettingsRow(title: "Token Report", detail: "tokscale", action: actions.openReport)
             }
@@ -171,7 +171,7 @@ public struct ScreenTimeAIUsagePanel: View {
                     }
                 }
             }
-            UpdatedStamp(report.updated, staleAfter: aiUsageStaleAfter)
+            UpdatedStamp(report.updated, staleAfter: aiUsageStaleAfter, refresh: actions.refresh)
             if !report.models.isEmpty {
                 SettingsRow(title: "Token Report", detail: "tokscale", action: actions.openReport)
             }
@@ -227,7 +227,7 @@ public struct ForecastAIUsagePanel: View {
                     costChart
                 }
             }
-            UpdatedStamp(report.updated, staleAfter: aiUsageStaleAfter)
+            UpdatedStamp(report.updated, staleAfter: aiUsageStaleAfter, refresh: actions.refresh)
             if !report.days.isEmpty {
                 SettingsRow(title: "Token Report", detail: "tokscale", action: actions.openReport)
             }
