@@ -21,6 +21,18 @@ def texts(payload):
     return [r.get("text", "") for r in payload["rows"]]
 
 
+class Cache(unittest.TestCase):
+    def test_serves_a_young_answer_for_the_same_search_only(self):
+        import json, os, tempfile
+        with tempfile.TemporaryDirectory() as d:
+            gh.CACHE = os.path.join(d, "cache.json")
+            with open(gh.CACHE, "w") as f:
+                json.dump({"at": 1000, "key": "-repo:a/b", "payload": {"label": "2"}}, f)
+            self.assertEqual(gh.fresh("-repo:a/b", 1000 + gh.FRESH_S - 1), {"label": "2"})
+            self.assertIsNone(gh.fresh("-repo:a/b", 1000 + gh.FRESH_S))
+            self.assertIsNone(gh.fresh("", 1001))
+
+
 class Render(unittest.TestCase):
     def test_list(self):
         p = gh.render([pr(1), pr(2, ci="FAILURE", reviews=1, decision="APPROVED")],
