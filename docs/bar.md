@@ -41,27 +41,28 @@ click turns wi-fi on or off. `wifi` and
 
 To change the gauge or a panel, open `helper/ui/Package.swift` in Xcode,
 then open `StatusGauge.swift`, `StatusPreviews.swift`,
-`CalendarPreviews.swift` or `WeatherPanel.swift` and show the canvas
+`CalendarPreviews.swift`, `ActivityPreviews.swift` or `WeatherPanel.swift` and show the canvas
 (Option-Command-Return). Each preview file shows every design. The weather previews read a saved
 wttr.in answer, `tests/fixtures/wttr-j1.json`.
 The previews draw every state at bar size and large, in light and dark.
 
-`status_panel`, `clock_panel` and `menubar_panel` pick the design of the
-status, clock and menu bar apps popups. `status_panel` takes `gauge`
-(the default), `control-center` or `settings`. `clock_panel` takes
-`timeline` (the default), `up-next` or `month`. `menubar_panel` takes
-`list` (the default), `grid` or `dock`. Each design shows the same
-things and takes the same clicks.
+`status_panel`, `clock_panel`, `menubar_panel` and `activity_panel` pick
+the design of the status, clock, menu bar apps and activity popups.
+`status_panel` takes `gauge` (the default), `control-center` or
+`settings`. `clock_panel` takes `timeline` (the default), `up-next` or
+`month`. `menubar_panel` takes `list` (the default), `grid` or `dock`.
+`activity_panel` takes `monitor` (the default), `widgets` or `top`. Each
+design shows the same things and takes the same clicks.
 
 ```
 status_panel = settings
 clock_panel = month
 ```
 
-`popup = glass` draws the popups on Liquid Glass, so the desktop shows
-through them, instead of the theme's flat background. The system
-setting Accessibility > Display > Reduce transparency turns it off
-again.
+Every popup sits on Liquid Glass, as the macOS menus do. A popup of
+rows, such as the Apple menu or a plugin's rows, looks like a macOS
+menu: the arrow keys select a row, Return clicks it and Esc closes the
+popup.
 
 `media = <characters>` sets how much of the track title the music pill
 shows before the title scrolls on a display without a notch. The
@@ -147,7 +148,7 @@ pill's colour and give it a popup:
 the label. A row takes the same `color` names. A row with an `https`
 or `x-apple.systempreferences:` `url` opens it when clicked, and a row
 with a `terminal` command opens your terminal on that command instead,
-the way the activity pill opens btop. A row with a `run` command runs
+the way the activity popup opens btop. A row with a `run` command runs
 it with no window, then runs the plugin again, so the popup shows what
 the command changed. Both run with the same trust as the plugin
 command that printed them. A colour emoji draws its own colours and
@@ -246,11 +247,12 @@ command = omacchiato-ai-usage --pill claude,codex --panel claude,codex,copilot -
 ```
 
 An open card shows the usage windows as rings, outside in, as the
-Activity app shows its rings. A table next to the rings gives each
-window's percent and the time until it resets. The tick on a ring marks
-the share of the window that has passed, and the colour compares the
-two: green at or near an even pace, orange more than 5 points ahead,
-and red more than 20 points ahead or at 90% used. A window whose plan
+Fitness app shows its rings. Each ring has its own colour: blue, purple,
+then mint. A table next to the rings gives each window's percent and
+the time until it resets, with a dot in the ring's colour. The tick on
+a ring marks the share of the window that has passed. The percent turns
+orange when the use is more than 5 points ahead of an even pace, and
+red when it is more than 20 points ahead or at 90% used. A window whose plan
 carries no limit is left out.
 
 A status box appears only while a provider is not operational. It reads

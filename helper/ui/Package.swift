@@ -14,6 +14,8 @@ let package = Package(
         .library(name: "AIUsagePanel", targets: ["AIUsagePanel"]),
         .library(name: "PRPanel", targets: ["PRPanel"]),
         .library(name: "MenuBarPanel", targets: ["MenuBarPanel"]),
+        .library(name: "RowsPanel", targets: ["RowsPanel"]),
+        .library(name: "ActivityPanel", targets: ["ActivityPanel"]),
     ],
     targets: [
         .target(name: "StatusGauge"),
@@ -23,6 +25,8 @@ let package = Package(
         .target(name: "AIUsagePanel", dependencies: ["StatusPanel"]),
         .target(name: "PRPanel", dependencies: ["StatusPanel"]),
         .target(name: "MenuBarPanel", dependencies: ["StatusPanel"]),
+        .target(name: "RowsPanel", dependencies: ["StatusPanel"]),
+        .target(name: "ActivityPanel", dependencies: ["StatusPanel"]),
     ],
     swiftLanguageModes: [.v5]
 )

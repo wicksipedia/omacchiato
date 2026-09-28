@@ -240,7 +240,12 @@ Left to right:
   it starts, the pill's text slides up between the date and the event in
   yellow, such as "Standup in 5m", and keeps its width. If the event has a call link, a click on the pill
   then joins the call and does not open the popup.
-- **Activity**: btop in a floating terminal.
+- **Activity**: a popup with the CPU load of the last minute, the
+  memory in use and its pressure, the network rates, and the apps and
+  commands that use the most CPU. It samples every 1.5 s, and only
+  while it is open. A row opens Activity Monitor, and another opens btop
+  in your terminal. `activity_panel` in `bar-pills.conf` picks another
+  design.
 
 <table>
   <tr>
@@ -381,7 +386,7 @@ the code this repo absorbed, with what Omacchiato uses each for.
 |---|---|---|
 | OmniWM | The window manager: niri and dwindle layouts, the focus border, the command palette, the quake terminal and the horizontal swipes | [BarutSRB/OmniWM](https://github.com/BarutSRB/OmniWM) |
 | Karabiner-Elements | Caps Lock as Super, and the chords that run commands | [pqrs-org/Karabiner-Elements](https://github.com/pqrs-org/Karabiner-Elements) |
-| Ghostty | The default terminal, with a hidden titlebar and colours from the theme. The activity pill opens btop in your terminal | [ghostty-org/ghostty](https://github.com/ghostty-org/ghostty) |
+| Ghostty | The default terminal, with a hidden titlebar and colours from the theme. The activity popup opens btop in your terminal | [ghostty-org/ghostty](https://github.com/ghostty-org/ghostty) |
 | Raycast | The launcher on `Cmd+Space`, a hotkey you set in Raycast itself | [raycast.com](https://www.raycast.com) |
 | starship | The shell prompt, from `config/starship.toml` | [starship/starship](https://github.com/starship/starship) |
 | fzf | Fuzzy finding in the shell, and the branch picker in `omacchiato-herdr-worktree` | [junegunn/fzf](https://github.com/junegunn/fzf) |
@@ -390,7 +395,7 @@ the code this repo absorbed, with what Omacchiato uses each for.
 | ripgrep | Search in the shell | [BurntSushi/ripgrep](https://github.com/BurntSushi/ripgrep) |
 | bat | `cat` with highlighting in `zsh/zshrc` | [sharkdp/bat](https://github.com/sharkdp/bat) |
 | lazygit | The `lg` alias | [jesseduffield/lazygit](https://github.com/jesseduffield/lazygit) |
-| btop | The activity pill's floating monitor | [aristocratos/btop](https://github.com/aristocratos/btop) |
+| btop | The full monitor that the activity popup opens | [aristocratos/btop](https://github.com/aristocratos/btop) |
 | jq | JSON handling in the GitHub pull requests pill | [jqlang/jq](https://github.com/jqlang/jq) |
 | gh | The GitHub pull requests pill's API calls | [cli/cli](https://github.com/cli/cli) |
 | JetBrains Mono Nerd Font | The bar's font, and the glyphs the pills and plugins use | [ryanoasis/nerd-fonts](https://github.com/ryanoasis/nerd-fonts) |
@@ -527,7 +532,7 @@ windows, which macOS's own switcher does not.
 | Middle-click the wi-fi pill | turn wi-fi off or on |
 | Middle-click the media title | play or pause |
 | ↑ / ↓, Return, Esc in an open popup | select a row, click it, close the popup |
-| Click the activity pill | btop in a floating terminal |
+| Click the activity pill | CPU, memory, network and the busiest processes |
 | Click the media title | open Music |
 
 ### herdr

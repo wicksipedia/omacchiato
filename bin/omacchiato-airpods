@@ -167,12 +167,12 @@ def device_rows(tool, name, model, icon, battery, cable):
     # the plug is about the whole device, and on one battery row it read as
     # that side charging, which nothing here can know
     if cable:
-        rows.append({"text": "plugged into this Mac", "dim": True})
+        rows.append({"text": "Plugged into this Mac", "dim": True})
     modes = listening(tool, name)
     if modes:
         current, supported = modes
         rows.append({"separator": True})
-        rows.append({"text": "noise control", "dim": True})
+        rows.append({"text": "Noise Control", "dim": True})
         for mode in supported:
             rows.append({"text": MODES.get(mode, mode), "detail": "✓" if mode == current else "",
                          "run": " ".join(shlex.quote(a) for a in

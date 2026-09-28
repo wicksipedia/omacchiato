@@ -5,7 +5,7 @@ import Testing
 import CalendarPanel
 import WeatherPanel
 
-// Serialized: some tests set the globals popupBarSource and NSTimeZone.default.
+// Serialized: some tests set the global NSTimeZone.default.
 @MainActor @Suite(.serialized)
 struct BarTests {
     @Test("the weather pill opens its panel once a report has come in")
@@ -65,31 +65,12 @@ struct BarTests {
         #expect(fit("short", font, 200) == "short")
     }
 
-    @Test("a popup is no wider than popupMaxWidth")
-    func popupWidth() {
-        let view = PopupView(frame: .zero)
-        view.rows = [PopupRow(text: String(repeating: "wide ", count: 60))]
-        #expect(view.measure().width <= popupMaxWidth)
-    }
-
-    @Test("opening a section moves no bar")
-    func barColumns() {
-        let bars = [PopupRow(text: "a", detail: "1%", inlineBar: 0.1),
-                    PopupRow(text: "a much longer label", detail: "100% · 3h", inlineBar: 0.9)]
-        popupBarSource = bars
-        defer { popupBarSource = [] }
-        let view = PopupView(frame: .zero)
-        view.rows = [bars[0]]
-        let folded = view.barColumns()
-        view.rows = bars
-        #expect(folded == view.barColumns())
-    }
-
     @Test("a closed section hides its rows and keeps its rule")
     func sections() {
         let rows = [PopupRow(text: "h", section: "closed"), PopupRow(text: "x"), PopupRow(separator: true),
                     PopupRow(text: "h2", section: "open"), PopupRow(text: "y")]
         #expect(foldSections("test", rows).map(\.text) == ["h", "", "h2", "y"])
+        #expect(foldSections("test", rows).map(\.open) == [false, nil, true, nil])
     }
 
     @Test("plugin rows read subtitle, bar and bar_color")
@@ -153,30 +134,6 @@ struct BarTests {
         #expect(isOmniWM("com.barut.OmniWM.dev"))
         #expect(!isOmniWM("com.example"))
         #expect(!isOmniWM(nil))
-    }
-
-    @Test("popup text on glass stays legible over white or black, on every theme")
-    func glassContrast() throws {
-        func luminance(_ c: NSColor) -> CGFloat {
-            let c = c.usingColorSpace(.sRGB)!
-            func channel(_ v: CGFloat) -> CGFloat { v <= 0.03928 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4) }
-            return 0.2126 * channel(c.redComponent) + 0.7152 * channel(c.greenComponent)
-                + 0.0722 * channel(c.blueComponent)
-        }
-        let themes = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-            .appendingPathComponent("../../themes").standardized
-        let names = try FileManager.default.contentsOfDirectory(atPath: themes.path)
-            .filter { FileManager.default.fileExists(atPath: themes.appendingPathComponent("\($0)/sketchybar.sh").path) }
-        #expect(!names.isEmpty)
-        for name in names {
-            let palette = loadPalette(themes.appendingPathComponent("\(name)/sketchybar.sh"))
-            for backdrop in [NSColor.white, NSColor.black] {
-                let glass = backdrop.blended(withFraction: popupGlassFill, of: palette.barBG)!
-                let (a, b) = (luminance(palette.label), luminance(glass))
-                let contrast = (max(a, b) + 0.05) / (min(a, b) + 0.05)
-                #expect(contrast >= 4.5, "\(name) over \(backdrop == .white ? "white" : "black"): \(contrast)")
-            }
-        }
     }
 
     @Test("a command that runs too long stops, and so does every process under it")

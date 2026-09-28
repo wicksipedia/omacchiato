@@ -60,8 +60,8 @@ def cpu_percent(ps_out, cores):
 def cpu():
     out = run("/bin/ps", "-Aceo", "pcpu=,comm=", "-r")
     pct = cpu_percent(out, os.cpu_count() or 1)
-    rows = [{"text": "cpu", "hero": True, "detail": "%.0f%%" % pct},
-            {"text": "in use", "bar": pct / 100, "detail": "%d cores" % (os.cpu_count() or 1)},
+    rows = [{"text": "CPU", "hero": True, "detail": "%.0f%%" % pct},
+            {"text": "In Use", "bar": pct / 100, "detail": "%d cores" % (os.cpu_count() or 1)},
             {"separator": True}]
     rows += top_rows(out, lambda v: "%.0f%%" % v)
     return pct, rows
@@ -86,11 +86,11 @@ def ram():
     app, wired, compressed = memory_parts(run("/usr/bin/vm_stat"))
     used = app + wired + compressed
     pct = 100.0 * used / total if total else 0.0
-    rows = [{"text": "memory", "hero": True, "detail": "%s of %s" % (gib(used), gib(total))},
-            {"text": "in use", "bar": pct / 100, "detail": "%.0f%%" % pct},
-            {"text": "app", "detail": gib(app), "dim": True},
-            {"text": "wired", "detail": gib(wired), "dim": True},
-            {"text": "compressed", "detail": gib(compressed), "dim": True},
+    rows = [{"text": "Memory", "hero": True, "detail": "%s of %s" % (gib(used), gib(total))},
+            {"text": "In Use", "bar": pct / 100, "detail": "%.0f%%" % pct},
+            {"text": "App", "detail": gib(app), "dim": True},
+            {"text": "Wired", "detail": gib(wired), "dim": True},
+            {"text": "Compressed", "detail": gib(compressed), "dim": True},
             {"separator": True}]
     # ps reports rss in KB
     rows += top_rows(run("/bin/ps", "-Aceo", "rss=,comm=", "-m"), lambda v: gib(v * 1024))
@@ -102,10 +102,10 @@ def disk():
     usage = shutil.disk_usage("/")
     used = usage.total - usage.free
     pct = 100.0 * used / usage.total
-    rows = [{"text": "disk", "hero": True, "detail": "%s free" % gb(usage.free)},
-            {"text": "in use", "bar": pct / 100, "detail": "%s of %s" % (gb(used), gb(usage.total))},
+    rows = [{"text": "Disk", "hero": True, "detail": "%s free" % gb(usage.free)},
+            {"text": "In Use", "bar": pct / 100, "detail": "%s of %s" % (gb(used), gb(usage.total))},
             {"separator": True},
-            {"text": "storage settings…", "dim": True,
+            {"text": "Storage Settings…", "dim": True,
              "url": "x-apple.systempreferences:com.apple.settings.Storage"}]
     return pct, rows
 

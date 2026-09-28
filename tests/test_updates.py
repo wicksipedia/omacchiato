@@ -18,7 +18,7 @@ class Pill(unittest.TestCase):
     def test_a_long_list_is_cut(self):
         out = updates.pill(["c%d" % i for i in range(15)])
         self.assertEqual(out["label"], "15")
-        self.assertIn({"text": "and 5 more", "dim": True}, out["rows"])
+        self.assertIn({"text": "And 5 more", "dim": True}, out["rows"])
 
 
 if __name__ == "__main__":

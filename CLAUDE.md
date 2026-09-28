@@ -103,16 +103,15 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   the pill order: `menubar`, then the plugin pills in file order, then
   the built-in pills.
 - `~/.config/omacchiato/bar-pills.conf` holds `<pill> = <mode>` lines:
-  `hide`, `icon`, `volume = muted`, `battery = time` and
-  `media = <characters>`. The bar reads it once at startup.
-- `popup = glass` puts the popup on an `NSGlassEffectView`, which then
-  holds the scroll view, so `refreshPopup` resizes the window's content
-  view and the glass content view, not a cast to `NSScrollView`.
-  In that mode `PopupView.draw` fills the theme background at
-  `popupGlassFill`, because the glass adapts only system colours to the
-  window behind it, and its `tintColor` shades the glass without making
-  text legible. A test checks the text contrast of every theme at that
-  fill over white and black. Reduce transparency turns the mode off.
+  `hide`, `icon`, `volume = muted`, `battery = time`,
+  `media = <characters>` and `<pill>_panel = <design>`. The bar reads it
+  once at startup.
+- Every popup is a SwiftUI view in a `PanelHost`. `panelView(name)`
+  picks it: a panel of its own, a plugin's `panel` object, or
+  `RowsPanel`, which draws `popupRows(for:)` as a macOS menu.
+  `panelRow` converts a `PopupRow`. The popup window never becomes key,
+  so an event tap (`setPopupKeys`) gives a row popup its arrow keys,
+  Return and Esc, and system controls there draw grey: draw them by hand.
 - `dur()` in `bar.swift` and `overview.swift` returns 0 while Reduce
   motion is on. Pass every animation duration through it.
 - The wi-fi popup lists the networks in range. A scan blocks for

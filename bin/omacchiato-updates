@@ -36,12 +36,12 @@ def pill(subjects):
     """The pill JSON for the commits that the clone does not have yet."""
     if not subjects:
         return {"icon": "", "label": ""}
-    rows = [{"text": "omacchiato update", "hero": True}]
+    rows = [{"text": "Omacchiato Update", "hero": True}]
     rows += [{"text": s, "dim": True} for s in subjects[:SHOWN]]
     if len(subjects) > SHOWN:
-        rows.append({"text": "and %d more" % (len(subjects) - SHOWN), "dim": True})
+        rows.append({"text": "And %d more" % (len(subjects) - SHOWN), "dim": True})
     rows += [{"separator": True},
-             {"text": "update now", "icon": UPDATE_ICON, "terminal": UPDATE}]
+             {"text": "Update Now", "icon": UPDATE_ICON, "terminal": UPDATE}]
     return {"icon": UPDATE_ICON, "label": str(len(subjects)), "color": "yellow", "rows": rows}
 
 

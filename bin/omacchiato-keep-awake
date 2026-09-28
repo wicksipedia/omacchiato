@@ -91,7 +91,7 @@ def main():
         print(json.dumps({"label": "", "icon": ""}))
         return
 
-    rows = [{"text": "keeping awake", "hero": True}]
+    rows = [{"text": "Keeping Awake", "hero": True}]
     rows += [{"text": name, "detail": duration(held)} for name, held in awake]
     print(json.dumps({"label": "", "icon": AWAKE_ICON, "color": "accent",
                       "rows": rows}, ensure_ascii=False))

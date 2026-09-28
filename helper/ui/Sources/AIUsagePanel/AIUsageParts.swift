@@ -16,7 +16,7 @@ struct ProviderMark: View {
 
     var body: some View {
         Group {
-            if let logo = provider.glyph.flatMap({ Self.logo($0, size: size) }) {
+            if let logo = provider.glyph.flatMap({ glyphImage($0, size: size) }) {
                 Image(nsImage: logo).renderingMode(.template)
             } else {
                 Text(provider.name.prefix(1))
@@ -27,24 +27,6 @@ struct ProviderMark: View {
         }
         .foregroundStyle(provider.color)
         .frame(width: size + 4, height: size + 4)
-    }
-
-    // A Nerd Font logo is wider than its advance and sits off centre, so
-    // SwiftUI's Text crops it. Draw the ink box alone.
-    static func logo(_ glyph: String, size: CGFloat) -> NSImage? {
-        guard let font = NSFontManager.shared.font(withFamily: "JetBrainsMono Nerd Font",
-                                                   traits: [], weight: 5, size: size) else { return nil }
-        let line = CTLineCreateWithAttributedString(NSAttributedString(string: glyph, attributes: [.font: font]))
-        let ink = CTLineGetImageBounds(line, nil)
-        guard ink.width > 0, ink.height > 0 else { return nil }
-        let image = NSImage(size: ink.size, flipped: false) { _ in
-            guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
-            ctx.textPosition = CGPoint(x: -ink.minX, y: -ink.minY)
-            CTLineDraw(line, ctx)
-            return true
-        }
-        image.isTemplate = true
-        return image
     }
 }
 
@@ -90,7 +72,7 @@ struct ProviderSection<Content: View>: View {
                 if !open, let m = provider.headline {
                     Text("\(Int((m.used * 100).rounded()))%")
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundStyle(m.tint)
+                        .foregroundStyle(m.tint == .green ? AnyShapeStyle(.primary) : AnyShapeStyle(m.tint))
                 }
                 Image(systemName: "chevron.right")
                     .font(.system(size: 10, weight: .semibold))
@@ -141,6 +123,10 @@ struct HealthNote: View {
     }
 }
 
+// A colour for each ring, outside in, as the Fitness app gives each of
+// its rings one. The percent text carries the pace.
+let ringColors: [Color] = [.blue, .purple, .mint]
+
 // Activity rings, one for each window, outside in. The tick on a ring
 // marks how far through the window the clock is, so a fill past the tick
 // is ahead of an even pace.
@@ -152,10 +138,10 @@ struct UsageRings: View {
         ZStack {
             ForEach(Array(metrics.prefix(3).enumerated()), id: \.offset) { i, metric in
                 ZStack {
-                    Circle().stroke(metric.tint.opacity(0.22), lineWidth: lineWidth)
+                    Circle().stroke(ringColors[i].opacity(0.22), lineWidth: lineWidth)
                     if metric.used > 0 {
                         Circle().trim(from: 0, to: min(1, metric.used))
-                            .stroke(metric.tint, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                            .stroke(ringColors[i], style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                     }
                     if let e = metric.elapsed {
                         Circle().trim(from: max(0, e - 0.005), to: min(1, e + 0.005))

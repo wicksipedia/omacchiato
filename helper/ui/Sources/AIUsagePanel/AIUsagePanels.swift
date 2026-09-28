@@ -55,15 +55,16 @@ public struct RingsAIUsagePanel: View {
                     Text("RESETS IN").font(.system(size: 9, weight: .semibold)).foregroundStyle(.tertiary)
                 }
             }
-            ForEach(metrics) { m in
+            ForEach(Array(metrics.enumerated()), id: \.offset) { i, m in
                 GridRow(alignment: .firstTextBaseline) {
                     HStack(spacing: 5) {
-                        Circle().fill(m.tint).frame(width: 7, height: 7)
+                        Circle().fill(ringColors[i]).frame(width: 7, height: 7)
                         Text(m.label).font(.system(size: 12, weight: .medium)).lineLimit(1)
                     }
+                    // the pace colour only when ahead of pace
                     Text("\(Int((m.used * 100).rounded()))%")
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(m.tint)
+                        .foregroundStyle(m.tint == .green ? AnyShapeStyle(.primary) : AnyShapeStyle(m.tint))
                         .gridColumnAlignment(.trailing)
                     Text(m.resetsIn.flatMap { $0 > 0 ? resetText($0) : nil } ?? "")
                         .font(.system(size: 12, design: .rounded))

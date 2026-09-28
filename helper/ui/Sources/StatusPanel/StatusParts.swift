@@ -82,13 +82,16 @@ public struct PanelCard<Content: View>: View {
 }
 
 // A row that highlights under the pointer and runs its action on a click.
+// The arrow keys select a row as the pointer does.
 public struct HoverRow<Content: View>: View {
     var action: (() -> Void)?
+    var selected: Bool
     @ViewBuilder var content: Content
     @State private var hovered = false
 
-    public init(action: (() -> Void)?, @ViewBuilder content: () -> Content) {
+    public init(action: (() -> Void)?, selected: Bool = false, @ViewBuilder content: () -> Content) {
         self.action = action
+        self.selected = selected
         self.content = content()
     }
 
@@ -97,7 +100,7 @@ public struct HoverRow<Content: View>: View {
             .padding(.horizontal, 6)
             .padding(.vertical, 5)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(hovered && action != nil ? AnyShapeStyle(.fill.tertiary) : AnyShapeStyle(.clear),
+            .background((hovered || selected) && action != nil ? AnyShapeStyle(.fill.tertiary) : AnyShapeStyle(.clear),
                         in: .rect(cornerRadius: 7))
             .contentShape(.rect)
             .onHover { hovered = $0 }
@@ -262,4 +265,22 @@ struct PanelBackground: ViewModifier {
 
 extension View {
     public func statusPanelBackground(width: CGFloat = 320) -> some View { modifier(PanelBackground(width: width)) }
+}
+
+// A Nerd Font glyph as a template image of its ink box. The glyphs are
+// wider than their advance and sit off centre, so SwiftUI's Text crops them.
+public func glyphImage(_ glyph: String, size: CGFloat) -> NSImage? {
+    guard let font = NSFontManager.shared.font(withFamily: "JetBrainsMono Nerd Font",
+                                               traits: [], weight: 9, size: size) else { return nil }
+    let line = CTLineCreateWithAttributedString(NSAttributedString(string: glyph, attributes: [.font: font]))
+    let ink = CTLineGetImageBounds(line, nil)
+    guard ink.width > 0, ink.height > 0 else { return nil }
+    let image = NSImage(size: ink.size, flipped: false) { _ in
+        guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
+        ctx.textPosition = CGPoint(x: -ink.minX, y: -ink.minY)
+        CTLineDraw(line, ctx)
+        return true
+    }
+    image.isTemplate = true
+    return image
 }

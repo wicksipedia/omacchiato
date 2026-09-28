@@ -39,10 +39,12 @@ import UniformTypeIdentifiers
 import SwiftUI
 #if canImport(StatusGauge)
 import StatusGauge
+import ActivityPanel
 import AIUsagePanel
 import CalendarPanel
 import MenuBarPanel
 import PRPanel
+import RowsPanel
 import StatusPanel
 import WeatherPanel
 #endif
@@ -366,6 +368,16 @@ func nerdFont(_ face: String, _ size: CGFloat) -> NSFont {
     }
     tlog("font: JetBrainsMono Nerd Font \(face) unavailable — using system mono")
     return .monospacedSystemFont(ofSize: size, weight: face == "Bold" ? .bold : .semibold)
+}
+
+// The macOS menu bar face for the text in the pills. A plugin label can
+// hold a Nerd Font glyph, so the Nerd Font follows in the cascade list.
+// The digits are fixed width, so a percent or a clock does not shift the
+// pills beside it.
+func menuBarFont(_ weight: NSFont.Weight, _ size: CGFloat = 13) -> NSFont {
+    let base = NSFont.monospacedDigitSystemFont(ofSize: size, weight: weight)
+    let nerd = NSFontDescriptor(fontAttributes: [.family: "JetBrainsMono Nerd Font"])
+    return NSFont(descriptor: base.fontDescriptor.addingAttributes([.cascadeList: [nerd]]), size: size) ?? base
 }
 
 // --- model ----------------------------------------------------------------
@@ -839,12 +851,6 @@ func dur(_ seconds: Double) -> Double {
     NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : seconds
 }
 
-// `popup = glass` puts the popup on Liquid Glass instead of a flat fill.
-// Reduce transparency turns it off again.
-var popupGlass: Bool {
-    pillModes["popup"] == "glass"
-        && !NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
-}
 var rightItems: [String: BarItem] = [:]
 // popup rows a plugin last returned, keyed by pill name
 var pluginRows: [String: [PopupRow]] = [:]
@@ -964,7 +970,7 @@ func pluginPopupRows(_ raw: [[String: Any]], of plugin: BarPlugin) -> [PopupRow]
         } else if let command = spec["terminal"] as? String, !command.isEmpty {
             // The plugin's own command already runs with the bar's grants, so a
             // row it prints may name a command too. Ghostty gets it as
-            // --command, like the activity pill's btop: -e asks to confirm.
+            // --command, like the activity popup's btop: -e asks to confirm.
             action = {
                 DispatchQueue.global(qos: .userInitiated).async {
                     _ = shell("/usr/bin/open", ["-na", terminalApp, "--args",
@@ -993,10 +999,6 @@ func pluginPopupRows(_ raw: [[String: Any]], of plugin: BarPlugin) -> [PopupRow]
 // the sections a click opened or closed, by plugin, header text and the
 // count of earlier headers with that text. The bar forgets them when it restarts.
 var sectionOpen: [String: Bool] = [:]
-// The rows a popup holds before folding. Inline bars share one label
-// column and one number column, and measuring those over the VISIBLE
-// rows moved every bar when a section opened.
-var popupBarSource: [PopupRow] = []
 
 // A header row toggles the rows after it, up to the next header or "end" row.
 // A separator right before the next header stays, so closed sections keep their rules.
@@ -1011,7 +1013,7 @@ func foldSections(_ name: String, _ rows: [PopupRow]) -> [PopupRow] {
             seen[row.text, default: 0] += 1
             let key = "\(name)\t\(row.text)\t\(seen[row.text]!)"
             let open = sectionOpen[key] ?? (row.section == "open")
-            row.detail = [row.detail, open ? "▾" : "▸"].filter { !$0.isEmpty }.joined(separator: " ")
+            row.open = open
             row.action = { sectionOpen[key] = !open; refreshPopup() }
             hiding = !open
         case "end":
@@ -1077,7 +1079,7 @@ func showPluginProblem(_ plugin: BarPlugin, _ problem: (what: String, detail: St
     tlog("plugin \(plugin.name): \(problem.what) \(problem.detail)")
     var rows = [PopupRow(icon: "\u{F071}", text: problem.what, tint: palette.red, iconTint: palette.red)]
     if !problem.detail.isEmpty { rows.append(PopupRow(text: problem.detail, dim: true)) }
-    rows.append(PopupRow(text: "run again", dim: true, action: { runPlugin(plugin) }))
+    rows.append(PopupRow(text: "Run Again", dim: true, action: { runPlugin(plugin) }))
     let good = pluginGoodRows[plugin.name] ?? []
     pluginRows[plugin.name] = rows + (good.isEmpty ? [] : [PopupRow(separator: true)] + good)
     pluginPanels[plugin.name] = nil
@@ -1912,284 +1914,11 @@ struct PopupRow {
     var inlineBar: Double? // 0...1 draws a track between the text and the detail
     var onSlide: ((Double) -> Void)?
     var action: (() -> Void)?
-    // fixed-width cells, calendar only — the font isn't monospaced, so
-    // space-padded text drifts out of the header's columns
-    var columns: [String]? = nil
-    var columnAccent: Int? // the cell that carries the today circle
     var tint: NSColor? // overrides the hero/dim colour for one row
     var barTint: NSColor? // colours the inline bar alone, leaving the label
     var iconTint: NSColor? // overrides the accent colour of the icon
     var section: String? // plugin rows: "open" or "closed" starts a section, "end" ends one
-}
-
-let rowHeight: CGFloat = 26
-let popupPad: CGFloat = 8
-// A long row ends in "…" rather than widen the popup past this.
-let popupMaxWidth: CGFloat = 520
-let popupRadius: CGFloat = 8
-// How much of the theme background the popup lays over its glass. The
-// glass adapts system colours to the window behind it, not theme colours,
-// and its tint only shades it. With no fill, a bright window behind a dark
-// theme's popup took the text to 2:1.
-let popupGlassFill: CGFloat = 0.85
-
-final class PopupView: NSView {
-    var rows: [PopupRow] = []
-    private var rowRects: [(Int, NSRect)] = []
-    // the row under the pointer, actionable rows only — menus read as
-    // menus when they answer the hover
-    private var hoveredRow: Int?
-
-    // NOT flipped: CTLineDraw draws in the CONTEXT's coordinates, so a
-    // flipped view renders every glyph mirrored. NSString.draw hid that
-    // difference, which is why this only broke when the text layer moved to
-    // CoreText — the bar is unflipped and looked fine. Rows are laid out
-    // downward explicitly instead of flipping the view.
-    func font(_ row: PopupRow) -> NSFont {
-        if row.hero { return nerdFont("Bold", 13) }
-        if row.dim { return nerdFont("Regular", 12) }
-        return nerdFont("Regular", 13)
-    }
-
-    func color(_ row: PopupRow) -> NSColor {
-        if row.hero { return palette.accent }
-        // the dim footer is the label colour at 60%, the same relationship
-        // the shell popups build with a 0x99 alpha prefix
-        if row.dim { return palette.label.withAlphaComponent(0.6) }
-        return row.tint ?? palette.label
-    }
-
-    // separators are hairlines, not rows: a full 26 pt of blank per
-    // rule made long menus read bulky instead of sectioned
-    func rowH(_ row: PopupRow) -> CGFloat { row.separator ? 10 : rowHeight }
-
-    // one width for every column cell in the popup, wide enough for the
-    // widest cell at its own row's font — a header letter and a two-digit
-    // day share a column even though they render at different sizes
-    func columnWidth() -> CGFloat {
-        var w: CGFloat = 0
-        for row in rows {
-            guard let cells = row.columns else { continue }
-            let f = font(row)
-            for cell in cells { w = max(w, advance(cell, f)) }
-        }
-        return w + 10
-    }
-
-    // the label and the numbers each side of every inline bar, measured
-    // over the unfolded rows so a section opening moves no bar
-    func barColumns() -> (label: CGFloat, detail: CGFloat) {
-        let source = popupBarSource.isEmpty ? rows : popupBarSource
-        let barred = source.filter { $0.inlineBar != nil }
-        return (barred.map { advance($0.text, font($0)) }.max() ?? 0,
-                barred.map { advance($0.detail, nerdFont("Regular", 11)) }.max() ?? 0)
-    }
-
-    func measure() -> NSSize {
-        var width: CGFloat = 0
-        var height: CGFloat = popupPad * 2
-        let colW = columnWidth()
-        let bars = barColumns()
-        for row in rows {
-            var w = advance(row.text, font(row))
-            if !row.detail.isEmpty { w += advance(row.detail, nerdFont("Regular", 11)) + 24 }
-            if !row.subtitle.isEmpty { w += advance(row.subtitle, nerdFont("Regular", 11)) + 8 }
-            if !row.icon.isEmpty { w += inkBox(row.icon, nerdFont("Bold", 13)).width + 8 }
-            if row.image != nil { w += 22 }
-            if row.slider != nil { w = max(w, 150) }
-            // the same three parts the row draws: label, a track of at
-            // least 100pt, and the numbers
-            if row.inlineBar != nil { w = max(w, bars.label + 12 + 100 + 12 + bars.detail) }
-            if let cells = row.columns { w = max(w, CGFloat(cells.count) * colW) }
-            width = max(width, w)
-            height += rowH(row)
-        }
-        return NSSize(width: min(width + popupPad * 2 + 20, popupMaxWidth), height: height)
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        rowRects.removeAll()
-        // plain fill: the scroll CONTAINER carries the rounded clip and
-        // border, so corners stay put while tall content scrolls
-        palette.barBG.withAlphaComponent(popupGlass ? popupGlassFill : 1).setFill()
-        bounds.fill()
-
-        let colW = columnWidth()
-        // inline bars share one column, so every bar starts and ends together
-        let (barLabelW, barDetailW) = barColumns()
-        var y = bounds.height - popupPad
-        for (index, row) in rows.enumerated() {
-            let h = rowH(row)
-            y -= h
-            let rect = NSRect(x: popupPad, y: y, width: bounds.width - popupPad * 2, height: h)
-            if row.separator {
-                palette.label.withAlphaComponent(0.15).setFill()
-                NSRect(x: rect.minX + 2, y: rect.midY - 0.5, width: rect.width - 4, height: 1).fill()
-                rowRects.append((index, rect))
-                continue
-            }
-            if row.highlight || index == hoveredRow {
-                palette.rowBG.setFill()
-                NSBezierPath(roundedRect: rect.insetBy(dx: -2, dy: 2), xRadius: 4, yRadius: 4).fill()
-            }
-            var x = rect.minX + 4
-            if let image = row.image {
-                image.draw(in: NSRect(x: x, y: rect.midY - 8, width: 16, height: 16))
-                x += 22
-            }
-            if !row.icon.isEmpty {
-                // same strategy as the bar: glyphs centre on ink, text on
-                // cap height — one way of placing things in this file
-                let iconFont = nerdFont("Bold", 13)
-                let w = inkBox(row.icon, iconFont).width
-                drawIcon(row.icon, iconFont, row.iconTint ?? palette.accent,
-                         centeredIn: NSRect(x: x, y: rect.minY, width: w, height: rect.height))
-                x += w + 8
-            }
-            if let cells = row.columns {
-                // one box per cell, all the same width — centring absorbs the
-                // per-glyph advance differences a proportional font gives
-                // digits vs. letters, so every row lines up on the same grid.
-                // A wide row elsewhere in the popup, such as an event title,
-                // would leave the grid on the left of an empty half.
-                let spread = max(colW, (rect.maxX - 20 - x) / CGFloat(cells.count))
-                for (i, cell) in cells.enumerated() {
-                    let box = NSRect(x: x, y: rect.minY, width: spread, height: rect.height)
-                    if i == row.columnAccent {
-                        let d = min(colW, rect.height) - 2
-                        palette.accent.setFill()
-                        NSBezierPath(ovalIn: NSRect(x: box.midX - d / 2, y: box.midY - d / 2,
-                                                    width: d, height: d)).fill()
-                        drawText(cell, font(row), palette.barBG, centeredIn: box)
-                    } else {
-                        drawText(cell, font(row), color(row), centeredIn: box)
-                    }
-                    x += spread
-                }
-            } else if let value = row.slider {
-                // track, then filled portion — the readout is the row's text
-                let trackW = rect.width - (x - rect.minX) - 52
-                let track = NSRect(x: x, y: rect.midY - 3, width: trackW, height: 6)
-                palette.rowBG.setFill()
-                NSBezierPath(roundedRect: track, xRadius: 3, yRadius: 3).fill()
-                (row.tint ?? palette.accent).setFill()
-                NSBezierPath(roundedRect: NSRect(x: track.minX, y: track.minY,
-                                                 width: track.width * CGFloat(value), height: track.height),
-                             xRadius: 3, yRadius: 3).fill()
-                if let marker = row.marker {
-                    let tickX = track.minX + track.width * CGFloat(max(0, min(1, marker)))
-                    palette.label.setFill()
-                    NSBezierPath(roundedRect: NSRect(x: tickX - 1, y: track.midY - 6, width: 2, height: 12),
-                                 xRadius: 1, yRadius: 1).fill()
-                }
-                drawText(row.text, font(row), color(row),
-                         leftAt: rect.maxX - advance(row.text, font(row)) - 4, midY: rect.midY)
-            } else {
-                let tint = index == hoveredRow && row.action != nil ? palette.accent : color(row)
-                var room = rect.maxX - 4 - x
-                if !row.detail.isEmpty { room -= advance(row.detail, nerdFont("Regular", 11)) + 24 }
-                if !row.subtitle.isEmpty { room -= advance(row.subtitle, nerdFont("Regular", 11)) + 8 }
-                // a bar row's label has its own column, which measure() keeps
-                let text = row.inlineBar == nil ? fit(row.text, font(row), room) : row.text
-                drawText(text, font(row), tint, leftAt: x, midY: rect.midY)
-                if !row.subtitle.isEmpty {
-                    drawText(row.subtitle, nerdFont("Regular", 11),
-                             palette.label.withAlphaComponent(0.5),
-                             leftAt: x + advance(text, font(row)) + 8, midY: rect.midY)
-                }
-                if !row.detail.isEmpty {
-                    let df = nerdFont("Regular", 11)
-                    drawText(row.detail, df, palette.label.withAlphaComponent(0.5),
-                             leftAt: rect.maxX - advance(row.detail, df) - 4, midY: rect.midY)
-                }
-                if let share = row.inlineBar {
-                    let left = x + barLabelW + 12
-                    let track = NSRect(x: left, y: rect.midY - 3,
-                                       width: max(0, rect.maxX - 4 - barDetailW - 12 - left), height: 6)
-                    palette.rowBG.setFill()
-                    NSBezierPath(roundedRect: track, xRadius: 3, yRadius: 3).fill()
-                    (row.barTint ?? row.tint ?? palette.accent).setFill()
-                    NSBezierPath(roundedRect: NSRect(x: track.minX, y: track.minY,
-                                                     width: track.width * CGFloat(max(0, min(1, share))),
-                                                     height: track.height),
-                                 xRadius: 3, yRadius: 3).fill()
-                    // the same pace tick the slider rows carry
-                    if let marker = row.marker {
-                        let tickX = track.minX + track.width * CGFloat(max(0, min(1, marker)))
-                        palette.label.setFill()
-                        NSBezierPath(roundedRect: NSRect(x: tickX - 1, y: track.midY - 5,
-                                                         width: 2, height: 10),
-                                     xRadius: 1, yRadius: 1).fill()
-                    }
-                }
-            }
-            rowRects.append((index, rect))
-        }
-    }
-
-
-    // Tracking areas, not a poll and not a global monitor: a global
-    // monitor stops delivering once this app is itself active, which is
-    // exactly what clicking the bar makes it.
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        trackingAreas.forEach(removeTrackingArea)
-        addTrackingArea(NSTrackingArea(rect: bounds,
-                                       options: [.mouseEnteredAndExited, .mouseMoved, .activeAlways, .inVisibleRect],
-                                       owner: self))
-    }
-
-    override func mouseMoved(with event: NSEvent) {
-        let p = convert(event.locationInWindow, from: nil)
-        let hit = rowRects.first(where: { $0.1.contains(p) && rows[$0.0].action != nil })?.0
-        if hit != hoveredRow { hoveredRow = hit; needsDisplay = true }
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        if hoveredRow != nil { hoveredRow = nil; needsDisplay = true }
-        scheduleHullCheck()
-    }
-
-    private func slide(_ event: NSEvent) {
-        let p = convert(event.locationInWindow, from: nil)
-        guard let (index, rect) = rowRects.first(where: { $0.1.contains(p) }),
-              rows[index].slider != nil, let onSlide = rows[index].onSlide else { return }
-        let trackX = rect.minX + 4
-        let trackW = rect.width - 4 - 52
-        onSlide(min(1, max(0, (p.x - trackX) / trackW)))
-    }
-
-    override func mouseDown(with event: NSEvent) { slide(event) }
-    override func mouseDragged(with event: NSEvent) { slide(event) }
-
-    // true when the key belongs to the popup
-    func key(_ code: Int) -> Bool {
-        switch code {
-        case 53: // Esc
-            closePopup()
-        case 125, 126: // ↓, ↑
-            let clickable = rowRects.map(\.0).filter { rows[$0].action != nil && rows[$0].slider == nil }
-            hoveredRow = nextSelection(clickable, from: hoveredRow, by: code == 125 ? 1 : -1)
-            if let row = hoveredRow, let rect = rowRects.first(where: { $0.0 == row })?.1 {
-                scrollToVisible(rect)
-            }
-            needsDisplay = true
-        case 36, 76: // Return, Enter
-            // with no row selected, Return still reaches the front app
-            guard let row = hoveredRow, rows.indices.contains(row), let action = rows[row].action else { return false }
-            action()
-        default:
-            return false
-        }
-        return true
-    }
-
-    override func mouseUp(with event: NSEvent) {
-        let p = convert(event.locationInWindow, from: nil)
-        guard let (index, _) = rowRects.first(where: { $0.1.contains(p) }),
-              rows[index].slider == nil, let action = rows[index].action else { return }
-        action()
-    }
+    var open: Bool? // a section title after foldSections: whether its rows show
 }
 
 final class PopupWindow: NSWindow {
@@ -2197,15 +1926,16 @@ final class PopupWindow: NSWindow {
 }
 
 var popupWindow: PopupWindow?
-var popupView: PopupView?
 var openPopup: String? // which bar item owns it
 
 func closePopup() {
     if openPopup == "wifi" || openPopup == "status" { stopHotspotBrowse() }
+    if openPopup == "activity" { stopActivitySampling() }
     setPopupKeys(false)
     popupWindow?.orderOut(nil)
     popupWindow = nil
-    popupView = nil
+    popupShownRows = []
+    popupSelection = nil
     openPopup = nil
 }
 
@@ -2217,118 +1947,33 @@ func closePopup() {
 var popupTopY: CGFloat = 0
 var popupAnchorX: CGFloat = 0
 var popupAlignLeft = false
+var popupScreen = NSRect.zero // the frame of the bar's screen, which holds the popup
 
 func refreshPopup() {
-    if let name = openPopup, let window = popupWindow,
-       let host = window.contentView as? PanelHost, let view = panelView(name) {
-        host.rootView = view
-        let size = host.fittingSize
-        window.setFrame(NSRect(x: window.frame.maxX - size.width, y: popupTopY - size.height,
-                               width: size.width, height: size.height), display: true)
-        return
-    }
-    // A plugin that failed has no panel: close it, and the next click shows the error.
-    if popupWindow?.contentView is PanelHost { closePopup(); return }
-    guard let name = openPopup, let view = popupView, let window = popupWindow else { return }
-    view.rows = popupRows(for: name)
-    let size = view.measure()
-    let screen = window.screen ?? NSScreen.main
-    var winH = size.height
-    var x = popupAlignLeft ? popupAnchorX : popupAnchorX - size.width
-    if let screen {
-        winH = min(size.height, popupTopY - screen.frame.minY - 20)
-        x = min(max(screen.frame.minX + 6, x), screen.frame.maxX - size.width - 6)
-    }
-    window.setFrame(NSRect(x: x, y: popupTopY - winH,
-                           width: size.width, height: winH), display: false)
-    let box = NSRect(origin: .zero, size: NSSize(width: size.width, height: winH))
-    window.contentView?.frame = box
-    (window.contentView as? NSGlassEffectView)?.contentView?.frame = box
-    view.frame = NSRect(origin: .zero, size: size)
-    view.scroll(NSPoint(x: 0, y: max(0, size.height - winH))) // drilling resets to the top
-    view.needsDisplay = true
-    view.display()
+    guard let name = openPopup, let window = popupWindow, let host = window.contentView as? PanelHost else { return }
+    // A plugin that failed has no panel and no rows: close it.
+    guard let view = panelView(name) else { closePopup(); return }
+    host.rootView = view
+    host.placeWindow()
 }
 
 func showPopup(_ name: String, under anchor: NSRect, on surface: BarSurface, alignLeft: Bool = false) {
     if openPopup == name { closePopup(); return }
     closePopup()
-    if let view = panelView(name) {
-        showPanel(name, view, under: anchor, on: surface)
-        return
-    }
-    let rows = popupRows(for: name)
-    guard !rows.isEmpty else { return }
-
-    let view = PopupView(frame: .zero)
-    view.rows = rows
-    let size = view.measure()
-    view.frame = NSRect(origin: .zero, size: size)
-
-    // right-aligned under the item, clamped to the screen it opened on;
-    // taller-than-screen content (Recent Items) scrolls inside a capped
-    // window instead of running off the display
-    let screen = surface.screen
-    let barBottom = surface.window.frame.minY
-    popupTopY = barBottom - 4
-    popupAnchorX = alignLeft ? anchor.minX : anchor.maxX
-    popupAlignLeft = alignLeft
-    let winH = min(size.height, popupTopY - screen.frame.minY - 20)
-    var x = alignLeft ? anchor.minX : anchor.maxX - size.width
-    x = min(max(screen.frame.minX + 6, x), screen.frame.maxX - size.width - 6)
-    let window = PopupWindow(contentRect: NSRect(x: x, y: popupTopY - winH,
-                                                 width: size.width, height: winH),
-                             styleMask: .borderless, backing: .buffered, defer: false)
-    window.isOpaque = false
-    window.backgroundColor = .clear
-    window.hasShadow = true
-    window.level = .popUpMenu
-    window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
-    window.acceptsMouseMovedEvents = true
-    let scroll = NSScrollView(frame: NSRect(origin: .zero, size: NSSize(width: size.width, height: winH)))
-    scroll.drawsBackground = false
-    scroll.hasVerticalScroller = true
-    scroll.scrollerStyle = .overlay
-    scroll.autohidesScrollers = true
-    scroll.documentView = view
-    scroll.wantsLayer = true
-    scroll.layer?.cornerRadius = popupRadius
-    scroll.layer?.masksToBounds = true
-    scroll.layer?.borderWidth = 1
-    scroll.layer?.borderColor = palette.accent.cgColor
-    if popupGlass {
-        let glass = NSGlassEffectView(frame: scroll.frame)
-        glass.cornerRadius = popupRadius
-        glass.tintColor = palette.barBG.withAlphaComponent(0.5)
-        glass.contentView = scroll
-        window.contentView = glass
-    } else {
-        window.contentView = scroll
-    }
-    view.scroll(NSPoint(x: 0, y: max(0, size.height - winH))) // start at the top
-    window.alphaValue = 0
-    window.orderFrontRegardless()
-    NSAnimationContext.runAnimationGroup { ctx in
-        ctx.duration = dur(0.12)
-        window.animator().alphaValue = 1
-    }
-    popupWindow = window
-    popupView = view
-    openPopup = name
-    setPopupKeys(true)
+    guard let view = panelView(name) else { return }
+    showPanel(name, view, under: anchor, on: surface, alignLeft: alignLeft)
 }
 
 // A click on a pill opens its popup only when the popup has something to show.
 func hasPopup(_ name: String) -> Bool {
     switch name {
     case "weather": return weatherReport != nil
-    case "status", "clock", "menubar": return true
+    case "status", "clock", "menubar", "activity": return true
     default: return pluginPanels[name] != nil || !popupRows(for: name).isEmpty
     }
 }
 
-// The weather, status and clock popups are SwiftUI panels. They draw their own
-// background, so they have no rows, no theme border and take no keys.
+// The popups here are SwiftUI panels. They draw their own background, so they have no rows, no theme border and take no keys.
 func panelView(_ name: String) -> AnyView? {
     switch name {
     case "weather": return weatherReport.map { AnyView(WeatherPanel(report: $0).clipShape(.rect(cornerRadius: 16))) }
@@ -2346,6 +1991,13 @@ func panelView(_ name: String) -> AnyView? {
         case "dock": return AnyView(DockMenuBarPanel(report: report, actions: menuBarActions))
         default: return AnyView(ListMenuBarPanel(report: report, actions: menuBarActions))
         }
+    case "activity":
+        let report = activityReport()
+        switch pillModes["activity_panel"] {
+        case "widgets": return AnyView(WidgetsActivityPanel(report: report, actions: activityActions))
+        case "top": return AnyView(TopActivityPanel(report: report, actions: activityActions))
+        default: return AnyView(MonitorActivityPanel(report: report, actions: activityActions))
+        }
     case "clock":
         let report = calendarReport()
         switch pillModes["clock_panel"] {
@@ -2354,7 +2006,7 @@ func panelView(_ name: String) -> AnyView? {
         default: return AnyView(TimelineCalendarPanel(report: report, actions: calendarActions))
         }
     default:
-        guard let json = pluginPanels[name] else { return nil }
+        guard let json = pluginPanels[name] else { return rowsPanel(popupRows(for: name)) }
         if let report = PRReport(json: json) {
             var actions = PRActions()
             actions.open = { url in
@@ -2399,28 +2051,42 @@ final class PanelHost: NSHostingView<AnyView> {
     // The popup window never becomes key, so the first click must count.
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
-    // A panel can change its own size, as when a section opens. Keep the
-    // top right corner under the pill.
+    // A panel can change its own size, as when a section opens.
     override func layout() {
         super.layout()
-        let size = fittingSize
-        guard let window, abs(size.height - window.frame.height) > 0.5 || abs(size.width - window.frame.width) > 0.5
-        else { return }
-        window.setFrame(NSRect(x: window.frame.maxX - size.width, y: window.frame.maxY - size.height,
-                               width: size.width, height: size.height), display: true)
+        if let window, window.frame.size != fittingSize { placeWindow() }
     }
+
+    // Fit the window to the panel, with its top edge under the bar and its
+    // side at the pill, on the screen.
+    func placeWindow() {
+        guard let window else { return }
+        let size = fittingSize
+        let screen = popupScreen
+        let x = min(max(screen.minX + 6, popupAlignLeft ? popupAnchorX : popupAnchorX - size.width),
+                    screen.maxX - size.width - 6)
+        window.setFrame(NSRect(x: x, y: popupTopY - size.height, width: size.width, height: size.height), display: true)
+    }
+
+    // A tracking area, not a global monitor: a global monitor stops once
+    // this app is active, and a click on the bar makes it active.
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+                                       owner: self))
+    }
+
+    override func mouseExited(with event: NSEvent) { scheduleHullCheck() }
 }
 
-func showPanel(_ name: String, _ view: AnyView, under anchor: NSRect, on surface: BarSurface) {
+func showPanel(_ name: String, _ view: AnyView, under anchor: NSRect, on surface: BarSurface, alignLeft: Bool = false) {
     let host = PanelHost(rootView: view)
-    let size = host.fittingSize
-    let screen = surface.screen
     popupTopY = surface.window.frame.minY - 4
-    popupAnchorX = anchor.maxX
-    popupAlignLeft = false
-    let x = min(max(screen.frame.minX + 6, anchor.maxX - size.width), screen.frame.maxX - size.width - 6)
-    let window = PopupWindow(contentRect: NSRect(x: x, y: popupTopY - size.height,
-                                                 width: size.width, height: size.height),
+    popupScreen = surface.screen.frame
+    popupAnchorX = alignLeft ? anchor.minX : anchor.maxX
+    popupAlignLeft = alignLeft
+    let window = PopupWindow(contentRect: NSRect(origin: .zero, size: host.fittingSize),
                              styleMask: .borderless, backing: .buffered, defer: false)
     window.isOpaque = false
     window.backgroundColor = .clear
@@ -2428,6 +2094,7 @@ func showPanel(_ name: String, _ view: AnyView, under anchor: NSRect, on surface
     window.level = .popUpMenu
     window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
     window.contentView = host
+    host.placeWindow()
     window.alphaValue = 0
     window.orderFrontRegardless()
     NSAnimationContext.runAnimationGroup { ctx in
@@ -2436,6 +2103,69 @@ func showPanel(_ name: String, _ view: AnyView, under anchor: NSRect, on surface
     }
     popupWindow = window
     openPopup = name
+    setPopupKeys(!popupShownRows.isEmpty)
+}
+
+// The rows of an open row popup, and the one the arrow keys selected.
+var popupShownRows: [PopupRow] = []
+var popupSelection: Int?
+
+// Keep in sync with the look of a row in RowsPanel.
+func panelRow(_ row: PopupRow) -> PanelRow {
+    var out = PanelRow()
+    // the app menus mark a submenu with › and the way back with ‹
+    out.submenu = row.icon == "›"
+    out.back = row.icon == "‹"
+    out.icon = out.submenu || out.back ? "" : row.icon
+    out.image = row.image
+    out.text = row.text
+    out.detail = row.detail
+    out.subtitle = row.subtitle
+    out.separator = row.separator
+    out.hero = row.hero
+    out.dim = row.dim
+    out.highlight = row.highlight
+    out.slider = row.slider
+    out.bar = row.inlineBar
+    out.marker = row.marker
+    out.tint = row.tint.map { Color(nsColor: $0) }
+    out.barTint = row.barTint.map { Color(nsColor: $0) }
+    out.iconTint = row.iconTint.map { Color(nsColor: $0) }
+    out.open = row.open
+    out.action = row.action
+    out.onSlide = row.onSlide
+    return out
+}
+
+// A popup of rows as a panel. The screen height caps it, and more rows scroll.
+func rowsPanel(_ rows: [PopupRow]) -> AnyView? {
+    popupShownRows = rows
+    guard !rows.isEmpty else { return nil }
+    if let i = popupSelection, !rows.indices.contains(i) { popupSelection = nil }
+    let limit = (NSScreen.main?.visibleFrame.height ?? 800) - 40
+    return AnyView(RowsPanel(rows: rows.map(panelRow), selected: popupSelection, maxHeight: limit))
+}
+
+// True when the key belongs to the popup.
+func popupKey(_ code: Int) -> Bool {
+    switch code {
+    case 53: // Esc
+        closePopup()
+    case 125, 126: // ↓, ↑
+        let clickable = popupShownRows.indices.filter {
+            popupShownRows[$0].action != nil && popupShownRows[$0].slider == nil
+        }
+        popupSelection = nextSelection(clickable, from: popupSelection, by: code == 125 ? 1 : -1)
+        refreshPopup()
+    case 36, 76: // Return, Enter
+        // with no row selected, Return still reaches the front app
+        guard let i = popupSelection, popupShownRows.indices.contains(i),
+              let action = popupShownRows[i].action else { return false }
+        action()
+    default:
+        return false
+    }
+    return true
 }
 
 // ↑ and ↓ move through the rows of an open popup, Return clicks the row and
@@ -2450,12 +2180,12 @@ func setPopupKeys(_ on: Bool) {
             eventsOfInterest: CGEventMask(1 << CGEventType.keyDown.rawValue),
             callback: { _, type, event, _ in
                 if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-                    if let tap = popupKeyTap, popupView != nil { CGEvent.tapEnable(tap: tap, enable: true) }
+                    if let tap = popupKeyTap, !popupShownRows.isEmpty { CGEvent.tapEnable(tap: tap, enable: true) }
                     return Unmanaged.passUnretained(event)
                 }
                 let modifiers = event.flags.intersection([.maskCommand, .maskControl, .maskAlternate, .maskShift])
-                guard modifiers.isEmpty, let view = popupView,
-                      view.key(Int(event.getIntegerValueField(.keyboardEventKeycode))) else {
+                guard modifiers.isEmpty, !popupShownRows.isEmpty,
+                      popupKey(Int(event.getIntegerValueField(.keyboardEventKeycode))) else {
                     return Unmanaged.passUnretained(event)
                 }
                 return nil
@@ -2587,12 +2317,12 @@ func brightnessRows() -> [PopupRow] {
     // rather than a lying one
     if let ns = blueLightStatus(), ns.available.boolValue {
         let on = ns.enabled.boolValue
-        rows.append(PopupRow(text: "night shift \(on ? "on" : "off")", action: {
+        rows.append(PopupRow(text: "Night Shift \(on ? "On" : "Off")", action: {
             setNightShift(!on)
             refreshPopup()
         }))
     }
-    rows.append(PopupRow(text: "display settings…", dim: true, action: {
+    rows.append(PopupRow(text: "Display Settings…", dim: true, action: {
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Displays-Settings.extension")!)
         closePopup()
     }))
@@ -2621,7 +2351,7 @@ func volumeRows() -> [PopupRow] {
                                  refreshPopup()
                              }))
     }
-    rows.append(PopupRow(text: "sound settings…", dim: true, action: {
+    rows.append(PopupRow(text: "Sound Settings…", dim: true, action: {
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Sound-Settings.extension")!)
         closePopup()
     }))
@@ -2709,24 +2439,24 @@ func batteryRows() -> [PopupRow] {
     var rows: [PopupRow] = []
     let b = batteryInfo()
     if let b {
-        rows.append(PopupRow(text: "battery", detail: "\(b.percent)%", hero: true,
+        rows.append(PopupRow(text: "Battery", detail: "\(b.percent)%", hero: true,
                              inlineBar: Double(b.percent) / 100, tint: b.low ? .systemRed : nil))
         rows.append(PopupRow(text: b.charging ? "charging" : (b.onAC ? "charged, on AC" : "on battery"),
                              detail: b.timeText ?? ""))
     }
     rows.append(PopupRow(separator: true))
-    if let mode = b?.mode { rows.append(PopupRow(text: "mode", detail: mode)) }
-    if let thermal = b?.thermal { rows.append(PopupRow(text: "thermal", detail: thermal)) }
+    if let mode = b?.mode { rows.append(PopupRow(text: "Mode", detail: mode)) }
+    if let thermal = b?.thermal { rows.append(PopupRow(text: "Thermal", detail: thermal)) }
     if let watts = b?.watts {
         rows.append(PopupRow(text: b?.charging == true ? "charging at" : "draw", detail: String(format: "%.1f W", watts)))
     }
-    if let adapter = b?.adapterWatts { rows.append(PopupRow(text: "adapter", detail: "\(adapter) W")) }
+    if let adapter = b?.adapterWatts { rows.append(PopupRow(text: "Adapter", detail: "\(adapter) W")) }
     rows.append(PopupRow(separator: true))
     if let health = b?.health {
         let verdict = health >= 90 ? "" : (health >= 80 ? "  fair" : "  worn")
-        rows.append(PopupRow(text: "health", detail: "\(health)%\(verdict)"))
+        rows.append(PopupRow(text: "Health", detail: "\(health)%\(verdict)"))
     }
-    if let cycles = b?.cycles { rows.append(PopupRow(text: "cycles", detail: "\(cycles)")) }
+    if let cycles = b?.cycles { rows.append(PopupRow(text: "Cycles", detail: "\(cycles)")) }
     rows.append(PopupRow(separator: true))
     rows.append(PopupRow(text: "Battery Settings…", dim: true, action: openBatterySettings))
     return rows
@@ -2920,20 +2650,20 @@ func toggleWifiPower() {
 func wifiRows() -> [PopupRow] {
     let w = wifiInfo()
     var rows: [PopupRow] = [PopupRow(text: w.ssid ?? "wi-fi", hero: true)]
-    rows.append(PopupRow(text: "ip \(w.ip ?? "none")"))
-    if let router = w.router { rows.append(PopupRow(text: "router \(router)")) }
+    rows.append(PopupRow(text: "IP \(w.ip ?? "none")"))
+    if let router = w.router { rows.append(PopupRow(text: "Router \(router)")) }
     if let rssi = w.rssi {
         let verdict = rssi >= -55 ? "excellent" : (rssi >= -67 ? "good" : (rssi >= -75 ? "fair" : "weak"))
-        rows.append(PopupRow(text: "signal \(rssi) dBm  \(verdict)"))
+        rows.append(PopupRow(text: "Signal \(rssi) dBm  \(verdict)"))
     }
     // how fast, and how safe — the two questions the old rows left open
     let link = [w.rate.map { "\($0) Mbps" }, w.security].compactMap { $0 }
-    if !link.isEmpty { rows.append(PopupRow(text: "link " + link.joined(separator: "  "))) }
+    if !link.isEmpty { rows.append(PopupRow(text: "Link " + link.joined(separator: "  "))) }
     if let channel = w.channel {
         rows.append(PopupRow(text: (["channel \(channel)"] + [w.band, w.width].compactMap { $0 }).joined(separator: "  ")))
     }
     rows.append(PopupRow(separator: true))
-    rows.append(PopupRow(text: "networks", dim: true))
+    rows.append(PopupRow(text: "Networks", dim: true))
     // the one you are on leads the list with a tick, the way the macOS
     // menu marks it. A lock on every row says nothing, so only the rare
     // open network carries a word.
@@ -2944,10 +2674,10 @@ func wifiRows() -> [PopupRow] {
         rows.append(PopupRow(icon: wifiStrengthGlyph(network.rssi), text: network.ssid,
                              detail: network.open ? "open" : "", action: { joinWifi(network.ssid) }))
     }
-    if w.networks.isEmpty, w.scanning { rows.append(PopupRow(text: "looking…", dim: true)) }
+    if w.networks.isEmpty, w.scanning { rows.append(PopupRow(text: "Looking…", dim: true)) }
     if !w.phones.isEmpty {
         rows.append(PopupRow(separator: true))
-        rows.append(PopupRow(text: "phones", dim: true))
+        rows.append(PopupRow(text: "Phones", dim: true))
         for phone in w.phones {
             rows.append(PopupRow(icon: "\u{F011C}", text: phone.name,
                                  detail: phone.connected ? "connected" : phone.battery.map { "\($0)%" } ?? "",
@@ -2955,7 +2685,7 @@ func wifiRows() -> [PopupRow] {
                                  action: phone.connected ? nil : { startHotspot(named: phone.name) }))
         }
     }
-    rows.append(PopupRow(text: "network settings…", dim: true, action: openNetworkSettings))
+    rows.append(PopupRow(text: "Network Settings…", dim: true, action: openNetworkSettings))
     return rows
 }
 
@@ -2966,9 +2696,9 @@ func startHotspot(named name: String) {
 }
 
 func bluetoothRows() -> [PopupRow] {
-    var rows: [PopupRow] = [PopupRow(text: "bluetooth", hero: true)]
+    var rows: [PopupRow] = [PopupRow(text: "Bluetooth", hero: true)]
     guard CBCentralManager.authorization == .allowedAlways else {
-        rows.append(PopupRow(text: "no permission in this launch context", dim: true))
+        rows.append(PopupRow(text: "No permission in this launch context", dim: true))
         return rows
     }
     for device in (IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice]) ?? [] {
@@ -2982,7 +2712,7 @@ func bluetoothRows() -> [PopupRow] {
                                  refreshPopup()
                              }))
     }
-    rows.append(PopupRow(text: "bluetooth settings…", dim: true, action: {
+    rows.append(PopupRow(text: "Bluetooth Settings…", dim: true, action: {
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.BluetoothSettings")!)
         closePopup()
     }))
@@ -3017,13 +2747,12 @@ func appleRows() -> [PopupRow] {
         PopupRow(text: "Sleep", action: run("/usr/bin/pmset", ["sleepnow"])),
         PopupRow(text: "Restart…", action: systemEvents("restart")),
         PopupRow(text: "Shut Down…", action: systemEvents("shut down")),
-        PopupRow(text: "theme", detail: currentThemeName(), dim: true,
+        PopupRow(text: "Theme", detail: currentThemeName(), dim: true,
                  action: run("\(NSHomeDirectory())/.local/bin/theme-next", [])),
     ]
 }
 
 func popupRows(for name: String) -> [PopupRow] {
-    popupBarSource = []
     switch name {
     case "apple": return appleMenuRows()
     case "battery": return batteryRows()
@@ -3033,8 +2762,7 @@ func popupRows(for name: String) -> [PopupRow] {
     case "bluetooth": return bluetoothRows()
     case "appmenu": return appMenuRows()
     default:
-        popupBarSource = pluginRows[name] ?? []
-        return foldSections(name, popupBarSource)
+        return foldSections(name, pluginRows[name] ?? [])
     }
 }
 
@@ -3233,6 +2961,245 @@ let menuBarActions: MenuBarActions = {
     return actions
 }()
 
+// MARK: - Activity popup
+
+// The activity popup samples the system only while it is open. A scan of
+// every process takes about 10 ms, so the samples run on their own queue.
+let activityQueue = DispatchQueue(label: "com.omacchiato.bar.activity", qos: .utility)
+let activityHost = mach_host_self()
+let activityInterval = 1.5
+var activityTimer: DispatchSourceTimer?
+var activityGeneration = 0                  // a sample from an older opening is dropped
+var activityLatest: ActivityReport?
+var activitySampler = ActivitySampler()     // activityQueue only
+var activityIcons: [String: NSImage] = [:]
+
+// The kernel's name for the process it charges another process to. It is
+// private, so the lookup gives up quietly on a macOS without it.
+let responsibleFor: (@convention(c) (pid_t) -> pid_t)? = {
+    guard let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "responsibility_get_pid_responsible_for_pid")
+    else { return nil }
+    return unsafeBitCast(symbol, to: (@convention(c) (pid_t) -> pid_t).self)
+}()
+
+func readCPUTicks() -> [CPUTicks] {
+    var count: natural_t = 0
+    var info: processor_info_array_t?
+    var infoCount: mach_msg_type_number_t = 0
+    guard host_processor_info(activityHost, PROCESSOR_CPU_LOAD_INFO, &count, &info, &infoCount) == KERN_SUCCESS,
+          let info else { return [] }
+    defer {
+        vm_deallocate(mach_task_self_, vm_address_t(bitPattern: info),
+                      vm_size_t(Int(infoCount) * MemoryLayout<integer_t>.stride))
+    }
+    return (0..<Int(count)).map { core in
+        func ticks(_ state: Int32) -> UInt64 { UInt64(UInt32(bitPattern: info[core * Int(CPU_STATE_MAX) + Int(state)])) }
+        return CPUTicks(user: ticks(CPU_STATE_USER), system: ticks(CPU_STATE_SYSTEM),
+                        idle: ticks(CPU_STATE_IDLE), nice: ticks(CPU_STATE_NICE))
+    }
+}
+
+func readMemory() -> (used: UInt64, compressed: UInt64, swap: UInt64, pressure: ActivityReport.Pressure) {
+    var stats = vm_statistics64()
+    var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64_data_t>.stride / MemoryLayout<integer_t>.stride)
+    let result = withUnsafeMutablePointer(to: &stats) {
+        $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { host_statistics64(activityHost, HOST_VM_INFO64, $0, &count) }
+    }
+    let page = UInt64(vm_kernel_page_size)
+    let used = result == KERN_SUCCESS
+        ? memoryUsed(anonymous: UInt64(stats.internal_page_count), purgeable: UInt64(stats.purgeable_count),
+                     wired: UInt64(stats.wire_count), compressor: UInt64(stats.compressor_page_count), pageSize: page)
+        : 0
+    var swap = xsw_usage()
+    var swapSize = MemoryLayout<xsw_usage>.size
+    if sysctlbyname("vm.swapusage", &swap, &swapSize, nil, 0) != 0 { swap = xsw_usage() }
+    var level: Int32 = 1
+    var levelSize = MemoryLayout<Int32>.size
+    _ = sysctlbyname("kern.memorystatus_vm_pressure_level", &level, &levelSize, nil, 0)
+    let pressure: ActivityReport.Pressure = level >= 4 ? .critical : (level >= 2 ? .warning : .normal)
+    return (used, result == KERN_SUCCESS ? UInt64(stats.compressor_page_count) * page : 0, swap.xsu_used, pressure)
+}
+
+func readNetwork() -> [String: (rx: UInt32, tx: UInt32)] {
+    var list: UnsafeMutablePointer<ifaddrs>?
+    guard getifaddrs(&list) == 0, let first = list else { return [:] }
+    defer { freeifaddrs(list) }
+    var counters: [String: (rx: UInt32, tx: UInt32)] = [:]
+    for entry in sequence(first: first, next: { $0.pointee.ifa_next }) {
+        let ifa = entry.pointee
+        guard let addr = ifa.ifa_addr, addr.pointee.sa_family == UInt8(AF_LINK), let data = ifa.ifa_data else { continue }
+        let name = String(cString: ifa.ifa_name)
+        guard countsTraffic(name) else { continue }
+        let link = data.assumingMemoryBound(to: if_data.self).pointee
+        counters[name] = (link.ifi_ibytes, link.ifi_obytes)
+    }
+    return counters
+}
+
+final class ActivitySampler {
+    var ticks: [CPUTicks] = []
+    var processes: [ProcessSample] = []
+    var network: [String: (rx: UInt32, tx: UInt32)] = [:]
+    var sampledAt: TimeInterval?
+    var history: [ActivityReport.Load] = []
+    var networkHistory: [Double] = []
+    var paths: [pid_t: (start: UInt64, path: String, responsible: String?)] = [:]
+    var names: [String: String] = [:]
+    let nanosPerTick: Double = {
+        var timebase = mach_timebase_info()
+        mach_timebase_info(&timebase)
+        return Double(timebase.numer) / Double(max(1, timebase.denom))
+    }()
+
+    // proc_pid_rusage fails for processes of other users, such as
+    // WindowServer. The total CPU load still counts them.
+    func readProcesses() -> [ProcessSample] {
+        let size = proc_listallpids(nil, 0)
+        guard size > 0 else { return [] }
+        var pids = [pid_t](repeating: 0, count: Int(size) + 32)
+        let found = proc_listallpids(&pids, Int32(pids.count * MemoryLayout<pid_t>.stride))
+        var samples: [ProcessSample] = []
+        var live: [pid_t: (start: UInt64, path: String, responsible: String?)] = [:]
+        var info = rusage_info_v4()
+        for pid in pids.prefix(Int(max(0, found))) where pid > 0 {
+            let status = withUnsafeMutablePointer(to: &info) {
+                $0.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { proc_pid_rusage(pid, RUSAGE_INFO_V4, $0) }
+            }
+            guard status == 0 else { continue }
+            // a pid that macOS gives to a new process has a new start time
+            var known = paths[pid]
+            if known?.start != info.ri_proc_start_abstime {
+                guard let path = processPath(pid) else { continue }
+                var responsible: String?
+                if appBundle(of: path) == nil, path.contains(".xpc/"), let owner = responsibleFor?(pid), owner != pid {
+                    responsible = processPath(owner)
+                }
+                known = (info.ri_proc_start_abstime, path, responsible)
+            }
+            guard let known else { continue }
+            live[pid] = known
+            let ticks = Double(info.ri_user_time &+ info.ri_system_time)
+            samples.append(ProcessSample(pid: pid, path: known.path, responsible: known.responsible,
+                                         cpuTime: UInt64(ticks * nanosPerTick), memory: info.ri_phys_footprint))
+        }
+        paths = live
+        return samples
+    }
+
+    func processPath(_ pid: pid_t) -> String? {
+        var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN) * 4)
+        guard proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 else { return nil }
+        return String(cString: buffer)
+    }
+
+    func name(_ key: String) -> String {
+        if let name = names[key] { return name }
+        let name = key.hasSuffix(".app") ? FileManager.default.displayName(atPath: key) : processName(key)
+        let clean = name.hasSuffix(".app") ? String(name.dropLast(4)) : name
+        names[key] = clean
+        return clean
+    }
+
+    func sample() -> ActivityReport {
+        let now = ProcessInfo.processInfo.systemUptime
+        let newTicks = readCPUTicks()
+        let newProcesses = readProcesses()
+        let newNetwork = readNetwork()
+        var load: ActivityReport.Load?
+        var cores: [Double] = []
+        var rows: [ActivityReport.Process] = []
+        var rates: (down: Double, up: Double)?
+        if let then = sampledAt {
+            let seconds = now - then
+            if let result = cpuLoad(from: ticks, to: newTicks) {
+                load = result.load
+                cores = result.cores
+                history = appending(result.load, to: history, limit: activityHistoryLimit)
+            }
+            let cpu = processCPU(from: processes, to: newProcesses, seconds: seconds)
+            rows = rankProcesses(newProcesses, cpu: cpu, limit: 10).map {
+                ActivityReport.Process(id: $0.key, name: name($0.key), cpu: $0.cpu, memory: $0.memory, count: $0.count)
+            }
+            let rate = networkRate(from: network, to: newNetwork, seconds: seconds)
+            rates = rate
+            networkHistory = appending(rate.down + rate.up, to: networkHistory, limit: activityHistoryLimit)
+        }
+        ticks = newTicks
+        processes = newProcesses
+        network = newNetwork
+        sampledAt = now
+        let memory = readMemory()
+        return ActivityReport(
+            load: load, history: history, cores: cores,
+            memoryUsed: memory.used, memoryTotal: ProcessInfo.processInfo.physicalMemory,
+            compressed: memory.compressed, swapUsed: memory.swap, pressure: memory.pressure,
+            download: rates?.down, upload: rates?.up, networkHistory: networkHistory, processes: rows,
+            hot: ProcessInfo.processInfo.thermalState.rawValue >= ProcessInfo.ThermalState.serious.rawValue)
+    }
+}
+
+// The first sample only sets a baseline. The second comes soon after, so
+// the popup shows a load at once.
+func startActivitySampling() {
+    guard activityTimer == nil else { return }
+    activityGeneration += 1
+    let generation = activityGeneration
+    let timer = DispatchSource.makeTimerSource(queue: activityQueue)
+    timer.schedule(deadline: .now() + 0.5, repeating: activityInterval, leeway: .milliseconds(100))
+    timer.setEventHandler {
+        let report = activitySampler.sample()
+        DispatchQueue.main.async {
+            guard generation == activityGeneration else { return }
+            activityLatest = report
+            if openPopup == "activity" { refreshPopup() }
+        }
+    }
+    activityQueue.async { _ = activitySampler.sample() }
+    timer.resume()
+    activityTimer = timer
+}
+
+func stopActivitySampling() {
+    activityTimer?.cancel()
+    activityTimer = nil
+    activityGeneration += 1
+    activityLatest = nil
+    activityQueue.async { activitySampler = ActivitySampler() }
+}
+
+func activityReport() -> ActivityReport {
+    startActivitySampling()
+    var report = activityLatest ?? {
+        let memory = readMemory()
+        return ActivityReport(load: nil, memoryUsed: memory.used, memoryTotal: ProcessInfo.processInfo.physicalMemory,
+                              compressed: memory.compressed, swapUsed: memory.swap, pressure: memory.pressure)
+    }()
+    for i in report.processes.indices where report.processes[i].id.hasSuffix(".app") {
+        let key = report.processes[i].id
+        if activityIcons[key] == nil { activityIcons[key] = NSWorkspace.shared.icon(forFile: key) }
+        report.processes[i].icon = activityIcons[key]
+    }
+    return report
+}
+
+let activityActions: ActivityActions = {
+    var actions = ActivityActions()
+    actions.openActivityMonitor = {
+        closePopup()
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.ActivityMonitor") else { return }
+        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+    }
+    if FileManager.default.isExecutableFile(atPath: btopBin) {
+        actions.openTerminalMonitor = {
+            closePopup()
+            DispatchQueue.global(qos: .userInitiated).async {
+                _ = shell("/usr/bin/open", ["-na", terminalApp, "--args", "--title=omacchiato-activity", "--command=\(btopBin)"])
+            }
+        }
+    }
+    return actions
+}()
+
 // By name, not by process: an app can run two of them, and two rows of
 // one name still choose nothing. The scan follows launch order, so the
 // rows moved between openings. Sort by name, and keep one app's own icons
@@ -3404,7 +3371,7 @@ func appleMenuRows() -> [PopupRow] {
     var rows = rowsForMenu(apple, collapseAlternates: true)
     guard !rows.isEmpty else { return appleRows() }
     if rows.last?.separator != true { rows.append(PopupRow(separator: true)) }
-    rows.append(PopupRow(text: "theme", detail: currentThemeName(), dim: true, action: {
+    rows.append(PopupRow(text: "Theme", detail: currentThemeName(), dim: true, action: {
         closePopup()
         DispatchQueue.global(qos: .userInitiated).async {
             _ = shell("\(NSHomeDirectory())/.local/bin/theme-next", [])
@@ -3416,9 +3383,9 @@ func appleMenuRows() -> [PopupRow] {
 func appMenuRows() -> [PopupRow] {
     let opts = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
     guard AXIsProcessTrustedWithOptions(opts) else {
-        return [PopupRow(text: "grant Accessibility to omacchiato-bar", hero: true),
+        return [PopupRow(text: "Grant Accessibility to omacchiato-bar", hero: true),
                 PopupRow(text: "System Settings opened the pane — toggle the bar on,", dim: true),
-                PopupRow(text: "then click the app name again", dim: true)]
+                PopupRow(text: "Then click the app name again", dim: true)]
     }
     // drilled into a menu: its items, behind a back row
     if let top = appMenuStack.last {
@@ -3712,7 +3679,7 @@ final class CheatsheetView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         let body = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5),
-                                xRadius: popupRadius, yRadius: popupRadius)
+                                xRadius: 8, yRadius: 8)
         palette.barBG.setFill()
         body.fill()
         palette.accent.setStroke()
@@ -3964,7 +3931,7 @@ let rightGap = max(0, CGFloat(Double(pillModes["right_gap"] ?? "") ?? 6))
 // horizontal breathing room inside a pill, each side
 let pillPad: CGFloat = 6
 
-// The terminal the activity pill opens btop in. install.sh writes the
+// The terminal the activity popup opens btop in. install.sh writes the
 // RESOLVED choice (apps.local.conf overrides already applied) next to the
 // other daemon configs, because a launchd agent cannot read the repo when
 // the clone sits under ~/Documents — which is exactly where this one is.
@@ -4190,8 +4157,8 @@ final class BarView: NSView {
         chipRects.removeAll()
         itemRects.removeAll()
         mediaRects.removeAll()
-        let chipFont = nerdFont("SemiBold", 13)
-        let appFont = nerdFont("Bold", 13)
+        let chipFont = menuBarFont(.medium)
+        let appFont = menuBarFont(.bold)
         let iconFont = nerdFont("Bold", 14)
         guard let surface else { return }
 
@@ -4454,15 +4421,8 @@ final class BarView: NSView {
             return
         }
         closePopup()
-        switch name {
-        case "activity":
-            DispatchQueue.global(qos: .userInitiated).async {
-                _ = shell("/usr/bin/open", ["-na", terminalApp, "--args", "--title=omacchiato-activity", "--command=\(btopBin)"])
-            }
-        default:
-            // a plugin pill: clicking asks for a fresh value now
-            if let plugin = barPlugins.first(where: { $0.name == name }) { runPlugin(plugin) }
-        }
+        // a plugin pill: clicking asks for a fresh value now
+        if let plugin = barPlugins.first(where: { $0.name == name }) { runPlugin(plugin) }
     }
 
     // Middle click: the quick toggle of a pill, with no popup.
