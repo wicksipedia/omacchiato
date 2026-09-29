@@ -19,6 +19,11 @@ workspace overview with live window previews, and a theme switch that
 recolours the bar, the focus border, the terminal and the wallpaper in
 one command.
 
+[![Watch the one-minute tour of Omacchiato on YouTube](https://img.youtube.com/vi/QfTOFTOCD-w/maxresdefault.jpg)](https://youtu.be/QfTOFTOCD-w)
+
+A one-minute tour: tiling, workspaces, the bar's popups, themes and the
+shortcuts.
+
 Omacchiato is a fork of [omacosy](https://github.com/paulsp94/omacosy)
 by Paul Spende, under the same MIT licence. On a Mac with omacosy
 installed, `install.sh` moves that install to the new names. macOS then
