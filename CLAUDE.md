@@ -127,18 +127,19 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
 - "Omacchiato Settings…" in the Apple menu opens `Settings.swift`, a
   window that becomes key, so it uses system controls. It has a page
   for each pill and plugin, and every key of both files has a control.
-  `builtinPills`, `pluginPrograms`, `pluginKinds` and `panelDesigns`
-  there say what each page offers: add a new pill mode, panel design or
-  plugin script there too. A plugin's page knows it by its program,
+  `builtinPills`, `pluginPrograms` and `pluginKinds`
+  there say what each page offers: add a new pill mode or plugin script
+  there too. A new panel design goes in `panelDesignNames` in
+  `helper/ui/Sources/PanelDesigns`, which the previews read as well. A plugin's page knows it by its program,
   because a plugin prints no panel while its pill is empty. The AI
   usage page reads and writes the script's flags (`AIUsageOptions`,
   keep in sync with `main()` in `bin/omacchiato-ai-usage`). `confSet`,
   `iniSet` and `iniRemove` change one line or section and keep comments
   and order.
-- A popup with designs shows them in the settings as thumbnails, then
-  the chosen one at full size. They are the real panels, drawn through
-  the same `statusPanel`, `prPanel` and like functions in `Popups.swift`
-  as the popup, with the sample data in each module's `…Samples.swift`.
+- A popup with designs shows them in the settings as thumbnails, each
+  scaled to fit the whole panel. They are the real panels, drawn through
+  the same `statusPanel`, `prPanel` and like functions in
+  `helper/ui/Sources/PanelDesigns` as the popup, with the sample data in each module's `…Samples.swift`.
   Those samples build into the bar, not only into the Xcode previews.
   A sample that carries a read time is a computed `static var`, so its
   "Updated … ago" stays minutes old in a bar that runs for days.

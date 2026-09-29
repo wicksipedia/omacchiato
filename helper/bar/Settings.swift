@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 #if canImport(StatusGauge)
+import PanelDesigns
 import SettingsPanel
 import ThemePanel
 #endif
@@ -65,14 +66,7 @@ let pluginKinds: [String: PillInfo] = [
     "stats": .init(title: "Stats", symbol: "chart.bar.fill", tint: "teal", summary: "CPU, memory or disk use."),
 ]
 
-let panelDesigns: [String: [SettingsReport.Choice]] = [
-    "status": [.init(nil, "Gauge"), .init("control-center", "Control Center"), .init("settings", "Settings")],
-    "menubar": [.init(nil, "List"), .init("grid", "Grid"), .init("dock", "Dock")],
-    "activity": [.init(nil, "Monitor"), .init("widgets", "Widgets"), .init("top", "Top")],
-    "clock": [.init(nil, "Timeline"), .init("up-next", "Up Next"), .init("month", "Month")],
-    "github-prs": [.init(nil, "Inbox"), .init("reminders", "Reminders"), .init("tracker", "Tracker")],
-    "ai-usage": [.init(nil, "Rings"), .init("screen-time", "Screen Time"), .init("forecast", "Forecast")],
-]
+let panelDesigns = panelDesignNames.mapValues { $0.map { SettingsReport.Choice($0.value, $0.title) } }
 
 func settingsReport() -> SettingsReport {
     func pill(_ key: String, _ info: PillInfo, group: SettingsReport.Pill.Group, designs: String) -> SettingsReport.Pill {

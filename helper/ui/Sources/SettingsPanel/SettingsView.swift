@@ -178,9 +178,6 @@ struct SettingsPillPage: View {
                         if let options = pill.aiUsage {
                             SettingsAIUsagePopup(options: options) { actions.setPlugin(pill.key, "command", $0.command) }
                         }
-                        if let kind = pill.panelKind, let chosen = actions.preview(kind, pill.panelValue) {
-                            SettingsDesignPreview(view: chosen)
-                        }
                     } header: {
                         Text("Popup")
                     } footer: {
@@ -207,8 +204,6 @@ struct SettingsDesignPicker: View {
     var kind: String
     var actions: SettingsActions
 
-    static let thumbScale: CGFloat = 0.36
-
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
                 ForEach(pill.shownPanelDesigns, id: \.self) { choice in
@@ -233,33 +228,31 @@ struct SettingsDesignPicker: View {
         .padding(.vertical, 6)
     }
 
-    // The top of the panel, scaled down on a desktop. A tall panel is cut off.
     func thumbnail(_ view: AnyView?) -> some View {
-        (view ?? AnyView(EmptyView()))
-            .fixedSize()
-            .allowsHitTesting(false)
-            .scaleEffect(Self.thumbScale, anchor: .top)
-            .padding(.top, 10)
-            .frame(width: 150, height: 180, alignment: .top)
+        SettingsThumbnail(view: view ?? AnyView(EmptyView()))
+            .frame(width: 170, height: 230)
             .background(settingsDesktop)
             .clipShape(.rect(cornerRadius: 10))
             .accessibilityHidden(true)
     }
 }
 
-// The chosen design at full size, on a desktop as wide as the form.
-struct SettingsDesignPreview: View {
+// The whole panel, scaled down to fit its box. Panels differ in height,
+// so the scale comes from the panel's own size.
+struct SettingsThumbnail: View {
     var view: AnyView
+    @State private var size = CGSize.zero
 
     var body: some View {
-        view.fixedSize()
-            .allowsHitTesting(false)
-            .padding(24)
-            .frame(maxWidth: .infinity)
-            .background(settingsDesktop)
-            .clipShape(.rect(cornerRadius: 12))
-            .padding(.vertical, 6)
-            .accessibilityHidden(true)
+        GeometryReader { box in
+            let room = CGSize(width: box.size.width - 16, height: box.size.height - 16)
+            let scale = size.width > 0 ? min(room.width / size.width, room.height / size.height, 1) : 0
+            view.fixedSize()
+                .allowsHitTesting(false)
+                .onGeometryChange(for: CGSize.self) { $0.size } action: { size = $0 }
+                .scaleEffect(scale)
+                .frame(width: box.size.width, height: box.size.height)
+        }
     }
 }
 
