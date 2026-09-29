@@ -244,9 +244,9 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
 - The native menu bar auto-hides (`_HIHideMenuBar`,
   `AutoHideMenuBarOption`), and the bar sits in its place.
 - `demo = on` in `bar-pills.conf` makes `panelView` draw the popups
-  that show private data (clock, weather, status, wi-fi, activity, pull
-  requests and AI usage) from the sample data, and hides the clock's
-  event name. Use it for a screen recording that goes public.
+  that show private data (clock, weather, status, wi-fi, activity, menu
+  bar apps, pull requests and AI usage) from the sample data, and hides the clock's
+  event name and the user's name in the Apple menu. Use it for a screen recording that goes public.
 - `omacchiato-popup <item> [display]` writes `/tmp/omacchiato-bar-popup`, and
   the bar opens that item's popup as a click would. It reads the file
   50 ms after a change, because a shell redirect empties the file first.

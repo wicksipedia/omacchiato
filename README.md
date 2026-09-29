@@ -29,7 +29,7 @@ by Paul Spende, under the same MIT licence. On a Mac with omacosy
 installed, `install.sh` moves that install to the new names. macOS then
 asks again for the permissions of the bar and the gesture daemon.
 
-![The Omacchiato desktop under the catppuccin-latte theme: the bar in place of the menu bar, over the theme's wallpaper](docs/screenshots/desktop.jpg)
+![The Omacchiato desktop under the catppuccin-latte theme: the bar in place of the menu bar, over the theme's wallpaper, on an empty workspace](docs/screenshots/desktop.jpg)
 
 Numbers from this repo, measured on the author's desk:
 
@@ -179,7 +179,7 @@ The gauge replaces the separate wi-fi and battery pills by default.
 `wifi = icon` or `battery = time` in `bar-pills.conf` brings either one
 back, and `status = hide` removes the gauge.
 
-<img src="docs/screenshots/bar-left.png" width="760" alt="Left end of the bar: the Apple menu, workspace chips with the apps on each workspace, the front app's name, and the song playing in Music">
+<img src="docs/screenshots/bar-left.png" width="760" alt="Left end of the bar: the Apple menu, workspace chips with the apps on each workspace and workspace 5 lit, the front app's name, and the song playing in Music">
 
 Left to right:
 
@@ -210,9 +210,9 @@ Left to right:
   Click the title to open Music. Scroll on it to skip to the next or
   previous track.
 
-<img src="docs/screenshots/popup-apple.png" width="220" alt="The Apple menu popup under its lit pill, drawn as a macOS menu: About This Mac, System Information, System Settings, App Store, Recent Items with a submenu chevron, Force Quit, Sleep, Restart, Shut Down, Lock Screen, Log Out, and Omacchiato's theme row naming the current theme at the bottom">
+<img src="docs/screenshots/popup-apple.png" width="220" alt="The Apple menu popup, drawn as a macOS menu: About This Mac, System Information, System Settings, App Store, Recent Items with a submenu chevron, Force Quit, Sleep, Restart, Shut Down, Lock Screen, Log Out, and Omacchiato Settings at the bottom">
 
-<img src="docs/screenshots/bar-right.png" width="620" alt="Right end of the bar: the menu bar apps grid, the Claude usage pill at 17%, the keep-awake cup, the GitHub pill with two open pull requests, the update pill with one new commit, the weather at 16°C, the status gauge with a nearly full ring and three lit dots, the date and time, and the activity pill">
+<img src="docs/screenshots/bar-right.png" width="620" alt="Right end of the bar: the menu bar apps grid, the AI usage pill at 8% with 1:58 until it resets, the GitHub pill with two open pull requests, the weather at 18°C, the status gauge, the date and time, and the activity pill">
 
 - **Menu bar apps**: the grid pill lists the third-party apps that have
   an icon in the hidden macOS menu bar, with each app's own icon.
@@ -269,18 +269,21 @@ Left to right:
   in your terminal. `activity_panel` in `bar-pills.conf` picks another
   design.
 
+The popup screenshots show sample data: `demo = on` in `bar-pills.conf`
+swaps the popups that show private data for it.
+
 <table>
   <tr>
     <td valign="top"><img src="docs/screenshots/popup-menubar.png" width="300" alt="The menu bar apps popup: one row per third-party icon in the hidden menu bar with the app's own icon, sorted by name, two OneDrive icons told apart by their account names, and an open-app mark on the rows whose icon the notch hides"></td>
-    <td valign="top"><img src="docs/screenshots/popup-status.png" width="320" alt="The status popup: the gauge drawn large with 99% charging, the wi-fi switch, tiles for power, battery health, signal, link, channel and address, the networks in range with a tick on the one in use, the iPhones that can share a hotspot with their battery, and rows for battery and wi-fi settings. Network names, the address and phone names are blurred here"></td>
+    <td valign="top"><img src="docs/screenshots/popup-status.png" width="320" alt="The status popup in its Settings design: the battery at 64% with 3 hours 12 minutes left, rows for power draw, health and cycles, the wi-fi switch with signal, link, channel, address and router, the networks in range with a tick on the one in use, and an iPhone that can share its hotspot"></td>
   </tr>
   <tr>
-    <td valign="top"><img src="docs/screenshots/popup-clock.png" width="340" alt="The clock popup: today's weekday and date, the month grid with today in a red circle, today's all-day events, and a timeline of today's events from the current hour, each in the colour of its calendar. Event names are blurred here"></td>
-    <td valign="top"><img src="docs/screenshots/popup-activity.png" width="320" alt="The activity popup: CPU at 14% with user and system shares, a one-minute load graph and a bar per core, memory at 42 GB of 64 GB with normal pressure, the network rates with a graph, the apps that use the most CPU with their memory, and rows that open Activity Monitor and btop"></td>
+    <td valign="top"><img src="docs/screenshots/popup-clock.png" width="340" alt="The clock popup: today's weekday and date, the month grid with today in a red circle, and a timeline of today's events from the current hour, each in the colour of its calendar"></td>
+    <td valign="top"><img src="docs/screenshots/popup-activity.png" width="320" alt="The activity popup in its Widgets design: tiles for CPU at 75% with a graph, memory at 86% of 16 GB with high pressure, the network rates with a graph, and the busiest process, then the apps that use the most CPU and a row that opens Activity Monitor"></td>
   </tr>
 </table>
 
-<img src="docs/screenshots/popup-weather.png" width="340" alt="The weather popup over a grey, rainy sky: the place (blurred here), 16° with patchy rain nearby, feels like 13° with a low of 15° and a high of 16°, an hourly forecast in 3-hour steps with the chance of rain, a 3-day forecast with a temperature bar for each day, and tiles for wind, humidity, UV index, sunrise and sunset">
+<img src="docs/screenshots/popup-weather.png" width="340" alt="The weather popup over a blue sky: the place, 21° and partly cloudy, feels like 19° with a low of 13° and a high of 23°, an hourly forecast with the chance of rain, a 3-day forecast with a temperature bar for each day, tiles for wind, humidity, UV index and sunrise, and the time of the last update">
 
 A popup stays open while the pointer is anywhere in the bar or the
 popup, and closes when it is in neither. While it is open, its pill
@@ -333,8 +336,8 @@ popup rows, and the bar draws the result. The format is under
 
 <table>
   <tr>
-    <td valign="top"><img src="docs/screenshots/popup-claude.png" width="340" alt="The AI usage popup: the Claude section open with its logo and plan, three rings for the session, weekly and Fable windows, each with its percent and the time until it resets; Codex and Copilot closed with their usage; and the last seven days as a bar chart of tokens per day and model, with an average line and the cost at API prices"></td>
-    <td valign="top"><img src="docs/screenshots/popup-github.png" width="380" alt="The GitHub pull requests popup: two open PRs, a bar that counts them by stage, the In Review group with a row per PR that shows its title, repository and number, lines added and removed, its checks and its age, and a row that opens all pull requests on GitHub"></td>
+    <td valign="top"><img src="docs/screenshots/popup-claude.png" width="340" alt="The AI usage popup: Claude with three rings for the session, weekly and Fable windows, each with its percent and the time until it resets; Codex with its 5-hour and weekly windows; Copilot at 34%; and the last seven days as a bar chart of tokens per day and model, with the cost at API prices"></td>
+    <td valign="top"><img src="docs/screenshots/popup-github.png" width="380" alt="The GitHub pull requests popup: six open PRs and a bar that counts them by stage, then groups for Needs You, Checks Running, In Review, Ready to Merge, Drafts and Done, each row with the PR's title, repository and number, lines added and removed, and its age, and a row that opens all pull requests on GitHub"></td>
   </tr>
 </table>
 

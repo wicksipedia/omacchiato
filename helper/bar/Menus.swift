@@ -608,6 +608,10 @@ func appleMenuRows() -> [PopupRow] {
     else { return appleRows() }
     var rows = rowsForMenu(apple, depth: 0, collapseAlternates: true)
     guard !rows.isEmpty else { return appleRows() }
+    // "Log Out <full name>…" names the user, so demo mode drops the name.
+    if demoMode {
+        rows = rows.map { var row = $0; row.text = row.text.replacingOccurrences(of: " " + NSFullUserName(), with: ""); return row }
+    }
     if rows.last?.separator != true { rows.append(PopupRow(separator: true)) }
     rows.append(PopupRow(text: "Omacchiato Settings…", dim: true, action: showSettings,
                          hover: { openSubmenu(nil, depth: 0, after: 0.2) }))

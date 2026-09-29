@@ -129,6 +129,7 @@ func demoPanel(_ name: String) -> AnyView? {
     case "wifi": return AnyView(WifiPanel(report: .onBattery))
     case "clock": return calendarPanel(pillModes["clock_panel"], .busy, .init())
     case "activity": return activityPanel(pillModes["activity_panel"], .building, .init())
+    case "menubar": return menuBarPanel(pillModes["menubar_panel"], .busy, .init())
     default:
         guard let json = pluginPanels[name] else { return nil }
         if PRReport(json: json) != nil { return prPanel(pillModes[name + "_panel"], .busy, .init()) }
