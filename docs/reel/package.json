@@ -1,0 +1,17 @@
+{
+  "name": "omacchiato-reel",
+  "private": true,
+  "description": "The one-minute video tour of Omacchiato, rendered with Remotion.",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "./render.sh"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.529",
+    "@types/react": "^19.3.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "remotion": "^4.0.529",
+    "typescript": "^7.0.2"
+  }
+}
