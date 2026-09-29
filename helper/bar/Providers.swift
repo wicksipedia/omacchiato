@@ -36,7 +36,7 @@ func updateClock() {
     set("clock") {
         $0.icon = "󰃰"
         $0.label = f.string(from: now)
-        $0.tickerText = next.map { $0.title ?? "event" } ?? ""
+        $0.tickerText = demoMode ? "" : next.map { $0.title ?? "event" } ?? ""
         $0.tickerTail = next.flatMap { soonLabel(start: $0.startDate, allDay: $0.isAllDay, now: now) } ?? ""
     }
 }

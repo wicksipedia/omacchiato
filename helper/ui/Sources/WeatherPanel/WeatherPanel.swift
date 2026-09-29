@@ -356,17 +356,8 @@ struct RangeBar: View {
     }
 }
 
-#if DEBUG
 extension WeatherReport {
-    // A real wttr.in answer, with the place replaced.
-    static var fixture: WeatherReport {
-        let url = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent().appendingPathComponent("../../../../tests/fixtures/wttr-j1.json")
-        let noon = Calendar.current.date(bySettingHour: 10, minute: 0, second: 0, of: Date())!
-        return (try? Data(contentsOf: url)).flatMap { WeatherReport(j1: $0, now: noon) } ?? WeatherReport()
-    }
-
-    static func sample(_ code: Int, night: Bool = false, temp: Int = 24, updatedAt: Date = Date()) -> WeatherReport {
+    public static func sample(_ code: Int, night: Bool = false, temp: Int = 24, updatedAt: Date = Date()) -> WeatherReport {
         var r = WeatherReport()
         r.updatedAt = updatedAt
         r.location = "Springfield"
@@ -396,6 +387,17 @@ extension WeatherReport {
         r.sunset = "05:55 PM"
         r.moon = "Waning Gibbous"
         return r
+    }
+}
+
+#if DEBUG
+extension WeatherReport {
+    // A real wttr.in answer, with the place replaced.
+    static var fixture: WeatherReport {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().appendingPathComponent("../../../../tests/fixtures/wttr-j1.json")
+        let noon = Calendar.current.date(bySettingHour: 10, minute: 0, second: 0, of: Date())!
+        return (try? Data(contentsOf: url)).flatMap { WeatherReport(j1: $0, now: noon) } ?? WeatherReport()
     }
 }
 

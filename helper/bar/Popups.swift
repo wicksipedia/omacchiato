@@ -118,7 +118,27 @@ func hasPopup(_ name: String) -> Bool {
 }
 
 // Every case returns a SwiftUI panel. The default case draws plugin and built-in rows as a menu.
+// `demo = on` in bar-pills.conf swaps the popups that show private data
+// for the sample data of the previews, so a screen recording can go public.
+var demoMode: Bool { pillModes["demo"] == "on" }
+
+func demoPanel(_ name: String) -> AnyView? {
+    switch name {
+    case "weather": return AnyView(WeatherPanel(report: .sample(116, temp: 21)).clipShape(.rect(cornerRadius: 16)))
+    case "status": return statusPanel(pillModes["status_panel"], .onBattery, .init())
+    case "wifi": return AnyView(WifiPanel(report: .onBattery))
+    case "clock": return calendarPanel(pillModes["clock_panel"], .busy, .init())
+    case "activity": return activityPanel(pillModes["activity_panel"], .building, .init())
+    default:
+        guard let json = pluginPanels[name] else { return nil }
+        if PRReport(json: json) != nil { return prPanel(pillModes[name + "_panel"], .busy, .init()) }
+        if AIUsageReport(json: json) != nil { return aiUsagePanel(pillModes[name + "_panel"], .busy, .init()) }
+        return nil
+    }
+}
+
 func panelView(_ name: String) -> AnyView? {
+    if demoMode, let view = demoPanel(name) { return view }
     switch name {
     case "weather":
         return weatherReport.map { AnyView(WeatherPanel(report: $0, refresh: updateWeather).clipShape(.rect(cornerRadius: 16))) }
@@ -178,9 +198,6 @@ func panelView(_ name: String) -> AnyView? {
     }
 }
 
-// Each design of a panel, by its name in bar-pills.conf. The popup and the
-// settings window's preview both draw through these, so they cannot differ.
-// Keep the names in sync with panelDesigns in Settings.swift.
 func airPodsActions(plugin name: String, settings: URL?) -> AirPodsActions {
     var actions = AirPodsActions()
     actions.openSettings = {
