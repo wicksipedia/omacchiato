@@ -1,11 +1,22 @@
 #!/usr/bin/env python3
-"""Print a bar pill while something is deliberately keeping the Mac awake."""
+"""The keep-awake pill, and the command that turns keep awake on and off.
+
+`omacchiato-keep-awake on | off | toggle | for <minutes>` writes the state
+file, and the bar holds the Mac awake while it reads on. With no argument,
+the script prints the pill: a dimmed cup while off, the accent cup while
+on or while another process holds the Mac awake.
+"""
 
 import json
+import os
 import re
 import subprocess
+import sys
+import time
 
 AWAKE_ICON = "\U000f0176"
+# Keep in sync with helper/bar/KeepAwake.swift.
+STATE = os.path.expanduser("~/.local/state/omacchiato/keep-awake")
 
 
 # Background daemons hold an idle assertion as a matter of course: powerd
@@ -90,19 +101,70 @@ def panel_holder(name, pid, age):
     return {"name": name, "pid": pid, "duration": duration(age)}
 
 
-def main():
-    # nothing holding it is the ordinary state, and a pill for the ordinary
-    # state is one more thing to read past
-    awake = holders()
-    if not awake:
-        print(json.dumps({"label": "", "icon": ""}))
-        return
+def read_state(text, now):
+    """(on, end time) from the state file: "on", "off", or an end time."""
+    text = text.strip()
+    if text == "on":
+        return True, None
+    try:
+        until = float(text)
+    except ValueError:
+        return False, None
+    return (True, until) if until > now else (False, None)
 
-    rows = [{"text": "Keeping Awake", "hero": True}]
+
+def next_state(args, on, now):
+    """The state file text for a command. Raises ValueError for a bad one."""
+    if args == ["on"]:
+        return "on"
+    if args == ["off"]:
+        return "off"
+    if args == ["toggle"]:
+        return "off" if on else "on"
+    if len(args) == 2 and args[0] == "for":
+        minutes = int(args[1])
+        if minutes > 0:
+            return str(int(now + minutes * 60))
+    raise ValueError("usage: omacchiato-keep-awake [on | off | toggle | for <minutes>]")
+
+
+def time_left(until, now):
+    minutes = max(1, round((until - now) / 60))
+    return f"{minutes // 60}h {minutes % 60}m" if minutes >= 60 else f"{minutes}m"
+
+
+def render(on, until, awake, now, script):
+    rows = [{"text": "Keeping Awake" if on or awake else "Sleep Allowed", "hero": True}]
     rows += [{"text": name, "detail": duration(age)} for name, _, age in awake]
-    panel = {"kind": "keep-awake", "holders": [panel_holder(*h) for h in awake]}
-    print(json.dumps({"label": "", "icon": AWAKE_ICON, "color": "accent",
-                      "rows": rows, "panel": panel}, ensure_ascii=False))
+    panel = {"kind": "keep-awake", "on": on, "until": until,
+             "holders": [panel_holder(*h) for h in awake]}
+    return {"label": time_left(until, now) if on and until else "", "icon": AWAKE_ICON,
+            "color": "accent" if on or awake else "muted", "right_click": script + " toggle",
+            "rows": rows, "panel": panel}
+
+
+def load_state(now):
+    try:
+        with open(STATE) as f:
+            return read_state(f.read(), now)
+    except OSError:
+        return False, None
+
+
+def main():
+    now = time.time()
+    on, until = load_state(now)
+    if len(sys.argv) > 1:
+        try:
+            text = next_state(sys.argv[1:], on, now)
+        except ValueError as e:
+            sys.exit(str(e))
+        os.makedirs(os.path.dirname(STATE), exist_ok=True)
+        with open(STATE + ".tmp", "w") as f:
+            f.write(text + "\n")
+        os.replace(STATE + ".tmp", STATE)
+        return
+    print(json.dumps(render(on, until, holders(), now, os.path.abspath(sys.argv[0])), ensure_ascii=False))
 
 
 if __name__ == "__main__":

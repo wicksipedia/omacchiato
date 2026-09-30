@@ -29,5 +29,51 @@ class PanelHolder(unittest.TestCase):
                          {"name": "Steam", "pid": 812, "duration": "1h 26m"})
 
 
+class State(unittest.TestCase):
+    def test_the_file_reads_as_off_on_or_on_until_a_time(self):
+        self.assertEqual(ka.read_state("", 100), (False, None))
+        self.assertEqual(ka.read_state("off\n", 100), (False, None))
+        self.assertEqual(ka.read_state("on\n", 100), (True, None))
+        self.assertEqual(ka.read_state("400\n", 100), (True, 400))
+        self.assertEqual(ka.read_state("junk", 100), (False, None))
+
+    def test_an_end_time_in_the_past_reads_as_off(self):
+        self.assertEqual(ka.read_state("99", 100), (False, None))
+
+    def test_each_command_writes_its_state(self):
+        self.assertEqual(ka.next_state(["on"], False, 100), "on")
+        self.assertEqual(ka.next_state(["off"], True, 100), "off")
+        self.assertEqual(ka.next_state(["toggle"], True, 100), "off")
+        self.assertEqual(ka.next_state(["toggle"], False, 100), "on")
+        self.assertEqual(ka.next_state(["for", "30"], False, 100), "1900")
+
+    def test_a_bad_command_is_refused(self):
+        for args in (["for"], ["for", "0"], ["for", "x"], ["sometimes"]):
+            with self.assertRaises(ValueError):
+                ka.next_state(args, False, 100)
+
+
+class Pill(unittest.TestCase):
+    def test_off_shows_a_dimmed_cup_that_a_right_click_turns_on(self):
+        p = ka.render(False, None, [], 100, "/bin/ka")
+        self.assertEqual((p["icon"], p["color"], p["label"]), (ka.AWAKE_ICON, "muted", ""))
+        self.assertEqual(p["right_click"], "/bin/ka toggle")
+        self.assertEqual((p["panel"]["on"], p["panel"]["until"]), (False, None))
+
+    def test_on_shows_the_accent_cup(self):
+        p = ka.render(True, None, [], 100, "/bin/ka")
+        self.assertEqual((p["color"], p["label"]), ("accent", ""))
+        self.assertTrue(p["panel"]["on"])
+
+    def test_a_timed_run_shows_the_time_left(self):
+        self.assertEqual(ka.render(True, 100 + 45 * 60, [], 100, "/bin/ka")["label"], "45m")
+        self.assertEqual(ka.render(True, 100 + 65 * 60, [], 100, "/bin/ka")["label"], "1h 5m")
+
+    def test_another_holder_lights_the_cup_while_ours_is_off(self):
+        p = ka.render(False, None, [("Steam", 812, "01:26:17")], 100, "/bin/ka")
+        self.assertEqual(p["color"], "accent")
+        self.assertEqual(p["panel"]["holders"][0]["name"], "Steam")
+
+
 if __name__ == "__main__":
     unittest.main()

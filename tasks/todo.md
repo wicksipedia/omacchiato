@@ -4,7 +4,7 @@ Plan: `tasks/plan.md`. Design: `docs/plans/2026-09-30-keep-awake-and-quit-on-clo
 
 ## Phase 1: keep awake from the command line
 - [x] T1 Spike: which posted event resets the idle time (XS)
-- [ ] T2 State file, command and always-on pill (S)
+- [x] T2 State file, command and always-on pill (S)
 - [ ] T3 The bar holds the assertion from the state file (M)
 - [ ] Checkpoint A: assertion follows the command; review with the user
 
