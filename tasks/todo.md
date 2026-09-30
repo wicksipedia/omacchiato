@@ -20,7 +20,7 @@ Plan: `tasks/plan.md`. Design: `docs/plans/2026-09-30-keep-awake-and-quit-on-clo
 ## Phase 3: lid closed
 - [x] T10 Sudoers rule in install.sh and uninstall.sh (S)
 - [x] T11 The bar sets disablesleep with keep awake (S)
-- [ ] Checkpoint C: release; remove Vorssaint's lid setting
+- [x] Checkpoint C: release; remove Vorssaint's lid setting (tested with the lid, release pending)
 
 ## Phase 4: quit on close
 - [ ] T12 Spike: AX windows with OmniWM parked windows (XS)
