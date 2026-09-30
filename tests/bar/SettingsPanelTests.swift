@@ -118,4 +118,23 @@ import Testing
                 == quitExceptionsHeader + "\ncom.apple.Music\ncom.raycast.macos\n")
         #expect(quitExceptionsText([]) == quitExceptionsHeader + "\n")
     }
+
+    @Test("the sidebar lists Music on the left, shown pills in bar order, then hidden ones, and features apart")
+    func sidebar() {
+        typealias Pill = SettingsReport.Pill
+        let report = SettingsReport(pills: [
+            Pill(key: "media", title: "Music", symbol: "", canHide: false),
+            Pill(key: "clock", title: "Clock", symbol: ""),
+            Pill(key: "wifi", title: "Wi-Fi", symbol: "", optIn: true),
+            Pill(key: "status", title: "Status", symbol: ""),
+            Pill(key: "github", title: "Pull Requests", symbol: "", group: .plugins),
+            Pill(key: "keepawake", title: "Keep Awake", symbol: "", group: .features),
+        ], order: ["github", "status", "wifi", "clock", "keepawake"])
+        let sidebar = report.sidebar
+        #expect(sidebar.left.map(\.key) == ["media"])
+        #expect(sidebar.shown.map(\.key) == ["github", "status", "clock"])
+        #expect(sidebar.hidden.map(\.key) == ["wifi"])
+        #expect(sidebar.features.map(\.key) == ["keepawake"])
+    }
 }
+

@@ -11,7 +11,7 @@ Plan: `tasks/plan.md`.
 - [x] Checkpoint A: drag Clock above Status; review with the user
 
 ## Phase 2: sidebar by task
-- [ ] S3 Regroup the sidebar (M)
+- [x] S3 Regroup the sidebar (M)
 - [ ] S4 A HUDs & Sounds page (S)
 - [ ] Checkpoint B: every key has a control; review with the user
 

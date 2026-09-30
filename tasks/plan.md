@@ -83,7 +83,7 @@ git history (commit 257d382 and earlier).
 - [ ] Review with the user, with a day of memory lines
 
 ### Phase 2: sidebar by task
-- [ ] S3: Regroup the sidebar
+- [x] S3: Regroup the sidebar
 - [ ] S4: A HUDs & Sounds page
 
 ### Checkpoint B

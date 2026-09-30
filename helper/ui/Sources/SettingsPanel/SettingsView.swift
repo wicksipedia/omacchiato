@@ -9,7 +9,7 @@ import ThemePanel
 // this window becomes key, so it uses the system controls.
 public struct SettingsView: View {
     public enum Page: Hashable {
-        case layout, theme, files, addPlugin, quitOnClose
+        case layout, theme, files, addPlugin, quitOnClose, debug
         case pill(String)
     }
 
@@ -25,20 +25,25 @@ public struct SettingsView: View {
 
     public var body: some View {
         NavigationSplitView {
+            let sidebar = report.sidebar
             List(selection: $page) {
                 Section("General") {
                     SettingsSidebarRow(title: "Theme", symbol: "paintpalette.fill", tint: "indigo").tag(Page.theme)
                     SettingsSidebarRow(title: "Bar", symbol: "rectangle.split.3x1", tint: "gray").tag(Page.layout)
+                }
+                if !sidebar.left.isEmpty { Section("Left of the Bar") { rows(sidebar.left) } }
+                Section("Right of the Bar") { rows(sidebar.shown) }
+                if !sidebar.hidden.isEmpty { Section("Hidden") { rows(sidebar.hidden) } }
+                Section("Features") {
                     if report.quitOnClose != nil {
                         SettingsSidebarRow(title: "Quit on Close", symbol: "xmark.square.fill", tint: "red")
                             .tag(Page.quitOnClose)
                     }
-                    SettingsSidebarRow(title: "Config Files", symbol: "doc.text", tint: "gray").tag(Page.files)
+                    rows(sidebar.features)
                 }
-                Section("Bar") { rows(.bar) }
-                Section("Plugins") {
-                    rows(.plugins)
-                    SettingsSidebarRow(title: "Add Plugin", symbol: "plus", tint: "green").tag(Page.addPlugin)
+                Section("Advanced") {
+                    SettingsSidebarRow(title: "Config Files", symbol: "doc.text", tint: "gray").tag(Page.files)
+                    SettingsSidebarRow(title: "Debug", symbol: "ladybug.fill", tint: "gray").tag(Page.debug)
                 }
             }
             .navigationSplitViewColumnWidth(min: 190, ideal: 210, max: 260)
@@ -62,6 +67,8 @@ public struct SettingsView: View {
                 .navigationTitle("Theme")
             case .files?:
                 SettingsFilesPage(report: report, actions: actions)
+            case .debug?:
+                SettingsDebugPage(on: report.debug, actions: actions)
             case .quitOnClose?:
                 if let quit = report.quitOnClose { SettingsQuitOnClosePage(quit: quit, actions: actions) }
             case .addPlugin?:
@@ -73,8 +80,8 @@ public struct SettingsView: View {
         .frame(minWidth: 680, idealWidth: 760, minHeight: 460, idealHeight: 580)
     }
 
-    func rows(_ group: SettingsReport.Pill.Group) -> some View {
-        ForEach(report.pills.filter { $0.group == group }) { pill in
+    func rows(_ pills: [SettingsReport.Pill]) -> some View {
+        ForEach(pills) { pill in
             SettingsSidebarRow(title: pill.title, symbol: pill.symbol, tint: pill.tint, dimmed: !pill.shown)
                 .tag(Page.pill(pill.key))
         }
@@ -769,5 +776,27 @@ struct SettingsAppIcon: View {
             }
         }
         .frame(width: 20, height: 20)
+    }
+}
+
+struct SettingsDebugPage: View {
+    var on: Bool
+    var actions: SettingsActions
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle("Log the bar's memory each minute",
+                       isOn: Binding(get: { on }, set: { actions.set("debug", $0 ? "on" : nil) }))
+            } footer: {
+                HStack {
+                    Text("Writes the memory in use to /tmp/omacchiato-bar.log (debug = on).")
+                    Spacer()
+                    Button("Open Log") { actions.open(URL(fileURLWithPath: "/tmp/omacchiato-bar.log")) }
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle("Debug")
     }
 }

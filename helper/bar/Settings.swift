@@ -102,7 +102,7 @@ func settingsReport() -> SettingsReport {
         let info = pluginKinds[kind]
             ?? PillInfo(title: plugin.name.prefix(1).uppercased() + plugin.name.dropFirst(),
                         symbol: "puzzlepiece.extension.fill", tint: "purple", summary: "A plugin pill.")
-        var page = pill(plugin.name, info, group: .plugins, designs: kind)
+        var page = pill(plugin.name, info, group: kind == "keep-awake" ? .features : .plugins, designs: kind)
         page.plugin = .init(command: plugin.command, interval: Int(plugin.interval), icon: plugin.icon,
                             iconColor: plugin.iconColor,
                             args: kind == "github-prs" ? .search : kind == "stats" ? .stats : .none,
@@ -126,7 +126,7 @@ func settingsReport() -> SettingsReport {
     }
     // The music pill shows while Music plays, so it has no key to hide it.
     pills.insert(.init(key: "media", title: "Music", symbol: "music.note", tint: "pink",
-                       summary: "The song that plays in Music. Shows while Music plays.",
+                       summary: "The song that plays in Music, at the left of the bar, while Music plays.",
                        canHide: false,
                        numbers: [number("media", "Title length, in characters", 8...80, 28),
                                  number("media_notch", "Title length beside the notch", 8...80, 20)],
@@ -140,7 +140,7 @@ func settingsReport() -> SettingsReport {
     return SettingsReport(pills: pills, numbers: numbers, files: files, theme: settingsThemes,
                           quitOnClose: quitOnCloseReport(),
                           order: fullPillOrder(modes: pillModes, plugins: barPlugins),
-                          orderSaved: pillModes["order"] != nil)
+                          orderSaved: pillModes["order"] != nil, debug: pillModes["debug"] == "on")
 }
 
 func quitOnCloseReport() -> SettingsReport.QuitOnClose {

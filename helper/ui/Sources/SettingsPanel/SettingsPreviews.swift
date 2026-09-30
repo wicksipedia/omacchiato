@@ -11,7 +11,7 @@ extension SettingsReport {
     static let sample = SettingsReport(
         pills: [
             Pill(key: "media", title: "Music", symbol: "music.note", tint: "pink",
-                 summary: "The song that plays in Music. Shows while Music plays.", canHide: false,
+                 summary: "The song that plays in Music, at the left of the bar, while Music plays.", canHide: false,
                  numbers: [Number(key: "media", title: "Title length, in characters", range: 8...80, fallback: 28, value: 49),
                            Number(key: "media_notch", title: "Title length beside the notch", range: 8...80, fallback: 20, value: nil)],
                  switches: [Switch(key: "media_notch_fill", title: "Grow up to the notch", off: "no", value: nil)]),
@@ -60,7 +60,7 @@ extension SettingsReport {
                  plugin: PluginFields(command: "omacchiato-stats cpu", interval: 10, icon: "\u{f4bc}", iconColor: "accent",
                                       args: .stats)),
             Pill(key: "keepawake", title: "Keep Awake", symbol: "cup.and.saucer.fill", tint: "orange",
-                 summary: "Shows while an app keeps the Mac awake.", group: .plugins, styles: iconOrLabel,
+                 summary: "Shows while an app keeps the Mac awake.", group: .features, styles: iconOrLabel,
                  numbers: [Number(key: "keep_awake_jiggle", title: "Move the mouse every, in minutes (0 is off)",
                                   range: 0...10, fallback: 1, value: nil),
                            Number(key: "keep_awake_battery", title: "Turn off on battery at, in percent (0 is off)",

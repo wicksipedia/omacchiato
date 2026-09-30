@@ -22,7 +22,8 @@ public struct SettingsReport {
 
     // One pill and everything about it, on one page.
     public struct Pill: Identifiable {
-        public enum Group: String { case bar = "Bar", plugins = "Plugins" }
+        // features: a plugin that is a feature of the Mac, not a pill to read, such as Keep Awake
+        public enum Group: String { case bar = "Bar", plugins = "Plugins", features = "Features" }
 
         public var key: String
         public var title: String
@@ -219,16 +220,31 @@ public struct SettingsReport {
     public var quitOnClose: QuitOnClose?
     public var order: [String]           // the right-hand pills in bar order, hidden ones too
     public var orderSaved: Bool          // bar-pills.conf names an order, so Reset Order has work
+    public var debug: Bool               // debug = on: the bar logs its memory each minute
 
     public init(pills: [Pill], numbers: [Number] = [], files: [File] = [], theme: ThemeReport? = nil,
-                quitOnClose: QuitOnClose? = nil, order: [String] = [], orderSaved: Bool = false) {
+                quitOnClose: QuitOnClose? = nil, order: [String] = [], orderSaved: Bool = false, debug: Bool = false) {
         self.order = order
+        self.debug = debug
         self.orderSaved = orderSaved
         self.pills = pills
         self.numbers = numbers
         self.files = files
         self.theme = theme
         self.quitOnClose = quitOnClose
+    }
+}
+
+// The sidebar: Music on the left of the bar, the right-hand pills in bar
+// order split into shown and hidden, and the features apart.
+extension SettingsReport {
+    public var sidebar: (left: [Pill], shown: [Pill], hidden: [Pill], features: [Pill]) {
+        let features = pills.filter { $0.group == .features }
+        let left = pills.filter { $0.key == "media" }
+        let right = pills.filter { $0.group != .features && $0.key != "media" }
+        let ordered = order.compactMap { key in right.first { $0.key == key } }
+            + right.filter { !order.contains($0.key) }
+        return (left, ordered.filter(\.shown), ordered.filter { !$0.shown }, features)
     }
 }
 
