@@ -1,0 +1,1 @@
+plans/2026-09-30-keep-awake-and-quit-on-close-design.md
