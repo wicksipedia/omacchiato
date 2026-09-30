@@ -164,8 +164,8 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   Control Center slider and round button, by hand, because a system
   control draws grey in a window that is not key.
   `panelView` sets `panelSettings` in the environment for a pill with a
-  Settings page, and `statusPanelBackground` then ends the panel with an
-  "Omacchiato Settings" row that opens that page. A panel with a
+  Settings page, and `statusPanelBackground` then ends the panel with a
+  muted "Customize Pill" row that opens that page. A panel with a
   background of its own, such as the weather panel, has no such row.
   `panelRow` converts a `PopupRow`. The popup window never becomes key,
   so an event tap (`setPopupKeys`) gives a row popup its arrow keys,

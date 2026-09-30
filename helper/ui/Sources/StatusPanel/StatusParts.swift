@@ -301,7 +301,7 @@ struct PanelBackground: ViewModifier {
         let shape = RoundedRectangle(cornerRadius: 22)
         VStack(spacing: 10) {
             content
-            if let settings { SettingsRow(title: "Omacchiato Settings", action: settings) }
+            if let settings { CustomizeRow(action: settings) }
         }
             .padding(12)
             .frame(width: width)
@@ -309,6 +309,24 @@ struct PanelBackground: ViewModifier {
                 Color.clear.glassEffect(.regular, in: shape)
                 shape.fill(.background.opacity(0.6))
             }
+    }
+}
+
+// The link to the pill's page in Omacchiato Settings. Muted, so it reads
+// as a way out of the panel, not as one more setting.
+struct CustomizeRow: View {
+    var action: () -> Void
+
+    var body: some View {
+        HoverRow(action: action) {
+            HStack {
+                Text("Customize Pill")
+                Spacer()
+                Image(systemName: "arrow.up.forward").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+            }
+            .font(.system(size: 12))
+            .foregroundStyle(.secondary)
+        }
     }
 }
 
