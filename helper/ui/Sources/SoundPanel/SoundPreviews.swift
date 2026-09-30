@@ -2,6 +2,21 @@
 import SwiftUI
 #if canImport(StatusPanel)
 import StatusPanel
+
+// Every level the HUD can show, and a long device name.
+#Preview("Volume HUD") {
+    Desk {
+        VStack(spacing: 12) {
+            VolumeOSD(report: .desk)
+            VolumeOSD(report: SoundReport(volume: 0.0625, outputs: SoundReport.desk.outputs))
+            VolumeOSD(report: .muted)
+            VolumeOSD(report: .loud)
+        }
+    }
+}
+#Preview("Volume HUD: light") {
+    Desk(colors: [.mint, .cyan, .teal]) { VolumeOSD(report: .desk) }.preferredColorScheme(.light)
+}
 #endif
 
 extension SoundReport {
@@ -24,4 +39,19 @@ extension SoundReport {
 #Preview("Sound: muted") { Desk { SoundPanel(report: .muted) } }
 #Preview("Sound: full, long name") { Desk { SoundPanel(report: .loud) } }
 #Preview("Sound: light") { Desk(colors: [.mint, .cyan, .teal]) { SoundPanel(report: .desk) }.preferredColorScheme(.light) }
+
+// Every level the HUD can show, and a long device name.
+#Preview("Volume HUD") {
+    Desk {
+        VStack(spacing: 12) {
+            VolumeOSD(report: .desk)
+            VolumeOSD(report: SoundReport(volume: 0.0625, outputs: SoundReport.desk.outputs))
+            VolumeOSD(report: .muted)
+            VolumeOSD(report: .loud)
+        }
+    }
+}
+#Preview("Volume HUD: light") {
+    Desk(colors: [.mint, .cyan, .teal]) { VolumeOSD(report: .desk) }.preferredColorScheme(.light)
+}
 #endif

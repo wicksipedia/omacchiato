@@ -794,6 +794,7 @@ AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject),
     attachVolumeListeners()
 }
 attachVolumeListeners()
+startVolumeKeys()
 
 // brightness: DisplayServices publishes, so the keyboard keys land here
 // without the bar being told about them by anyone else

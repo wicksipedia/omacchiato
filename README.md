@@ -247,7 +247,10 @@ Left to right:
   is muted, nothing otherwise. It follows a CoreAudio property
   listener, so it changes the moment the microphone does.
 - **Volume**: scroll adjusts, click opens a slider and the output
-  device menu.
+  device menu. The bar takes the volume keys and shows its own HUD at
+  the top right, in place of the macOS one. Shift+Option steps by a
+  quarter step. An output with no volume control, such as some HDMI
+  displays, still gets the macOS HUD.
 - **Battery**: charge and state, live draw in watts, the adapter's
   wattage, time to full or empty once the rate settles, and health as
   the ratio of full charge to design capacity, which keeps moving
