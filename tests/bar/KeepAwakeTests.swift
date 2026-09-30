@@ -38,4 +38,13 @@ import Testing
         #expect(jiggleInterval("0") == nil)
         #expect(jiggleInterval("x") == 60)
     }
+
+    @Test("on battery, keep awake ends at keep_awake_battery percent, 20 by default; on power it stays")
+    func batteryLimit() {
+        #expect(batteryEndsKeepAwake(percent: 20, onAC: false, mode: nil))
+        #expect(!batteryEndsKeepAwake(percent: 21, onAC: false, mode: nil))
+        #expect(!batteryEndsKeepAwake(percent: 5, onAC: true, mode: nil))
+        #expect(batteryEndsKeepAwake(percent: 35, onAC: false, mode: "40"))
+        #expect(!batteryEndsKeepAwake(percent: 5, onAC: false, mode: "off"))
+    }
 }

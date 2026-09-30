@@ -144,6 +144,7 @@ func updateBattery() {
         let max = d[kIOPSMaxCapacityKey] as? Int ?? 100
         let pct = max > 0 ? Int((Double(cur) / Double(max) * 100).rounded()) : cur
         let charging = (d[kIOPSPowerSourceStateKey] as? String) == kIOPSACPowerValue
+        checkKeepAwakeBattery(percent: pct, onAC: charging)
         // Same steps and glyphs as macOS's own battery icon.
         var icon = "󰂃", color = palette.red
         switch pct {

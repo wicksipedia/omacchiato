@@ -73,7 +73,7 @@ other. The lid (T10–T11) depends only on T3.
 - [x] T5: Right-click on a plugin pill
 - [x] T6: On/off and time buttons in the keep-awake popup
 - [x] T7: Mouse jiggle, paused while the screen is locked
-- [ ] T8: Battery limit
+- [x] T8: Battery limit
 - [ ] T9: Keep Awake settings page and docs
 
 ### Checkpoint B

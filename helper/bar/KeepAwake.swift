@@ -61,6 +61,20 @@ func jiggle() {
         .post(tap: .cghidEventTap)
 }
 
+// `keep_awake_battery` is the lowest percent on battery, 20 by default.
+func batteryEndsKeepAwake(percent: Int, onAC: Bool, mode: String?) -> Bool {
+    guard !onAC, mode != "off" else { return false }
+    return percent <= (mode.flatMap { Int($0) } ?? 20)
+}
+
+// The battery pill calls this on each power source change.
+func checkKeepAwakeBattery(percent: Int, onAC: Bool) {
+    guard keepAwakeShown != nil, keepAwakeShown != .off,
+          batteryEndsKeepAwake(percent: percent, onAC: onAC, mode: pillModes["keep_awake_battery"]) else { return }
+    writeKeepAwake("off")
+    applyKeepAwake(reason: "Battery at \(percent)%")
+}
+
 var keepAwakeAssertions: [IOPMAssertionID] = []
 var keepAwakeJiggle: Timer?
 var keepAwakeShown: KeepAwake?
