@@ -14,6 +14,14 @@ import StatusPanel
         }
     }
 }
+#Preview("Microphone HUD") {
+    Desk {
+        VStack(spacing: 12) {
+            MicOSD(muted: true, device: "MacBook Pro Microphone")
+            MicOSD(muted: false, device: "Matt’s AirPods Max")
+        }
+    }
+}
 #Preview("Volume HUD: light") {
     Desk(colors: [.mint, .cyan, .teal]) { VolumeOSD(report: .desk) }.preferredColorScheme(.light)
 }

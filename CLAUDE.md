@@ -117,7 +117,9 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
 - `~/.config/omacchiato/bar-pills.conf` holds `<pill> = <mode>` lines:
   `hide`, `icon`, `volume = muted`, `battery = time`,
   `media = <characters>`, `<pill>_panel = <design>`, and
-  `volume_hud = off` and `volume_click = off` for the volume keys.
+  `volume_hud = off` and `volume_click = off` for the volume keys, and
+  `mic_hud = off`. The mic watch runs with the mic pill hidden, so the
+  mic HUD still shows.
 - `Config.swift` watches `bar-pills.conf` and `bar-plugins.conf`, and
   their folder, because an editor saves by a rename and `echo >>` writes
   in place. When the text changes, `reloadConfig()` rereads both and

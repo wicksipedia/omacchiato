@@ -95,6 +95,7 @@ rules = slot_rules + [
     rule("next theme", "t", SHIFT, cmd=f"{home}/.local/bin/theme-next"),
     rule("next wallpaper", "b", SHIFT, cmd=f"{home}/.local/bin/theme-bg-next"),
     rule("lock", "l", SHIFT, cmd=f"{home}/.local/bin/omacchiato-helper lock"),
+    rule("mute microphone", "m", SUPER, cmd=f"{home}/.local/bin/omacchiato-helper mic toggle >/dev/null 2>&1"),
     rule("cheatsheet", "k", SUPER, cmd="/usr/bin/touch /tmp/omacchiato-bar-cheatsheet"),
     # OmniWM has no close-window command (HotkeyCommand.swift) — send
     # the app-level Cmd+W instead, which closes the focused window

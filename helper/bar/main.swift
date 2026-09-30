@@ -795,6 +795,8 @@ AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject),
 }
 attachVolumeListeners()
 startVolumeKeys()
+// Not gated on the mic pill: the mic HUD shows with the pill hidden.
+startMicWatch()
 
 // brightness: DisplayServices publishes, so the keyboard keys land here
 // without the bar being told about them by anyone else
@@ -872,7 +874,6 @@ func startProviders() {
     func once(_ pill: String, _ start: () -> Void) {
         if rightOrder.contains(pill), startedProviders.insert(pill).inserted { start() }
     }
-    once("mic", startMicWatch)
     // bluetooth: gated on the privacy grant, which the watcher also needs
     once("bluetooth") { bluetoothWatcher.start() }
     // signal strength publishes no change

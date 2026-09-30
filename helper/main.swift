@@ -7,6 +7,8 @@
 //   wallpaper <path>        set the desktop picture on every screen
 //   audio list              output devices: "*<TAB>name" (current) / "-<TAB>name"
 //   audio set <name>        make <name> the default output device
+//   mic <on|off|toggle>     unmute or mute the default input, then print
+//                           "on" or "muted"; bare `mic` prints the state
 //   bt power                print bluetooth power state (0/1)
 //   bt power <on|off|toggle>
 //   bt devices              paired devices: "<1|0 connected><TAB>address<TAB>name<TAB>kind"
@@ -108,6 +110,76 @@ func deviceName(_ id: AudioDeviceID) -> String {
         _ = AudioObjectGetPropertyData(id, &addr, 0, nil, &size, ptr)
     }
     return name as String
+}
+
+// The mic mutes by its mute switch. A device with no switch mutes by its
+// input volume at 0, and the old level waits in micLevelFile for the unmute.
+let micLevelFile = NSString(string: "~/.local/state/omacchiato/mic-level").expandingTildeInPath
+
+func defaultInputDevice() -> AudioDeviceID {
+    var addr = audioProperty(kAudioHardwarePropertyDefaultInputDevice)
+    var id = AudioDeviceID(0)
+    var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+    AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &size, &id)
+    return id
+}
+
+func inputProperty(_ selector: AudioObjectPropertySelector) -> AudioObjectPropertyAddress {
+    AudioObjectPropertyAddress(mSelector: selector, mScope: kAudioDevicePropertyScopeInput,
+                               mElement: kAudioObjectPropertyElementMain)
+}
+
+func settable(_ dev: AudioDeviceID, _ selector: AudioObjectPropertySelector) -> Bool {
+    var addr = inputProperty(selector)
+    var ok: DarwinBoolean = false
+    return AudioObjectIsPropertySettable(dev, &addr, &ok) == noErr && ok.boolValue
+}
+
+func micLevel(_ dev: AudioDeviceID) -> Float32? {
+    var addr = inputProperty(kAudioDevicePropertyVolumeScalar)
+    var level: Float32 = 0
+    var size = UInt32(MemoryLayout<Float32>.size)
+    return AudioObjectGetPropertyData(dev, &addr, 0, nil, &size, &level) == noErr ? level : nil
+}
+
+func setMicLevel(_ dev: AudioDeviceID, _ level: Float32) {
+    var addr = inputProperty(kAudioDevicePropertyVolumeScalar)
+    var value = level
+    AudioObjectSetPropertyData(dev, &addr, 0, nil, UInt32(MemoryLayout<Float32>.size), &value)
+}
+
+// Keep in sync with micMuted() in helper/bar/Providers.swift.
+func micIsMuted(_ dev: AudioDeviceID) -> Bool {
+    var addr = inputProperty(kAudioDevicePropertyMute)
+    var muted: UInt32 = 0
+    var size = UInt32(MemoryLayout<UInt32>.size)
+    if AudioObjectGetPropertyData(dev, &addr, 0, nil, &size, &muted) == noErr, muted != 0 { return true }
+    return (micLevel(dev) ?? 1) <= 0.0001
+}
+
+func setMicMuted(_ dev: AudioDeviceID, _ on: Bool) {
+    if settable(dev, kAudioDevicePropertyMute) {
+        var addr = inputProperty(kAudioDevicePropertyMute)
+        var value: UInt32 = on ? 1 : 0
+        AudioObjectSetPropertyData(dev, &addr, 0, nil, UInt32(MemoryLayout<UInt32>.size), &value)
+        // an unmute also lifts a level that something else took to 0
+        if on || (micLevel(dev) ?? 1) > 0.0001 { return }
+    }
+    guard settable(dev, kAudioDevicePropertyVolumeScalar) else {
+        if !settable(dev, kAudioDevicePropertyMute) { fail("mic: \(deviceName(dev)) has no mute switch and no input volume") }
+        return
+    }
+    if on {
+        if let level = micLevel(dev), level > 0.0001 {
+            try? FileManager.default.createDirectory(atPath: (micLevelFile as NSString).deletingLastPathComponent,
+                                                     withIntermediateDirectories: true)
+            try? String(level).write(toFile: micLevelFile, atomically: true, encoding: .utf8)
+        }
+        setMicLevel(dev, 0)
+    } else {
+        let saved = (try? String(contentsOfFile: micLevelFile, encoding: .utf8)).flatMap { Float32($0) }
+        setMicLevel(dev, saved.map { $0 > 0.0001 ? $0 : 0.75 } ?? 0.75)
+    }
 }
 
 // --- dispatch ----------------------------------------------------------
@@ -335,6 +407,18 @@ case "audio":
     } else {
         fail("usage: audio list | audio set <name>")
     }
+
+case "mic":
+    let dev = defaultInputDevice()
+    guard dev != 0 else { fail("mic: no input device") }
+    switch args.count > 2 ? args[2] : "status" {
+    case "on": setMicMuted(dev, false)
+    case "off": setMicMuted(dev, true)
+    case "toggle": setMicMuted(dev, !micIsMuted(dev))
+    case "status": break
+    default: fail("usage: mic on | off | toggle | status")
+    }
+    print(micIsMuted(dev) ? "muted" : "on")
 
 case "bt":
     let sub = args.count > 2 ? args[2] : ""

@@ -33,7 +33,7 @@ let builtinPills: [String: PillInfo] = [
     "brightness": .init(title: "Display", symbol: "sun.max.fill", tint: "yellow",
                         summary: "Brightness, extra dimming and Night Shift."),
     "mic": .init(title: "Microphone", symbol: "mic.slash.fill", tint: "red",
-                 summary: "Shows only while the microphone is muted.", styled: false),
+                 summary: "Shows only while the microphone is muted. Super+M mutes it.", styled: false),
     "volume": .init(title: "Sound", symbol: "speaker.wave.2.fill", tint: "pink",
                     summary: "Volume and the output device.", extras: [.init("muted", "Only while muted")]),
     "status": .init(title: "Status", symbol: "gauge.with.dots.needle.67percent", tint: "green",
@@ -84,6 +84,10 @@ func settingsReport() -> SettingsReport {
     for key in rightOrderAll {
         guard let info = builtinPills[key] else { continue }
         var page = pill(key, info, group: .bar, designs: key)
+        if key == "mic" {
+            page.switches = [.init(key: "mic_hud", title: "Show a HUD when the microphone mutes", off: "off",
+                                   value: pillModes["mic_hud"])]
+        }
         if key == "volume" {
             page.switches = [.init(key: "volume_hud", title: "Show the volume HUD", off: "off",
                                    value: pillModes["volume_hud"]),

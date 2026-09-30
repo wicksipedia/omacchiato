@@ -20,6 +20,7 @@ import CalendarPanel
 import MenuBarPanel
 import PRPanel
 import RowsPanel
+import SoundPanel
 import StatusPanel
 import ThemePanel
 import WeatherPanel
@@ -211,12 +212,20 @@ func micMuted() -> Bool {
 // The pill exists only to flag a muted mic, so it draws only then.
 func updateMic() {
     let muted = micMuted()
+    // A new default input is not a mute, so it shows no HUD.
+    let dev = defaultInputDevice()
+    if let last = lastMic, last.device == dev, last.muted != muted, pillModes["mic_hud"] != "off" {
+        showHUD(AnyView(MicOSD(muted: muted, device: audioDeviceName(dev) ?? "")))
+    }
+    lastMic = (dev, muted)
     set("mic") {
         $0.drawing = muted
         $0.icon = muted ? "\u{F036D}" : ""
         $0.iconColor = muted ? palette.red : nil
     }
 }
+
+var lastMic: (device: AudioDeviceID, muted: Bool)?
 
 func volumeAddress(_ element: UInt32) -> AudioObjectPropertyAddress {
     AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyVolumeScalar,
@@ -303,19 +312,23 @@ func audioOutputDevices() -> [(id: AudioDeviceID, name: String)] {
         guard AudioObjectGetPropertyDataSize(id, &streams, 0, nil, &streamSize) == noErr, streamSize > 0
         else { continue }
 
-        var nameAddr = AudioObjectPropertyAddress(mSelector: kAudioObjectPropertyName,
-                                                  mScope: kAudioObjectPropertyScopeGlobal,
-                                                  mElement: kAudioObjectPropertyElementMain)
-        var name: CFString = "" as CFString
-        var nameSize = UInt32(MemoryLayout<CFString>.size)
-        var ok = false
-        withUnsafeMutablePointer(to: &name) { ptr in
-            ok = AudioObjectGetPropertyData(id, &nameAddr, 0, nil, &nameSize, ptr) == noErr
-        }
-        guard ok else { continue }
-        result.append((id, name as String))
+        guard let name = audioDeviceName(id) else { continue }
+        result.append((id, name))
     }
     return result
+}
+
+func audioDeviceName(_ id: AudioDeviceID) -> String? {
+    var addr = AudioObjectPropertyAddress(mSelector: kAudioObjectPropertyName,
+                                          mScope: kAudioObjectPropertyScopeGlobal,
+                                          mElement: kAudioObjectPropertyElementMain)
+    var name: CFString = "" as CFString
+    var size = UInt32(MemoryLayout<CFString>.size)
+    var ok = false
+    withUnsafeMutablePointer(to: &name) { ptr in
+        ok = AudioObjectGetPropertyData(id, &addr, 0, nil, &size, ptr) == noErr
+    }
+    return ok ? name as String : nil
 }
 
 func setDefaultOutputDevice(_ id: AudioDeviceID) {

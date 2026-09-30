@@ -245,7 +245,10 @@ Left to right:
   process exits, so a crash restores the screen by itself.
 - **Microphone**: a struck-through microphone while the default input
   is muted, nothing otherwise. It follows a CoreAudio property
-  listener, so it changes the moment the microphone does.
+  listener, so it changes the moment the microphone does. `Super+M`
+  mutes or unmutes the default input, through `omacchiato-helper mic
+  toggle`. A glass HUD at the top right shows each change, from any
+  source. `mic_hud = off` turns the HUD off.
 - **Volume**: scroll adjusts, click opens a slider and the output
   device menu. The bar takes the volume keys and shows its own HUD at
   the top right, in place of the macOS one. Shift+Option steps by a
@@ -542,6 +545,7 @@ from the live config, and you can type to filter it.
 | `Super+Shift+T` | next theme; one name, so a light/dark pair stops (*Karabiner*) |
 | `Super+Shift+B` | next wallpaper of the current theme (*Karabiner*) |
 | `Super+Shift+L` | lock the screen (*Karabiner*) |
+| `Super+M` | mute or unmute the microphone (*Karabiner*) |
 | `Super+K` | keybinding cheatsheet (*Karabiner*) |
 | `Cmd+Space` | Raycast, once you give it that hotkey in Raycast's settings |
 
