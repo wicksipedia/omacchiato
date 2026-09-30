@@ -812,13 +812,10 @@ struct SettingsHUDsPage: View {
                 Section {
                     Toggle(s.title, isOn: Binding(get: { s.on }, set: { actions.set(s.key, $0 ? nil : s.off) }))
                     if let preview = hudPreview(s.key) {
-                        // on a small desktop, so the glass has something behind it
                         preview
-                            .padding(18)
+                            .padding(14)
                             .frame(maxWidth: .infinity)
-                            .background(LinearGradient(colors: [.teal, .blue, .indigo],
-                                                       startPoint: .topLeading, endPoint: .bottomTrailing),
-                                        in: .rect(cornerRadius: 10))
+                            .background(.fill.quaternary, in: .rect(cornerRadius: 10))
                             .padding(.vertical, 4)
                             .opacity(s.on ? 1 : 0.35)
                             .allowsHitTesting(false)
