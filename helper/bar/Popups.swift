@@ -184,11 +184,14 @@ func panelView(_ name: String) -> AnyView? {
         }
         if let report = PRReport(json: json) {
             var actions = PRActions()
-            actions.open = { url in
+            // If openAll captures `actions`, the closures form a loop, and
+            // SwiftUI overflows the stack when it compares two panels.
+            let open: (URL) -> Void = { url in
                 if url.scheme == "https" { NSWorkspace.shared.open(url) }
                 closePopup()
             }
-            actions.openAll = { actions.open(URL(string: "https://github.com/pulls")!) }
+            actions.open = open
+            actions.openAll = { open(URL(string: "https://github.com/pulls")!) }
             actions.refresh = { refreshPlugin(name) }
             return prPanel(pillModes[name + "_panel"], report, actions)
         }
