@@ -550,7 +550,8 @@ struct SettingsAddPluginPage: View {
 
 // The first page: the right-hand pills in bar order, to drag into a new
 // order and to show or hide, then the gaps. Music and the workspaces keep
-// their places on the left.
+// their places on the left. A List, not a Form: on macOS only a List
+// drags rows with onMove.
 struct SettingsBarPage: View {
     var report: SettingsReport
     var actions: SettingsActions
@@ -560,26 +561,25 @@ struct SettingsBarPage: View {
         report.order.compactMap { key in report.pills.first { $0.key == key } }
     }
 
+    func move(_ key: String, to index: Int) {
+        var keys = pills.map(\.key)
+        guard let at = keys.firstIndex(of: key) else { return }
+        keys.remove(at: at)
+        keys.insert(key, at: min(max(0, index), keys.count))
+        actions.setOrder(keys)
+    }
+
     var body: some View {
-        Form {
+        List {
             Section {
-                ForEach(pills) { pill in
-                    HStack(spacing: 10) {
-                        SettingsIcon(symbol: pill.symbol, tint: pill.tint, size: 22).opacity(pill.shown ? 1 : 0.45)
-                        Text(pill.title).foregroundStyle(pill.shown ? .primary : .secondary)
-                        Spacer()
-                        if pill.canHide {
-                            Toggle("Show \(pill.title)", isOn: Binding(get: { pill.shown },
-                                                                     set: { actions.set(pill.key, pill.value(shown: $0)) }))
-                                .labelsHidden()
-                                .toggleStyle(.switch)
-                                .controlSize(.small)
+                ForEach(Array(pills.enumerated()), id: \.element.id) { index, pill in
+                    SettingsBarRow(pill: pill, actions: actions, open: open)
+                        .contextMenu {
+                            Button("Move to Top") { move(pill.key, to: 0) }.disabled(index == 0)
+                            Button("Move Up") { move(pill.key, to: index - 1) }.disabled(index == 0)
+                            Button("Move Down") { move(pill.key, to: index + 1) }.disabled(index == pills.count - 1)
+                            Button("Move to Bottom") { move(pill.key, to: pills.count) }.disabled(index == pills.count - 1)
                         }
-                        Button("Open \(pill.title) Settings", systemImage: "chevron.right") { open(.pill(pill.key)) }
-                            .labelStyle(.iconOnly)
-                            .buttonStyle(.borderless)
-                            .foregroundStyle(.tertiary)
-                    }
                 }
                 .onMove { from, to in
                     var keys = pills.map(\.key)
@@ -587,14 +587,17 @@ struct SettingsBarPage: View {
                     actions.setOrder(keys)
                 }
             } header: {
-                Text("Right Side")
+                Text("Right Side of the Bar")
             } footer: {
-                HStack {
-                    Text("Drag to change the order. A hidden pill keeps its place.")
-                    Spacer()
-                    Button("Reset Order") { actions.setOrder(nil) }.disabled(!report.orderSaved)
-                    Button("Add Plugin…") { open(.addPlugin) }
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("The top pill sits furthest left. Drag a pill, or right-click it, to move it. A hidden pill keeps its place.")
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack {
+                        Button("Reset Order") { actions.setOrder(nil) }.disabled(!report.orderSaved)
+                        Button("Add Plugin…") { open(.addPlugin) }
+                    }
                 }
+                .padding(.vertical, 4)
             }
             Section {
                 ForEach(report.numbers) { SettingsNumberRow(number: $0, actions: actions) }
@@ -604,8 +607,35 @@ struct SettingsBarPage: View {
                 Text("Changes apply at once and save to bar-pills.conf.")
             }
         }
-        .formStyle(.grouped)
+        .listStyle(.inset(alternatesRowBackgrounds: false))
         .navigationTitle("Bar")
+    }
+}
+
+struct SettingsBarRow: View {
+    var pill: SettingsReport.Pill
+    var actions: SettingsActions
+    var open: (SettingsView.Page) -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "line.3.horizontal").foregroundStyle(.tertiary).accessibilityHidden(true)
+            SettingsIcon(symbol: pill.symbol, tint: pill.tint, size: 22).opacity(pill.shown ? 1 : 0.45)
+            Text(pill.title).foregroundStyle(pill.shown ? .primary : .secondary)
+            Spacer()
+            if pill.canHide {
+                Toggle("Show \(pill.title)", isOn: Binding(get: { pill.shown },
+                                                         set: { actions.set(pill.key, pill.value(shown: $0)) }))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+            }
+            Button("Open \(pill.title) Settings", systemImage: "chevron.right") { open(.pill(pill.key)) }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.borderless)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 3)
     }
 }
 
@@ -650,8 +680,9 @@ struct SettingsFilesPage: View {
                     .pickerStyle(.segmented)
                     .labelsHidden()
                     .fixedSize()
+                    // the Nerd Font, so the icon glyphs in the files do not read as "?"
                     TextEditor(text: Binding(get: { text }, set: { drafts[file.name] = $0 }))
-                        .font(.system(size: 12, design: .monospaced))
+                        .font(.custom("JetBrainsMono Nerd Font", size: 12))
                         .autocorrectionDisabled()
                         .scrollContentBackground(.hidden)
                         .padding(6)
