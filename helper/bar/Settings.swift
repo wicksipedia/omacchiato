@@ -84,8 +84,7 @@ func settingsReport() -> SettingsReport {
     var pills = ["menubar"].compactMap { key in builtinPills[key].map { pill(key, $0, group: .bar, designs: key) } }
     for key in rightOrderAll {
         guard let info = builtinPills[key] else { continue }
-        var page = pill(key, info, group: .bar, designs: key)
-        pills.append(page)
+        pills.append(pill(key, info, group: .bar, designs: key))
     }
     for plugin in barPlugins {
         let program = (plugin.command.split(separator: " ").first.map(String.init) ?? "") as NSString
