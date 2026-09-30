@@ -49,7 +49,8 @@ let package = Package(
         .target(name: "StatsPanel", dependencies: ["StatusPanel", "ActivityPanel"]),
         .target(name: "PanelDesigns", dependencies: ["StatusPanel", "MenuBarPanel", "ActivityPanel", "CalendarPanel",
                                                      "PRPanel", "AIUsagePanel"]),
-        .target(name: "SettingsPanel", dependencies: ["StatusPanel", "ThemePanel", "PanelDesigns"]),
+        .target(name: "SettingsPanel", dependencies: ["StatusPanel", "ThemePanel", "PanelDesigns", "SoundPanel",
+                                                     "KeepAwakePanel"]),
     ],
     swiftLanguageModes: [.v5]
 )

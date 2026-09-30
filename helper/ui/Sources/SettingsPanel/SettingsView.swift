@@ -2,6 +2,8 @@ import SwiftUI
 #if canImport(StatusPanel)
 import StatusPanel
 import ThemePanel
+import SoundPanel
+import KeepAwakePanel
 #endif
 
 // The Omacchiato Settings window, laid out as System Settings: a sidebar
@@ -791,15 +793,44 @@ struct SettingsHUDsPage: View {
 
     var body: some View {
         Form {
-            Section {
-                ForEach(switches) { s in
+            ForEach(switches) { s in
+                Section {
                     Toggle(s.title, isOn: Binding(get: { s.on }, set: { actions.set(s.key, $0 ? nil : s.off) }))
+                    if let preview = hudPreview(s.key) {
+                        // on a small desktop, so the glass has something behind it
+                        preview
+                            .padding(18)
+                            .frame(maxWidth: .infinity)
+                            .background(LinearGradient(colors: [.teal, .blue, .indigo],
+                                                       startPoint: .topLeading, endPoint: .bottomTrailing),
+                                        in: .rect(cornerRadius: 10))
+                            .padding(.vertical, 4)
+                            .opacity(s.on ? 1 : 0.35)
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
+                    }
                 }
-            } footer: {
+            }
+            Section {} footer: {
                 Text("A HUD shows at the top right of the screen with the pointer, and works with its pill hidden.")
             }
         }
         .formStyle(.grouped)
         .navigationTitle("HUDs & Sounds")
+    }
+}
+
+// The HUD that a switch turns on or off, drawn with sample values.
+func hudPreview(_ key: String) -> AnyView? {
+    switch key {
+    case "volume_hud":
+        return AnyView(VolumeOSD(report: SoundReport(volume: 0.56, outputs: [
+            .init(id: 1, name: "MacBook Pro Speakers", transport: .builtIn, current: true)])))
+    case "mic_hud":
+        return AnyView(MicOSD(muted: true, device: "MacBook Pro Microphone"))
+    case "keep_awake_hud":
+        return AnyView(KeepAwakeOSD(on: true, detail: "Until turned off"))
+    default:
+        return nil
     }
 }
