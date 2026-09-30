@@ -10,7 +10,7 @@ Plan: `tasks/plan.md`. Design: `docs/plans/2026-09-30-keep-awake-and-quit-on-clo
 
 ## Phase 2: every way in, and Vorssaint's options
 - [x] T4 Super+Esc and the keep-awake HUD (M)
-- [ ] T5 Right-click on a plugin pill (S)
+- [x] T5 Right-click on a plugin pill (S)
 - [ ] T6 On/off and time buttons in the popup (M)
 - [ ] T7 Mouse jiggle, paused while locked (S)
 - [ ] T8 Battery limit (S)

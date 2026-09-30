@@ -70,7 +70,7 @@ other. The lid (T10–T11) depends only on T3.
 ### Phase 2: every way in, and Vorssaint's options
 
 - [x] T4: Super+Esc and the keep-awake HUD
-- [ ] T5: Right-click on a plugin pill
+- [x] T5: Right-click on a plugin pill
 - [ ] T6: On/off and time buttons in the keep-awake popup
 - [ ] T7: Mouse jiggle, paused while the screen is locked
 - [ ] T8: Battery limit

@@ -216,7 +216,8 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   use `x-apple.systempreferences:`. `foldSections`
   keys a section's open state by header text, because the detail changes.
   `parts` is a list of `icon`, `icon_color`, `label`, `label_color` and `under` that the pill
-  draws after its own icon and label. A `panel` object replaces the
+  draws after its own icon and label. `right_click` is a command that a
+  right-click on the pill runs, then the plugin runs again. A `panel` object replaces the
   rows with a SwiftUI panel: `kind = ai-usage` for
   `helper/ui/Sources/AIUsagePanel`, `kind = github-prs` for
   `helper/ui/Sources/PRPanel`, and `airpods`, `keep-awake`, `updates`

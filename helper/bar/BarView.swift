@@ -356,6 +356,13 @@ final class BarView: NSView {
         if let plugin = barPlugins.first(where: { $0.name == name }) { runPlugin(plugin) }
     }
 
+    // Right click: a plugin's quick action, as `right_click` in its JSON names it.
+    override func rightMouseDown(with event: NSEvent) {
+        guard let name = hit(event), let command = pluginRightClick[name] else { return }
+        closePopup()
+        runPluginCommand(name, command)
+    }
+
     // Middle click: the quick toggle of a pill, with no popup.
     override func otherMouseDown(with event: NSEvent) {
         guard event.buttonNumber == 2 else { return }

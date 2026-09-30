@@ -102,6 +102,8 @@ var rightItems: [String: BarItem] = [:]
 var pluginRows: [String: [PopupRow]] = [:]
 // A plugin's panel object, when it has a SwiftUI panel. Replaces the popup rows.
 var pluginPanels: [String: [String: Any]] = [:]
+// A command that a right-click on the pill runs, from `right_click` in the plugin's JSON.
+var pluginRightClick: [String: String] = [:]
 
 func set(_ name: String, _ mutate: (inout BarItem) -> Void) {
     var item = rightItems[name] ?? BarItem()
@@ -371,6 +373,7 @@ func runPlugin(_ plugin: BarPlugin) {
             pluginGoodRows[plugin.name] = pluginPopupRows(obj?["rows"] as? [[String: Any]] ?? [], of: plugin)
             pluginRows[plugin.name] = pluginGoodRows[plugin.name]
             pluginPanels[plugin.name] = obj?["panel"] as? [String: Any]
+            pluginRightClick[plugin.name] = obj?["right_click"] as? String
             let color = pluginColor(obj?["color"] as? String)
             let icon = obj?["icon"] as? String ?? plugin.icon
             let parts = rawParts.map {
@@ -428,6 +431,7 @@ func stopPlugin(_ name: String) {
     pluginRows[name] = nil
     pluginGoodRows[name] = nil
     pluginPanels[name] = nil
+    pluginRightClick[name] = nil
 }
 
 func startPlugins() {
