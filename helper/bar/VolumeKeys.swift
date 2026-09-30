@@ -11,7 +11,8 @@ import StatusPanel
 // The bar takes the volume keys, sets the volume itself and shows VolumeOSD,
 // so the macOS HUD never shows. A key reaches the system as before when the
 // output has no volume to set (an HDMI display, for example), or with Option
-// alone, which opens Sound settings.
+// alone, which opens Sound settings. `volume_hud = off` and
+// `volume_click = off` in bar-pills.conf turn off the HUD and the click.
 
 let NX_SYSDEFINED: UInt32 = 14
 let NX_SUBTYPE_AUX_CONTROL_BUTTONS: Int16 = 8
@@ -56,7 +57,7 @@ func pressVolumeKey(_ key: VolumeKey, fine: Bool) {
         writeVolume(nextVolume(now.percent, up: key == .up, fine: fine))
     }
     updateVolume()
-    showVolumeOSD()
+    if pillModes["volume_hud"] != "off" { showVolumeOSD() }
 }
 
 var volumeKeyTap: CFMachPort?
@@ -79,8 +80,14 @@ func startVolumeKeys() {
             let mods = ns.modifierFlags.intersection([.shift, .option])
             guard mods != .option, outputVolumeSettable() else { return Unmanaged.passUnretained(event) }
             // 0xA is key down, 0xB key up. Take both, so the system sees neither.
-            if (ns.data1 & 0xFF00) >> 8 == 0xA {
-                DispatchQueue.main.async { pressVolumeKey(key, fine: mods == [.shift, .option]) }
+            let down = (ns.data1 & 0xFF00) >> 8 == 0xA
+            DispatchQueue.main.async {
+                if down {
+                    pressVolumeKey(key, fine: mods == [.shift, .option])
+                } else if key != .mute {
+                    // as in macOS, the click comes when the key goes up
+                    playVolumeClick()
+                }
             }
             return nil
         }, userInfo: nil)
@@ -95,10 +102,23 @@ func startVolumeKeys() {
 var volumeOSDWindow: NSWindow?
 var volumeOSDHide: DispatchWorkItem?
 
-// Top right, under the bar of the screen with the pointer, where the macOS HUD shows.
+let volumeClick = NSSound(contentsOfFile: "/System/Library/LoginPlugins/BezelServices.loginPlugin/Contents/Resources/volume.aiff",
+                          byReference: true)
+
+func playVolumeClick() {
+    guard pillModes["volume_click"] != "off", let sound = volumeClick else { return }
+    sound.stop()
+    sound.play()
+}
+
 func showVolumeOSD() {
     guard let report = soundReport() else { return }
-    let view = AnyView(VolumeOSD(report: report))
+    showHUD(AnyView(VolumeOSD(report: report)))
+}
+
+// The HUDs share one window. It shows at the top right,
+// under the bar of the screen with the pointer, where the macOS HUD shows.
+func showHUD(_ view: AnyView) {
     let window: NSWindow
     if let shown = volumeOSDWindow {
         window = shown

@@ -144,24 +144,25 @@ struct SettingsPillPage: View {
                                                         set: { actions.set(pill.key, pill.value(shown: $0)) }))
                 }
             }
+            if pill.shown, pill.styles.count > 1 {
+                Section("Appearance") {
+                    Picker("Style", selection: Binding(get: { pill.style }, set: { actions.set(pill.key, $0) })) {
+                        ForEach(pill.shownStyles, id: \.self) { Text($0.title).tag($0.value) }
+                    }
+                    .pickerStyle(.inline)
+                    .labelsHidden()
+                }
+            }
+            // The options work without the pill: the volume HUD shows with the pill hidden.
+            if !pill.numbers.isEmpty || !pill.switches.isEmpty {
+                Section("Options") {
+                    ForEach(pill.numbers) { SettingsNumberRow(number: $0, actions: actions) }
+                    ForEach(pill.switches) { s in
+                        Toggle(s.title, isOn: Binding(get: { s.on }, set: { actions.set(s.key, $0 ? nil : s.off) }))
+                    }
+                }
+            }
             if pill.shown {
-                if pill.styles.count > 1 {
-                    Section("Appearance") {
-                        Picker("Style", selection: Binding(get: { pill.style }, set: { actions.set(pill.key, $0) })) {
-                            ForEach(pill.shownStyles, id: \.self) { Text($0.title).tag($0.value) }
-                        }
-                        .pickerStyle(.inline)
-                        .labelsHidden()
-                    }
-                }
-                if !pill.numbers.isEmpty || !pill.switches.isEmpty {
-                    Section("Options") {
-                        ForEach(pill.numbers) { SettingsNumberRow(number: $0, actions: actions) }
-                        ForEach(pill.switches) { s in
-                            Toggle(s.title, isOn: Binding(get: { s.on }, set: { actions.set(s.key, $0 ? nil : s.off) }))
-                        }
-                    }
-                }
                 if let options = pill.aiUsage {
                     SettingsAIUsagePill(options: options) { actions.setPlugin(pill.key, "command", $0.command) }
                 }

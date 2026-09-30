@@ -82,7 +82,15 @@ func settingsReport() -> SettingsReport {
     }
     var pills = ["menubar"].compactMap { key in builtinPills[key].map { pill(key, $0, group: .bar, designs: key) } }
     for key in rightOrderAll {
-        if let info = builtinPills[key] { pills.append(pill(key, info, group: .bar, designs: key)) }
+        guard let info = builtinPills[key] else { continue }
+        var page = pill(key, info, group: .bar, designs: key)
+        if key == "volume" {
+            page.switches = [.init(key: "volume_hud", title: "Show the volume HUD", off: "off",
+                                   value: pillModes["volume_hud"]),
+                             .init(key: "volume_click", title: "Click when the volume changes", off: "off",
+                                   value: pillModes["volume_click"])]
+        }
+        pills.append(page)
     }
     for plugin in barPlugins {
         let program = (plugin.command.split(separator: " ").first.map(String.init) ?? "") as NSString

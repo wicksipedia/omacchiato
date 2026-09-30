@@ -250,7 +250,9 @@ Left to right:
   device menu. The bar takes the volume keys and shows its own HUD at
   the top right, in place of the macOS one. Shift+Option steps by a
   quarter step. An output with no volume control, such as some HDMI
-  displays, still gets the macOS HUD.
+  displays, still gets the macOS HUD. The bar clicks when a volume key
+  goes up, as macOS does. The Sound page in Settings turns off the HUD
+  (`volume_hud = off`) or the click (`volume_click = off`).
 - **Battery**: charge and state, live draw in watts, the adapter's
   wattage, time to full or empty once the rate settles, and health as
   the ratio of full charge to design capacity, which keeps moving
