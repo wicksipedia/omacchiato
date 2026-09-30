@@ -75,6 +75,36 @@ func checkKeepAwakeBattery(percent: Int, onAC: Bool) {
     applyKeepAwake(reason: "Battery at \(percent)%")
 }
 
+// Lid closed: `pmset -a disablesleep 1` through the rule that
+// omacchiato-lid-rule installs. A marker file says the bar set it, so the
+// bar undoes only its own setting, also after a crash.
+let lidMarker = NSString(string: "~/.local/state/omacchiato/keep-awake-lid").expandingTildeInPath
+
+// true sets disablesleep 1, false sets 0, nil leaves it.
+func lidAction(on: Bool, mode: String?, setByBar: Bool) -> Bool? {
+    let want = on && mode != "off"
+    if want && !setByBar { return true }
+    if !want && setByBar { return false }
+    return nil
+}
+
+func applyLid(on: Bool) {
+    let setByBar = FileManager.default.fileExists(atPath: lidMarker)
+    guard let disable = lidAction(on: on, mode: pillModes["keep_awake_lid"], setByBar: setByBar) else { return }
+    if disable { FileManager.default.createFile(atPath: lidMarker, contents: nil) }
+    DispatchQueue.global(qos: .userInitiated).async {
+        let result = execute("/usr/bin/sudo", ["-n", "/usr/bin/pmset", "-a", "disablesleep", disable ? "1" : "0"], timeout: 10)
+        DispatchQueue.main.async {
+            if result.status != 0 {
+                tlog("keep awake: pmset disablesleep failed, so no lid rule? Run omacchiato-lid-rule install")
+                if disable { try? FileManager.default.removeItem(atPath: lidMarker) }
+            } else if !disable {
+                try? FileManager.default.removeItem(atPath: lidMarker)
+            }
+        }
+    }
+}
+
 var keepAwakeAssertions: [IOPMAssertionID] = []
 var keepAwakeJiggle: Timer?
 var keepAwakeShown: KeepAwake?
@@ -116,6 +146,7 @@ func applyKeepAwake(reason: String? = nil) {
         }
         keepAwakeHeldDisplay = display
     }
+    applyLid(on: state != .off)
     keepAwakeJiggle?.invalidate()
     keepAwakeJiggle = nil
     if state != .off, let every = jiggleInterval(pillModes["keep_awake_jiggle"]) {

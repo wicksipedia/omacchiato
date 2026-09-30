@@ -339,7 +339,11 @@ popup rows, and the bar draws the result. The format is under
   (`keep_awake_display = on` keeps the display on too), moves the mouse
   without moving the pointer every minute so chat apps do not show
   Away (`keep_awake_jiggle = <minutes>` or `off`), and turns off on
-  battery at 20 % (`keep_awake_battery = <percent>` or `off`). A HUD
+  battery at 20 % (`keep_awake_battery = <percent>` or `off`). It also
+  keeps the Mac awake with the lid closed (`keep_awake_lid = off` turns
+  that off), through a sudoers rule that `install.sh` adds with
+  `omacchiato-lid-rule`: it allows only `pmset -a disablesleep 0` and
+  `1`, and asks for the admin password once. A HUD
   shows each change (`keep_awake_hud = off` turns it off).
 - **CPU, memory and disk** (`omacchiato-stats`): the percentage in use,
   in yellow from 75 % and red from 90 %. The popups list the processes

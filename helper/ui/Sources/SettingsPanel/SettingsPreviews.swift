@@ -66,6 +66,7 @@ extension SettingsReport {
                            Number(key: "keep_awake_battery", title: "Turn off on battery at, in percent (0 is off)",
                                   range: 0...90, fallback: 20, value: nil)],
                  switches: [.init(key: "keep_awake_display", title: "Let the display sleep", off: "on", value: nil),
+                            .init(key: "keep_awake_lid", title: "Stay awake with the lid closed", off: "off", value: nil),
                             .init(key: "keep_awake_hud", title: "Show a HUD when keep awake changes", off: "off",
                                   value: nil)],
                  plugin: PluginFields(command: "omacchiato-keep-awake", interval: 10)),

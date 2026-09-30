@@ -106,10 +106,13 @@ for it. Omacchiato would do the same:
   only `/usr/bin/pmset -a disablesleep 0` and
   `/usr/bin/pmset -a disablesleep 1`, with no password.
 - `visudo -cf` checks the file before it is moved into place.
-- The bar sets `disablesleep 1` when keep awake turns on with
-  `keep_awake_lid = on`, and sets 0 when keep awake ends and when the
-  bar starts. So a crash leaves the lid setting on only until the bar
-  starts again.
+- The bar sets `disablesleep 1` when keep awake turns on, unless
+  `keep_awake_lid = off`, and sets 0 when keep awake ends. A marker file
+  records that the bar set it, so the bar undoes only its own setting.
+  After a crash, the next start reads the state file and the marker and
+  sets 0 if keep awake is off.
+- `omacchiato-lid-rule` checks for its own file, not with `sudo -n -l`,
+  because `sudo -l` lists a command for any admin, password or not.
 - `uninstall.sh` removes the rule and sets `disablesleep 0`.
 
 Risk: with `SleepDisabled 1`, a Mac in a bag stays awake and gets hot.

@@ -86,7 +86,7 @@ other. The lid (T10–T11) depends only on T3.
 ### Phase 3: lid closed
 
 - [x] T10: Sudoers rule in install.sh and uninstall.sh
-- [ ] T11: The bar sets `disablesleep` with keep awake
+- [x] T11: The bar sets `disablesleep` with keep awake
 
 ### Checkpoint C
 - [ ] The Mac stays awake with the lid closed while keep awake is on,

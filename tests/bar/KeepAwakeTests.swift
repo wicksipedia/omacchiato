@@ -47,4 +47,14 @@ import Testing
         #expect(batteryEndsKeepAwake(percent: 35, onAC: false, mode: "40"))
         #expect(!batteryEndsKeepAwake(percent: 5, onAC: false, mode: "off"))
     }
+
+    @Test("the lid setting follows keep awake, and the bar undoes only a setting it made")
+    func lid() {
+        #expect(lidAction(on: true, mode: nil, setByBar: false) == true)
+        #expect(lidAction(on: true, mode: nil, setByBar: true) == nil)
+        #expect(lidAction(on: false, mode: nil, setByBar: true) == false)
+        #expect(lidAction(on: false, mode: nil, setByBar: false) == nil, "another app's setting stays")
+        #expect(lidAction(on: true, mode: "off", setByBar: false) == nil)
+        #expect(lidAction(on: true, mode: "off", setByBar: true) == false, "turning the option off undoes it")
+    }
 }

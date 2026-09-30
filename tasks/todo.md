@@ -19,7 +19,7 @@ Plan: `tasks/plan.md`. Design: `docs/plans/2026-09-30-keep-awake-and-quit-on-clo
 
 ## Phase 3: lid closed
 - [x] T10 Sudoers rule in install.sh and uninstall.sh (S)
-- [ ] T11 The bar sets disablesleep with keep awake (S)
+- [x] T11 The bar sets disablesleep with keep awake (S)
 - [ ] Checkpoint C: release; remove Vorssaint's lid setting
 
 ## Phase 4: quit on close

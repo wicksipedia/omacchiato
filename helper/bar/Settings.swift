@@ -114,6 +114,8 @@ func settingsReport() -> SettingsReport {
             // on by default, so the switch is off when the key holds its "off" value
             page.switches = [.init(key: "keep_awake_display", title: "Let the display sleep", off: "on",
                                    value: pillModes["keep_awake_display"]),
+                             .init(key: "keep_awake_lid", title: "Stay awake with the lid closed", off: "off",
+                                   value: pillModes["keep_awake_lid"]),
                              .init(key: "keep_awake_hud", title: "Show a HUD when keep awake changes", off: "off",
                                    value: pillModes["keep_awake_hud"])]
         }
