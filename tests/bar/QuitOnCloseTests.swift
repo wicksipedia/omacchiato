@@ -32,4 +32,12 @@ import Testing
         #expect(parseExceptions("# keep\ncom.apple.Music\n\n  com.raycast.macos  # launcher\n")
                 == ["com.apple.Music", "com.raycast.macos"])
     }
+
+    @Test("a menu bar app, or an app with a menu bar icon, keeps working with no window, so it stays")
+    func menuBarApps() {
+        #expect(!shouldQuit(windows: [], bundleID: "com.raycast.macos", exceptions: none, everShowedWindow: true,
+                            menuBarOnly: true))
+        #expect(!shouldQuit(windows: [], bundleID: "dev.kdrag0n.MacVirt", exceptions: none, everShowedWindow: true,
+                            hasMenuBarIcon: true))
+    }
 }

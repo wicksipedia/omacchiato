@@ -13,9 +13,12 @@ let countedSubroles: Set<String> = ["AXStandardWindow", "AXDialog"]
 // window manager.
 let neverQuitPrefixes = ["com.apple.finder", "com.omacchiato.", "com.barut.OmniWM"]
 
+// A menu bar app (LSUIElement) turns into a regular app while its settings
+// window shows, and an app with a menu bar icon keeps working with no
+// window, as OrbStack does. Neither quits.
 func shouldQuit(windows: [String], bundleID: String?, exceptions: Set<String>,
-                everShowedWindow: Bool) -> Bool {
-    guard let bundleID, everShowedWindow, !exceptions.contains(bundleID),
+                everShowedWindow: Bool, menuBarOnly: Bool = false, hasMenuBarIcon: Bool = false) -> Bool {
+    guard let bundleID, everShowedWindow, !menuBarOnly, !hasMenuBarIcon, !exceptions.contains(bundleID),
           !neverQuitPrefixes.contains(where: { bundleID.hasPrefix($0) }) else { return false }
     return !windows.contains(where: countedSubroles.contains)
 }
@@ -118,8 +121,15 @@ final class QuitWatch {
         let ax = AXUIElementCreateApplication(pid)
         AXUIElementSetMessagingTimeout(ax, 0.25)
         let exceptions = parseExceptions((try? String(contentsOf: quitOnCloseFile, encoding: .utf8)) ?? "")
+        let info = app.bundleURL.flatMap { Bundle(url: $0)?.infoDictionary } ?? [:]
+        // a plist flag can be a boolean, a number or a "1"
+        func flag(_ key: String) -> Bool { (info[key] as? NSNumber)?.boolValue ?? ((info[key] as? String) == "1") }
+        let menuBarOnly = flag("LSUIElement") || flag("LSBackgroundOnly")
+        var extras: AnyObject?
+        let hasMenuBarIcon = AXUIElementCopyAttributeValue(ax, "AXExtrasMenuBar" as CFString, &extras) == .success
         guard shouldQuit(windows: windows(ax).map(subrole), bundleID: app.bundleIdentifier,
-                         exceptions: exceptions, everShowedWindow: showedWindow.contains(pid)) else { return }
+                         exceptions: exceptions, everShowedWindow: showedWindow.contains(pid),
+                         menuBarOnly: menuBarOnly, hasMenuBarIcon: hasMenuBarIcon) else { return }
         tlog("quit on close: \(app.bundleIdentifier ?? "\(pid)")")
         // a normal quit, so an app with unsaved work still asks
         app.terminate()
