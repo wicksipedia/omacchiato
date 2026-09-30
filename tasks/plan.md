@@ -1,239 +1,448 @@
-# Implementation plan: menu bar apps pill
-
-Design: `docs/plans/2026-09-14-menu-bar-apps-design.md` (approved).
+# Implementation plan: keep awake, lid closed, quit on close
 
 ## Overview
 
-Add a `menubar` pill to the Omacchiato bar. Its popup lists the running
-third-party menu bar apps, and a click on a row opens that app's own menu.
-All the work is in `helper/bar.swift`, plus the README.
+Move the last two Vorssaint features into Omacchiato: keep awake, with
+the options that are set in Vorssaint now, and quit on close, with the
+same exceptions. The design and the Vorssaint settings are in
+`docs/plans/2026-09-30-keep-awake-and-quit-on-close-design.md`. Both
+decisions there are A: the keep-awake cup always shows, and the Mac can
+stay awake with the lid closed.
 
 ## Architecture decisions
 
-- The bar finds menu bar icons through each app's `AXExtrasMenuBar`
-  Accessibility attribute. OmniWM uses the same attribute on macOS 27. The
-  bar already has Accessibility permission for the app-name menu.
-- The scan runs when the popup opens, on a background queue, with a 0.25 s
-  messaging timeout for each app. `popupRows(for:)` must return rows at once,
-  so it returns the last scan's rows (or a `Looking…` row) and the new scan
-  calls `refreshPopup()` when it ends. Nothing polls.
-- A click sends `AXPress` to the icon, unless Task 1 shows that this does not
-  work while the menu bar is hidden. The fallback is Ctrl+F8, posted as a
-  keyboard event, which shows the native menu bar with focus on its icons.
-- The pill sits at the left end of the right cluster, before the plugin
-  pills. `menubar = hide` in `bar-pills.conf` works with no new code, because
-  `rightOrder` already drops hidden pills.
-- No Screen Recording, no icon capture, no copied menus.
+- **The bar holds the state that must end with it.** The keep-awake
+  assertion, the jiggle timer, the lid setting and the window watch all
+  live in the bar. If the bar crashes, keep awake ends, and the next
+  start resets the lid setting.
+- **A state file connects the command to the bar.**
+  `omacchiato-keep-awake on|off|toggle|for <minutes>` writes
+  `~/.local/state/omacchiato/keep-awake`. The bar watches the file.
+  Karabiner, the popup and a right-click all run the same command.
+- **The plugin stays the view.** `omacchiato-keep-awake` still prints the
+  pill and the panel. It reads the state file, so it can show the cup
+  dimmed while off and the time left while on.
+- **A plugin can ask for a right-click command.** The plugin JSON gets a
+  `right_click` key. This is general, so the stale
+  `on_click = omacchiato-keep-awake toggle` line in `bar-plugins.conf`
+  can go.
+- **Pure functions carry the logic,** as the bar's tests need: the
+  keep-awake decision (state, time, battery, power source) and the
+  quit decision (windows, bundle ID, exceptions).
+- **Settings in `bar-pills.conf`,** as for the volume and mic:
+  `keep_awake_display`, `keep_awake_jiggle`, `keep_awake_battery`,
+  `keep_awake_hud`, `keep_awake_lid`, `quit_on_close`. Exceptions go in
+  `~/.config/omacchiato/quit-on-close.conf`, one bundle ID per line.
 
 ## Dependency graph
 
 ```
-Task 1: scan + press, behind a test trigger (proves AXPress)
-   │
-   ├── Task 2: pill + popup list + click (uses the method Task 1 chose)
-   │      │
-   │      └── Task 3: Show menu bar row + Ctrl+F8 fallback + edge states
-   │              │
-   │              └── Task 4: docs, remove the test trigger
+T1 jiggle spike ──────────────────────────────┐
+T2 state file + command + pill ─┬─ T3 assertion in bar ─┬─ T4 Super+Esc + HUD
+                                │                       ├─ T6 popup controls
+                                └─ T5 right-click ──────┤
+                                                        ├─ T7 jiggle (needs T1)
+                                                        ├─ T8 battery limit
+                                                        └─ T9 settings + docs
+T10 sudoers rule ─ T11 lid in bar (needs T3)
+T12 AX spike ─ T13 quit decision ─ T14 window watch ─ T15 exceptions seed ─ T16 settings page
 ```
+
+Keep awake (T1–T9) and quit on close (T12–T16) do not depend on each
+other. The lid (T10–T11) depends only on T3.
 
 ## Task list
 
-### Phase 1: prove the risky part
+### Phase 1: keep awake works from the command line
 
-#### Task 1: Test AXPress on real menu bar icons while the menu bar is hidden
+- [x] T1: Spike: which posted event resets the idle time that Teams reads
+- [ ] T2: State file, command and always-on pill
+- [ ] T3: The bar holds the assertion from the state file
 
-**Description:** Add the scan (`menuBarItems()`) and the press
-(`pressMenuBarItem(_:)`) to the bar with no interface. A temporary trigger
-file, `/tmp/omacchiato-bar-menubar-test`, makes the bar log every item it found
-and press the item whose index the file contains. Use it on at least three
-apps, including one Electron app if one is running.
+### Checkpoint A
+- [ ] `bin/omacchiato-test` passes
+- [ ] `omacchiato-keep-awake on` makes `pmset -g assertions` list
+      "Omacchiato: keep the Mac awake"; `off` removes it
+- [ ] `omacchiato-keep-awake for 1` ends by itself after 1 minute
+- [ ] The cup shows dimmed while off and in the accent colour while on
+- [ ] Review with the user
 
-**Acceptance criteria:**
-- [ ] The bar log lists each third-party menu bar icon with its app name and label.
-- [ ] For each tested app, the plan records whether `AXPress` opens its menu or panel, where it appears, and whether macOS shows the menu bar.
-- [ ] A decision is recorded: `AXPress`, or show the menu bar and click the icon's position.
+### Phase 2: every way in, and Vorssaint's options
 
-**Verification:**
-- [ ] Build succeeds (the `swiftc` command in `install.sh`), and the bar restarts with `launchctl kickstart -k gui/$(id -u)/com.omacchiato.bar`.
-- [ ] Manual check: screenshots of each opened menu.
+- [ ] T4: Super+Esc and the keep-awake HUD
+- [ ] T5: Right-click on a plugin pill
+- [ ] T6: On/off and time buttons in the keep-awake popup
+- [ ] T7: Mouse jiggle, paused while the screen is locked
+- [ ] T8: Battery limit
+- [ ] T9: Keep Awake settings page and docs
 
-**Dependencies:** none.
-**Files likely touched:** `helper/bar.swift`.
-**Estimated scope:** S.
+### Checkpoint B
+- [ ] `bin/omacchiato-test` passes
+- [ ] Super+Esc, a right-click and the popup all turn it on and off
+- [ ] Teams stays "Available" after 10 minutes with no input
+- [ ] Commit, push, release. The user turns off keep awake in Vorssaint
+      (not the lid yet).
 
-#### Task 1 results (2026-09-14)
+### Phase 3: lid closed
 
-The scan found 9 icons in 204 ms: CleanShot X, Crank, ZoomIt, Vorssaint,
-1Password, Velja, OneDrive (two accounts) and OmniWM.
+- [ ] T10: Sudoers rule in install.sh and uninstall.sh
+- [ ] T11: The bar sets `disablesleep` with keep awake
 
-| App | Menu opened | Where it opened | `AXPress` result |
-|-----|-------------|-----------------|------------------|
-| CleanShot X | yes | under its own icon | `-25204` after 1.6 s |
-| 1Password (Electron) | yes | top-left corner of the screen | `-25204` after 1.6 s |
-| Velja | yes | top-left corner of the screen | `-25204` after 1.6 s |
-| OneDrive | nothing visible | none | `0` after 0.1 s |
+### Checkpoint C
+- [ ] The Mac stays awake with the lid closed while keep awake is on,
+      and sleeps with it off
+- [ ] Killing the bar and starting it again leaves `SleepDisabled 0`
+- [ ] Commit, push, release. The user removes Vorssaint's lid setting.
 
-Findings:
-- `AXPress` waits while the menu is open and then reports `-25204`
-  (cannot complete), so the press must run off the main thread and must not
-  treat `-25204` as a failure.
-- 1Password and Velja have icons that do not fit beside the notch, so macOS
-  hides them. Their menus open at the top-left corner of the screen.
-- OneDrive reports success but opens nothing, so a success result does not
-  prove that a menu opened.
-- macOS shows its menu bar while a menu is open. After the bar cancelled the
-  menus with `AXCancel`, the native menu bar stayed on screen and covered the
-  Omacchiato bar.
-- Labels: most are empty or symbol names ("Pawprint"). OneDrive's label
-  repeats the app name and has a second line, so a row uses the first line
-  without the app name, and only when an app has several icons.
-- One write to the trigger file fired the watch twice. Commands now carry a
-  nonce.
+### Phase 4: quit on close
 
-Recommendation: keep `AXPress`, keep `Show menu bar` as the way out for apps
-like OneDrive, and make Task 2 find out why the native menu bar stays shown.
+- [ ] T12: Spike: AX windows of an app with windows parked by OmniWM
+- [ ] T13: The quit decision as a pure function
+- [ ] T14: Watch windows and quit the app
+- [ ] T15: Seed the exceptions from Vorssaint
+- [ ] T16: Quit on Close settings page and docs
 
-Retest (11:04, no meeting): the bar pressed CleanShot X once and you closed
-its menu with a click. Two and ten seconds later the native menu bar had
-hidden itself again. So a press is safe when the menu closes the normal way.
-The stuck menu bar most likely came from the bar closing menus with
-`AXCancel`, or from the Teams call.
+### Checkpoint D
+- [ ] `bin/omacchiato-test` passes
+- [ ] TextEdit quits when its last window closes; Finder does not; an
+      app with unsaved work asks; an app with a window on another
+      workspace stays
+- [ ] Commit, push, release. The user turns off quit on close in
+      Vorssaint, and can then remove Vorssaint.
 
-Decision: use `AXPress`, and never close an app's menu from the bar.
+## Tasks
 
-Real use (11:12): you pressed CleanShot X, Crank and OmniWM from the new pill
-and closed each menu with a click. The native menu bar stayed on screen
-again. No menu or panel was open, no press was still waiting, and Escape did
-not help. This morning the same state cleared by itself after about 15 to 20
-minutes.
+### T1: Spike: which posted event resets the idle time that Teams reads
 
-Decision, revised: do not use `AXPress`. A row posts a real click instead,
-the way OmniWM's `HiddenBarClickForwarder` does. The pointer first moves to
-the top edge above the icon, so the hidden menu bar slides in. Then the bar
-clicks the icon's centre and moves the pointer back. An icon with no position
-on screen, or one behind the notch, gets `Show menu bar` instead.
-
-Icon positions (11:23, menu bar showing): OneDrive 1370 and 1406, OmniWM
-1442, CleanShot X 1476, Vorssaint 1510, ZoomIt 1560. Crank, 1Password and
-Velja sit at -1,1157, which is where macOS parks icons that the notch hides.
-Both stuck episodes included a press on one of those parked icons (1Password
-and Velja, then Crank), and the retest that did not stick pressed only a
-visible icon. So the likely trigger is a press on an icon behind the notch.
-The real-click design never clicks those icons.
-
-Confirmed at 11:24: quitting Crank released the stuck menu bar at once. A
-press from the pill on 1Password, also behind the notch, stuck it again. So
-the app whose hidden icon was pressed holds the menu bar until it quits. You
-also saw an app's menu blink in and out after a row click with `AXPress`.
-The pill's rows now use the real click.
-Confirmed again at 11:45: quitting 1Password released the menu bar at once.
-
-Real-click test (11:50): OmniWM, CleanShot X and a third visible icon all
-opened, but a little slowly, because the bar waited a fixed 0.4 s for the
-menu bar. The hidden icons did nothing, because the Ctrl+F8 event lacked the
-Fn flag. The window list tells hidden from shown: hidden, the menu bar window
-sits at y = -39 and is off screen; shown, it sits at y = 0.
-
-Changes: the bar polls for the menu bar every 15 ms (at most 0.6 s) and
-clicks once it is in place. An icon parked behind the notch opens its app,
-and its row says so. The Ctrl+F8 event carries the Fn flag.
-
-### Checkpoint: activation method
-
-- [ ] You review the Task 1 results and approve the activation method.
-
-### Phase 2: the feature
-
-#### Task 2: A menubar pill lists menu bar apps and opens one on click
-
-**Description:** Add the `menubar` pill with a grid icon at the left end of
-the right cluster. `popupRows(for: "menubar")` returns one row for each icon,
-with the app's icon and name, plus `· label` when an app has several icons.
-It shows cached rows at once and refreshes after a background scan. A click
-closes the popup and opens the app's menu with the method from Task 1.
+**Description:** Find the smallest input that keeps Teams and Slack from
+showing "Away". Post a mouse-moved event at the pointer's position from
+a scratch program, and read `ioreg -c IOHIDSystem` `HIDIdleTime` and
+`CGEventSourceSecondsSinceLastEventType` before and after. If a
+zero-distance move does not reset them, try a 1-point move and back.
 
 **Acceptance criteria:**
-- [ ] A click on the pill opens a popup that lists the running third-party menu bar apps, and no Apple items.
-- [ ] A click on a row opens that app's own menu or panel.
-- [ ] An app that does not answer within 0.25 s does not delay the popup.
+- [ ] One method is chosen, with the readings that show it resets the
+      idle time
+- [ ] The pointer does not visibly move
 
 **Verification:**
-- [ ] Build succeeds, and the bar restarts.
-- [ ] Manual check: screenshot of the popup, and of the menu that opens for each app from Task 1.
+- [ ] Manual check, with the user's permission: the idle time drops to
+      near 0 after the event
 
-**Dependencies:** Task 1.
-**Files likely touched:** `helper/bar.swift`.
-**Estimated scope:** M.
+**Dependencies:** None. **Files:** scratch only. **Scope:** XS
 
-#### Task 3: Show the menu bar on request and when a press fails
+### T2: State file, command and always-on pill
 
-**Description:** Add the last row, `Show menu bar ⌃F8`, which posts Ctrl+F8
-(key code 100 with the Control flag). Use the same call when a press fails or
-the app has quit since the scan. Add the empty state, `No menu bar apps
-running`, and reuse the app-name menu's rows for missing Accessibility.
+**Description:** `omacchiato-keep-awake` takes `on`, `off`, `toggle` and
+`for <minutes>`, and writes the state file (`on`, or an end time as a
+Unix time). With no argument, it prints the pill as now, plus: a dimmed
+cup while off, the accent cup while on, the time left for a timed run,
+`right_click` set to its own `toggle`, and `on` and `until` in the
+panel object. Remove the dead `on_click` line from this Mac's
+`bar-plugins.conf`.
 
 **Acceptance criteria:**
-- [ ] The `Show menu bar` row shows the native menu bar with focus on its icons.
-- [ ] A press that fails, or an app that has quit, shows the menu bar and does not fail silently.
-- [ ] With no menu bar apps, or no Accessibility permission, the popup says so.
+- [ ] Each argument writes the right state; an end time in the past
+      reads as off
+- [ ] The pill shows while off, dimmed
+- [ ] The existing holder list still works
 
 **Verification:**
-- [ ] Build succeeds, and the bar restarts.
-- [ ] Manual check: the `Show menu bar` row; quit an app with the popup open and click its row.
+- [ ] `python3 -m unittest tests/test_keep_awake.py`
+- [ ] `bin/omacchiato-test`
 
-**Dependencies:** Task 2.
-**Files likely touched:** `helper/bar.swift`.
-**Estimated scope:** S.
+**Dependencies:** None
+**Files:** `bin/omacchiato-keep-awake`, `tests/test_keep_awake.py`
+**Scope:** S
 
-### Checkpoint: feature complete
+### T3: The bar holds the assertion from the state file
 
-- [ ] The whole flow works on your real apps: open the pill, choose an app, use its menu.
-- [ ] `menubar = hide` removes the pill.
-- [ ] You review the screenshots.
-
-### Phase 3: finish
-
-#### Task 4: Document the pill and remove the test trigger
-
-**Description:** Remove the Task 1 trigger file code. Describe the pill in the
-README bar section, and add `menubar` to the pill names in the README and in
-the `bar-pills.conf` header comment.
+**Description:** A new `helper/bar/KeepAwake.swift` watches the state
+file, holds `PreventUserIdleSystemSleep` while it reads on, and
+releases it when it reads off or the end time passes. A pure function,
+`keepAwakeNow(state:now:)`, decides. With `keep_awake_display = on`, it
+also holds `PreventUserIdleDisplaySleep`. The bar starts it in
+`main.swift`.
 
 **Acceptance criteria:**
-- [ ] The bar has no test trigger code left.
-- [ ] The README describes the pill, the click behaviour and the Ctrl+F8 fallback.
+- [ ] The assertion follows the file within 1 second
+- [ ] A timed run ends at its end time and writes `off`
+- [ ] Quitting the bar releases the assertion
 
 **Verification:**
-- [ ] Build succeeds, and the bar restarts.
-- [ ] `grep menubar-test helper/bar.swift` finds nothing.
+- [ ] `swift test` with a new `KeepAwakeTests`
+- [ ] Manual: Checkpoint A
 
-**Dependencies:** Task 3.
-**Files likely touched:** `helper/bar.swift`, `README.md`.
-**Estimated scope:** XS.
+**Dependencies:** T2
+**Files:** `helper/bar/KeepAwake.swift`, `helper/bar/main.swift`,
+`tests/bar/KeepAwakeTests.swift`
+**Scope:** M
 
-### Checkpoint: complete
+### T4: Super+Esc and the keep-awake HUD
 
-- [ ] All acceptance criteria are met.
-- [ ] The changes are committed and pushed to the fork.
+**Description:** A Karabiner rule runs `omacchiato-keep-awake toggle` on
+Super+Esc. The bar shows a glass HUD, "Keeping Awake" (with the end
+time for a timed run) or "Sleep Allowed", in the shared HUD window when
+the state changes. `keep_awake_hud = off` turns it off.
+
+**Acceptance criteria:**
+- [ ] Super+Esc turns keep awake on and off, and the cheatsheet lists it
+- [ ] The HUD shows on each change, from any source
+- [ ] Xcode previews show both HUD states
+
+**Verification:**
+- [ ] `swift build`, `bin/omacchiato-test`
+- [ ] Manual: press Super+Esc twice
+
+**Dependencies:** T3
+**Files:** `bin/omacchiato-karabiner-omniwm`,
+`helper/ui/Sources/KeepAwakePanel/KeepAwakeOSD.swift`,
+`helper/ui/Sources/KeepAwakePanel/KeepAwakePreviews.swift`,
+`helper/bar/KeepAwake.swift`
+**Scope:** M
+
+### T5: Right-click on a plugin pill
+
+**Description:** `BarView` gets `rightMouseDown`. On a plugin pill whose
+last JSON had `right_click`, the bar runs that command through
+`runPluginCommand`. Other pills ignore a right-click, as now.
+
+**Acceptance criteria:**
+- [ ] A right-click on the cup turns keep awake on and off
+- [ ] A right-click on other pills does nothing
+- [ ] `right_click` is listed with the other plugin keys in CLAUDE.md
+
+**Verification:**
+- [ ] `swift build`, `bin/omacchiato-test`
+- [ ] Manual: right-click the cup twice
+
+**Dependencies:** T2
+**Files:** `helper/bar/BarView.swift`, `helper/bar/Plugins.swift`,
+`CLAUDE.md`
+**Scope:** S
+
+### T6: On/off and time buttons in the keep-awake popup
+
+**Description:** `KeepAwakeReport` gets `on` and `until`. The panel gets
+a toggle and buttons for 30 minutes, 1 hour, 2 hours and "Until turned
+off", drawn by hand because the popup is never key. They run the
+command through `runPluginCommand`. The holder list stays, and names the
+bar's own assertion "Omacchiato".
+
+**Acceptance criteria:**
+- [ ] Each button sets the state, and the panel shows the time left
+- [ ] Previews show off, on, and a timed run
+
+**Verification:**
+- [ ] `swift test` (report parsing), `bin/omacchiato-test`
+- [ ] Manual: each button
+
+**Dependencies:** T2, T3
+**Files:** `helper/ui/Sources/KeepAwakePanel/*.swift`,
+`helper/bar/Popups.swift`
+**Scope:** M
+
+### T7: Mouse jiggle, paused while the screen is locked
+
+**Description:** While keep awake is on, the bar posts the event chosen
+in T1 every `keep_awake_jiggle` minutes (default 1, `off` turns it
+off). It posts nothing while `screenLocked` is true.
+
+**Acceptance criteria:**
+- [ ] `pmset -g assertions` shows the `UserIsActive` entry each interval
+- [ ] No events while locked or while keep awake is off
+
+**Verification:**
+- [ ] Manual: Teams check at Checkpoint B
+
+**Dependencies:** T1, T3
+**Files:** `helper/bar/KeepAwake.swift`
+**Scope:** S
+
+### T8: Battery limit
+
+**Description:** On battery, at or below `keep_awake_battery` percent
+(default 20), the bar writes `off` and shows the HUD with "Battery low".
+`keepAwakeNow` takes the battery level and power source, so the tests
+cover it.
+
+**Acceptance criteria:**
+- [ ] Turns off at the limit on battery; stays on while charging
+- [ ] `keep_awake_battery = off` turns the limit off
+
+**Verification:**
+- [ ] `swift test` cases for the limit
+
+**Dependencies:** T3, T4
+**Files:** `helper/bar/KeepAwake.swift`, `tests/bar/KeepAwakeTests.swift`
+**Scope:** S
+
+### T9: Keep Awake settings page and docs
+
+**Description:** The Keep Awake page in Settings gets: display sleep,
+jiggle interval, battery limit and HUD. README and CLAUDE.md describe
+the command, the state file, the keys and Super+Esc.
+
+**Acceptance criteria:**
+- [ ] Each control writes its key, and the bar reads it at the moment
+      of use
+- [ ] The Settings preview shows the page
+
+**Verification:**
+- [ ] `swift build`, `bin/omacchiato-test`
+- [ ] Manual: change each control and check its effect
+
+**Dependencies:** T4, T7, T8
+**Files:** `helper/bar/Settings.swift`,
+`helper/ui/Sources/SettingsPanel/SettingsPreviews.swift`, `README.md`,
+`CLAUDE.md`
+**Scope:** M
+
+### T10: Sudoers rule in install.sh and uninstall.sh
+
+**Description:** `install.sh` writes
+`/etc/sudoers.d/omacchiato-keep-awake`, which lets the user run only
+`/usr/bin/pmset -a disablesleep 0` and `... 1` with no password. It
+checks the file with `visudo -cf` before it moves it into place, asks
+for the admin password once, and adds the file to the manifest.
+`uninstall.sh` removes it and runs `pmset -a disablesleep 0`.
+
+**Acceptance criteria:**
+- [ ] `sudo -n /usr/bin/pmset -a disablesleep 0` runs with no prompt
+- [ ] No other command runs with no password
+- [ ] A second `install.sh` run asks for nothing
+
+**Verification:**
+- [ ] `bash -n` through `bin/omacchiato-test`
+- [ ] Manual: the user runs `install.sh`, then `sudo -n -l`
+
+**Dependencies:** None
+**Files:** `install.sh`, `uninstall.sh`
+**Scope:** S
+
+### T11: The bar sets `disablesleep` with keep awake
+
+**Description:** With `keep_awake_lid = on` (on by default), the bar
+runs `sudo -n pmset -a disablesleep 1` when keep awake starts, and `0`
+when it ends and when the bar starts. If `sudo -n` fails, the bar logs
+it and keeps the assertion. The Settings page gets a lid switch.
+
+**Acceptance criteria:**
+- [ ] `pmset -g` shows `SleepDisabled 1` only while keep awake is on
+- [ ] Bar restart resets it to 0
+
+**Verification:**
+- [ ] Manual: Checkpoint C
+
+**Dependencies:** T3, T10
+**Files:** `helper/bar/KeepAwake.swift`, `helper/bar/Settings.swift`
+**Scope:** S
+
+### T12: Spike: AX windows of an app with windows parked by OmniWM
+
+**Description:** With a Finder window on another workspace, read
+`kAXWindowsAttribute` and each window's subrole and minimized state
+from a scratch program. Also check what a sheet, a settings window and
+a tabbed window report.
+
+**Acceptance criteria:**
+- [ ] Parked windows are in the list, or the plan changes to count them
+      another way
+- [ ] The subroles to count are known
+
+**Verification:**
+- [ ] The readings are noted in the design doc
+
+**Dependencies:** None. **Files:** scratch, design doc. **Scope:** XS
+
+### T13: The quit decision as a pure function
+
+**Description:** `shouldQuit(windows:bundleID:exceptions:everShowedWindow:)`
+returns quit or keep, from T12's rules: count standard windows,
+minimized ones too; never quit an exception, an app that never showed a
+window, Omacchiato's own apps or OmniWM.
+
+**Acceptance criteria:**
+- [ ] Tests cover each rule
+
+**Verification:**
+- [ ] `swift test` with a new `QuitOnCloseTests`
+
+**Dependencies:** T12
+**Files:** `helper/bar/QuitOnClose.swift`, `tests/bar/QuitOnCloseTests.swift`
+**Scope:** S
+
+### T14: Watch windows and quit the app
+
+**Description:** An `AXObserver` per `.regular` app, for window created
+and destroyed. After a window closes, wait 1 second, read the windows,
+ask `shouldQuit`, and call `terminate()`. Launch and quit notifications
+add and remove apps. The exceptions come from `quit-on-close.conf`,
+which the config watcher reloads. `quit_on_close = off` stops it.
+
+**Acceptance criteria:**
+- [ ] The Checkpoint D cases pass
+- [ ] Turning it off stops all quits at once
+
+**Verification:**
+- [ ] Manual: Checkpoint D
+- [ ] `/tmp/omacchiato-bar.log` has one line per quit
+
+**Dependencies:** T13
+**Files:** `helper/bar/QuitOnClose.swift`, `helper/bar/main.swift`,
+`helper/bar/Config.swift`
+**Scope:** M
+
+### T15: Seed the exceptions from Vorssaint
+
+**Description:** If `quit-on-close.conf` does not exist, `install.sh`
+writes it from `defaults read com.vorssaint.utils autoQuitExceptions`,
+or from a default list (Finder, Music, Raycast). It sets
+`quit_on_close = off` if Vorssaint had it off.
+
+**Acceptance criteria:**
+- [ ] On this Mac, the file holds the 7 Vorssaint apps
+- [ ] An existing file is never changed
+
+**Verification:**
+- [ ] `bash -n`; manual: run the block on this Mac
+
+**Dependencies:** T14
+**Files:** `install.sh`
+**Scope:** S
+
+### T16: Quit on Close settings page and docs
+
+**Description:** A Settings page with the on/off switch and the
+exceptions list: add one of the running apps, remove one. This needs a
+new list control in `SettingsReport` and `SettingsView`. README and
+CLAUDE.md describe the feature and the file.
+
+**Acceptance criteria:**
+- [ ] Adding and removing apps writes the file, and the bar reloads it
+- [ ] Previews show the page with the 7 apps
+
+**Verification:**
+- [ ] `swift build`, `bin/omacchiato-test`
+- [ ] Manual: add and remove an app
+
+**Dependencies:** T14, T15
+**Files:** `helper/bar/Settings.swift`,
+`helper/ui/Sources/SettingsPanel/*.swift`, `README.md`, `CLAUDE.md`
+**Scope:** M
 
 ## Risks and mitigations
 
 | Risk | Impact | Mitigation |
-|------|--------|------------|
-| `AXPress` does not open a menu while the menu bar is hidden | High | Task 1 tests it first. The fallback shows the menu bar, then clicks the icon's position, as OmniWM's `HiddenBarClickForwarder` does. |
-| A hung app blocks Accessibility calls | Medium | A 0.25 s messaging timeout for each app, and the scan runs off the main thread. |
-| An Electron app ignores `AXPress` | Medium | Task 1 tests an Electron app if one is running. The fallback covers it. |
-| You turned off the Ctrl+F8 shortcut in System Settings | Low | The README says how to turn it back on. |
+|---|---|---|
+| A posted event does not reset the idle time that Teams reads | High | T1 checks this first. The fallback is a 1-point move and back. |
+| Vorssaint and Omacchiato both run keep awake, quit on close or Super+Esc | Medium | Turn each one off in Vorssaint at its checkpoint. Super+Esc fires twice until then. |
+| The sudoers rule allows more than `pmset disablesleep` | High | Only the two exact commands. `visudo -cf` before the move. |
+| `SleepDisabled 1` is left on after a crash | Medium | The bar sets 0 at start. `uninstall.sh` sets 0. |
+| Quit on close quits an app with work in progress | High | `terminate()` is a polite quit, so apps ask about unsaved work. The 1-second wait and the exceptions cover the rest. |
+| OmniWM's parked windows are missing from AX | High | T12 checks this before any quit code exists. |
+| The window watch costs CPU with many apps | Low | One observer per app, events only; no polling. |
 
 ## Open questions
 
-- Which menu bar apps do you use most? Task 1 should test those.
-
-## Outcome (2026-09-14)
-
-All four tasks are done. The pill, the popup and `Show menu bar` work on this
-Mac. Rows click visible icons for real, and rows for icons behind the notch
-open the app. Task 4 removed the test trigger and the unused `AXPress` helper.
-You chose to keep the click at about 0.25 s: macOS has no setting for the
-menu bar's slide-in, and a click during the slide could miss.
+- None that block Phase 1.
