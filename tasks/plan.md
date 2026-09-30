@@ -72,7 +72,7 @@ git history (commit 257d382 and earlier).
 - [x] S0: Log the bar's memory each minute with `debug = on`
 
 ### Phase 1: pill order
-- [ ] S1: The `order` key in pillOrder
+- [x] S1: The `order` key in pillOrder
 - [ ] S2: The Bar page, with the drag-to-reorder list
 
 ### Checkpoint A

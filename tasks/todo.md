@@ -6,7 +6,7 @@ Plan: `tasks/plan.md`.
 - [x] S0 Log the bar's memory each minute with `debug = on` (S)
 
 ## Phase 1: pill order
-- [ ] S1 The `order` key in pillOrder (S)
+- [x] S1 The `order` key in pillOrder (S)
 - [ ] S2 The Bar page, with the drag-to-reorder list (M)
 - [ ] Checkpoint A: drag Clock above Status; review with the user
 

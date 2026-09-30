@@ -38,6 +38,31 @@ import Testing
         #expect(!order.contains("clock"))
     }
 
+    @Test("a saved order moves built-in and plugin pills, and the rest follow in the default order")
+    func savedOrder() {
+        let plugins = [BarPlugin(name: "github", command: "x"), BarPlugin(name: "claude", command: "y")]
+        let order = pillOrder(modes: ["order": "clock, github, status"], plugins: plugins)
+        #expect(Array(order.prefix(3)) == ["clock", "github", "status"])
+        #expect(Array(order.dropFirst(3)) == ["menubar", "claude", "weather", "bluetooth", "brightness",
+                                              "mic", "volume", "activity"])
+    }
+
+    @Test("a saved order drops unknown names and repeats; with no order the bar keeps its default")
+    func savedOrderEdges() {
+        let plugins = [BarPlugin(name: "github", command: "x")]
+        let plain = pillOrder(modes: [:], plugins: plugins)
+        #expect(pillOrder(modes: ["order": "gone, clock, clock"], plugins: plugins)
+                == ["clock"] + plain.filter { $0 != "clock" })
+        #expect(pillOrder(modes: ["order": ""], plugins: plugins) == plain)
+    }
+
+    @Test("a hidden pill keeps its place in the saved order and comes back to it")
+    func hiddenKeepsPlace() {
+        let full = fullPillOrder(modes: ["order": "clock, status", "clock": "hide"], plugins: [])
+        #expect(Array(full.prefix(2)) == ["clock", "status"])
+        #expect(pillOrder(modes: ["order": "clock, status", "clock": "hide"], plugins: []).first == "status")
+    }
+
     @Test("a reload stops removed, hidden and changed plugins, and starts new, shown and changed ones")
     func changes() {
         let a = BarPlugin(name: "a", command: "x"), b = BarPlugin(name: "b", command: "y")

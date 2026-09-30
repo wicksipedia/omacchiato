@@ -83,8 +83,21 @@ let optInPills: Set = ["wifi", "battery"]
 var rightOrder = pillOrder(modes: pillModes, plugins: barPlugins)
 var iconOnly = Set(pillModes.filter { $0.value == "icon" }.keys)
 
+// Every right-hand pill, hidden ones too, in the user's order: the pills
+// that `order` in bar-pills.conf names, then the rest in the default
+// order. A hidden pill keeps its place, so it comes back to it.
+func fullPillOrder(modes: [String: String], plugins: [BarPlugin]) -> [String] {
+    let all = ["menubar"] + plugins.map(\.name) + rightOrderAll
+    var named: [String] = []
+    for name in (modes["order"] ?? "").split(separator: ",").map({ $0.trimmingCharacters(in: .whitespaces) })
+    where all.contains(name) && !named.contains(name) {
+        named.append(name)
+    }
+    return named + all.filter { !named.contains($0) }
+}
+
 func pillOrder(modes: [String: String], plugins: [BarPlugin]) -> [String] {
-    (["menubar"] + plugins.map(\.name) + rightOrderAll)
+    fullPillOrder(modes: modes, plugins: plugins)
         .filter { modes[$0] != "hide" && (!optInPills.contains($0) || modes[$0] != nil) }
 }
 
