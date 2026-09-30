@@ -797,6 +797,7 @@ attachVolumeListeners()
 startVolumeKeys()
 // Not gated on the mic pill: the mic HUD shows with the pill hidden.
 startMicWatch()
+startKeepAwake()
 
 // brightness: DisplayServices publishes, so the keyboard keys land here
 // without the bar being told about them by anyone else

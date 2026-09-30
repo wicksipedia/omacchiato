@@ -57,7 +57,7 @@ other. The lid (T10–T11) depends only on T3.
 
 - [x] T1: Spike: which posted event resets the idle time that Teams reads
 - [x] T2: State file, command and always-on pill
-- [ ] T3: The bar holds the assertion from the state file
+- [x] T3: The bar holds the assertion from the state file
 
 ### Checkpoint A
 - [ ] `bin/omacchiato-test` passes
