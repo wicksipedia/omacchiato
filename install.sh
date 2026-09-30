@@ -415,6 +415,31 @@ PLUGINS_CONF="$HOME/.config/omacchiato/bar-plugins.conf"
 if [ -f "$PLUGINS_CONF" ] && grep -q 'omacchiato-claude-usage' "$PLUGINS_CONF"; then
   sed -i '' 's/omacchiato-claude-usage/omacchiato-ai-usage/g' "$(readlink -f "$PLUGINS_CONF")"
 fi
+# Quit on close: write the exceptions once, from Vorssaint's list if it
+# has one, and turn the feature on if Vorssaint had it on. A file that
+# exists is the user's, so it stays as it is.
+QUIT_CONF="$HOME/.config/omacchiato/quit-on-close.conf"
+if [ ! -e "$QUIT_CONF" ]; then
+  mkdir -p "$(dirname "$QUIT_CONF")"
+  QUIT_IDS="$(defaults export com.vorssaint.utils - 2>/dev/null \
+    | plutil -extract autoQuitExceptions json -o - - 2>/dev/null \
+    | python3 -c 'import json, sys; print("\n".join(json.load(sys.stdin)))' 2>/dev/null || true)"
+  {
+    echo "# Apps that stay open when their last window closes: one bundle ID a line."
+    if [ -n "$QUIT_IDS" ]; then
+      printf '%s\n' "$QUIT_IDS"
+    else
+      printf '%s\n' com.apple.finder com.apple.Music com.raycast.macos
+    fi
+  } > "$QUIT_CONF"
+  mark "copied-config $QUIT_CONF"
+  PILLS_CONF="$HOME/.config/omacchiato/bar-pills.conf"
+  if [ "$(defaults read com.vorssaint.utils autoQuitEnabled 2>/dev/null)" = 1 ] \
+     && ! grep -qs '^quit_on_close' "$PILLS_CONF"; then
+    echo "quit_on_close = on" >> "$(readlink -f "$PILLS_CONF" 2>/dev/null || echo "$PILLS_CONF")"
+  fi
+fi
+
 OLD_USAGE="$HOME/.local/bin/omacchiato-claude-usage"
 case "$(readlink "$OLD_USAGE" 2>/dev/null || true)" in *omacchiato* | *omacosy*) rm -f "$OLD_USAGE" ;; esac
 if have "copied-config $OLD_USAGE"; then

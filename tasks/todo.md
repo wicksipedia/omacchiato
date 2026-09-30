@@ -26,6 +26,6 @@ Plan: `tasks/plan.md`. Design: `docs/plans/2026-09-30-keep-awake-and-quit-on-clo
 - [x] T12 Spike: AX windows with OmniWM parked windows (XS)
 - [x] T13 The quit decision as a pure function (S)
 - [x] T14 Watch windows and quit the app (M)
-- [ ] T15 Seed the exceptions from Vorssaint (S)
+- [x] T15 Seed the exceptions from Vorssaint (S)
 - [ ] T16 Quit on Close settings page and docs (M)
 - [ ] Checkpoint D: release; turn off quit on close in Vorssaint
