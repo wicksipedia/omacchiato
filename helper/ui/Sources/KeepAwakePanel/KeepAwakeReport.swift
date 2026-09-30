@@ -19,18 +19,25 @@ public struct KeepAwakeReport {
 
     public var on: Bool
     public var until: Date?          // the end of a timed run
+    public var last: String          // the last chosen time, "on" or "for <minutes>"
     public var holders: [Holder]
 
-    public init(on: Bool = false, until: Date? = nil, holders: [Holder] = []) {
+    public init(on: Bool = false, until: Date? = nil, last: String = "on", holders: [Holder] = []) {
         self.on = on
         self.until = until
+        self.last = last
         self.holders = holders
+    }
+
+    public var lastMinutes: Int? {
+        let parts = last.split(separator: " ")
+        return parts.count == 2 && parts[0] == "for" ? Int(parts[1]) : nil
     }
 }
 
 public struct KeepAwakeActions {
     public var openSettings: () -> Void = {}
-    // Runs omacchiato-keep-awake with "on", "off" or "for <minutes>".
+    // Runs omacchiato-keep-awake with "toggle", "on", "off" or "for <minutes>".
     public var set: (String) -> Void = { _ in }
 
     public init() {}
@@ -48,6 +55,7 @@ extension KeepAwakeReport {
         }
         self.init(on: json["on"] as? Bool ?? false,
                   until: (json["until"] as? NSNumber).map { Date(timeIntervalSince1970: $0.doubleValue) },
+                  last: json["last"] as? String ?? "on",
                   holders: holders)
     }
 }

@@ -40,12 +40,20 @@ class State(unittest.TestCase):
     def test_an_end_time_in_the_past_reads_as_off(self):
         self.assertEqual(ka.read_state("99", 100), (False, None))
 
-    def test_each_command_writes_its_state(self):
-        self.assertEqual(ka.next_state(["on"], False, 100), "on")
-        self.assertEqual(ka.next_state(["off"], True, 100), "off")
-        self.assertEqual(ka.next_state(["toggle"], True, 100), "off")
-        self.assertEqual(ka.next_state(["toggle"], False, 100), "on")
-        self.assertEqual(ka.next_state(["for", "30"], False, 100), "1900")
+    def test_each_command_writes_its_state_and_remembers_a_chosen_time(self):
+        self.assertEqual(ka.next_state(["on"], False, 100), ("on", "on"))
+        self.assertEqual(ka.next_state(["off"], True, 100), ("off", None))
+        self.assertEqual(ka.next_state(["for", "30"], False, 100), ("1900", "for 30"))
+        self.assertEqual(ka.next_state(["for", "75"], False, 100), ("4600", "for 75"), "a custom time")
+
+    def test_toggle_turns_on_with_the_last_chosen_time(self):
+        self.assertEqual(ka.next_state(["toggle"], False, 100), ("on", None))
+        self.assertEqual(ka.next_state(["toggle"], False, 100, "for 30"), ("1900", None))
+        self.assertEqual(ka.next_state(["toggle"], True, 100, "for 30"), ("off", None))
+
+    def test_a_bad_remembered_time_falls_back_to_until_turned_off(self):
+        self.assertEqual(ka.next_state(["toggle"], False, 100, "for x"), ("on", None))
+        self.assertEqual(ka.next_state(["toggle"], False, 100, "toggle"), ("on", None))
 
     def test_a_bad_command_is_refused(self):
         for args in (["for"], ["for", "0"], ["for", "x"], ["sometimes"]):
@@ -58,12 +66,15 @@ class Pill(unittest.TestCase):
         p = ka.render(False, None, [], 100, "/bin/ka")
         self.assertEqual((p["icon"], p["color"], p["label"]), (ka.AWAKE_ICON, "muted", ""))
         self.assertEqual(p["right_click"], "/bin/ka toggle")
-        self.assertEqual((p["panel"]["on"], p["panel"]["until"]), (False, None))
+        self.assertEqual((p["panel"]["on"], p["panel"]["until"], p["panel"]["last"]), (False, None, "on"))
 
     def test_on_shows_the_accent_cup(self):
         p = ka.render(True, None, [], 100, "/bin/ka")
         self.assertEqual((p["color"], p["label"]), ("accent", ""))
         self.assertTrue(p["panel"]["on"])
+
+    def test_the_panel_carries_the_last_chosen_time(self):
+        self.assertEqual(ka.render(False, None, [], 100, "/bin/ka", "for 30")["panel"]["last"], "for 30")
 
     def test_a_timed_run_shows_the_time_left(self):
         self.assertEqual(ka.render(True, 100 + 45 * 60, [], 100, "/bin/ka")["label"], "45m")

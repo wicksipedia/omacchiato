@@ -37,4 +37,22 @@ import Testing
         let timed = try #require(KeepAwakeReport(json: ["kind": "keep-awake", "on": true, "until": 1790748720]))
         #expect(timed.on && timed.until == Date(timeIntervalSince1970: 1790748720))
     }
+
+    @Test("the last chosen time decodes, and a custom one reads as its minutes")
+    func last() throws {
+        #expect(KeepAwakeReport(json: json)?.last == "on")
+        let custom = try #require(KeepAwakeReport(json: ["kind": "keep-awake", "last": "for 75"]))
+        #expect(custom.last == "for 75" && custom.lastMinutes == 75)
+        #expect(KeepAwakeReport(json: ["kind": "keep-awake", "last": "on"])?.lastMinutes == nil)
+    }
+
+    @Test("the custom time steps by 15 minutes, from 15 minutes to 12 hours")
+    func customSteps() {
+        #expect(customMinutes(45, by: 1) == 60)
+        #expect(customMinutes(15, by: -1) == 15)
+        #expect(customMinutes(720, by: 1) == 720)
+        #expect(customLabel(75) == "1 hr 15 min")
+        #expect(customLabel(45) == "45 min")
+        #expect(customLabel(120) == "2 hr")
+    }
 }

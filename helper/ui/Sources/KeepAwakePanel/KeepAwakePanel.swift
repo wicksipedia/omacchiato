@@ -19,17 +19,19 @@ public struct KeepAwakePanel: View {
     public var body: some View {
         VStack(spacing: 10) {
             PanelCard {
+                // the switch turns on with the last chosen time, as Super+Esc does
                 ControlTile(title: "Keep Awake", subtitle: subtitle, symbol: "cup.and.saucer.fill", on: report.on) {
-                    actions.set(report.on ? "off" : "on")
+                    actions.set("toggle")
                 }
                 HStack(spacing: 6) {
                     ForEach(Self.durations, id: \.arg) { d in
-                        DurationButton(title: d.title,
-                                       on: report.on && d.arg == "on" && report.until == nil) { actions.set(d.arg) }
+                        DurationButton(title: d.title, on: report.last == d.arg) { actions.set(d.arg) }
                     }
                 }
                 .padding(.horizontal, 6)
-                .padding(.bottom, 4)
+                CustomDuration(chosen: custom, start: { actions.set("for \($0)") })
+                    .padding(.horizontal, 6)
+                    .padding(.bottom, 4)
             }
             PanelCard(title: "Also Keeping Awake", symbol: "cup.and.saucer.fill") {
                 if report.holders.isEmpty {
@@ -48,10 +50,68 @@ public struct KeepAwakePanel: View {
     static let durations = [(title: "30 min", arg: "for 30"), (title: "1 hr", arg: "for 60"),
                             (title: "2 hr", arg: "for 120"), (title: "Until Off", arg: "on")]
 
+    // The last time, when the user chose it with Custom rather than a preset.
+    var custom: Int? {
+        guard let minutes = report.lastMinutes, !Self.durations.contains(where: { $0.arg == report.last })
+        else { return nil }
+        return minutes
+    }
+
     var subtitle: String {
         guard report.on else { return "Off" }
         guard let until = report.until else { return "Until turned off" }
         return "Until " + until.formatted(date: .omitted, time: .shortened)
+    }
+}
+
+// 15 minutes to 12 hours, in 15-minute steps. A popup never takes typed text.
+func customMinutes(_ minutes: Int, by steps: Int) -> Int {
+    min(720, max(15, minutes + steps * 15))
+}
+
+func customLabel(_ minutes: Int) -> String {
+    let h = minutes / 60, m = minutes % 60
+    if h == 0 { return "\(m) min" }
+    return m == 0 ? "\(h) hr" : "\(h) hr \(m) min"
+}
+
+// A time of the user's own: − and + step it, and Start begins it.
+struct CustomDuration: View {
+    var chosen: Int?                     // the custom time last chosen, lit while it is the choice
+    var start: (Int) -> Void
+    @State private var minutes: Int?
+
+    var body: some View {
+        let shown = minutes ?? chosen ?? 45
+        HStack(spacing: 6) {
+            Text("Custom").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
+            Spacer(minLength: 4)
+            StepButton(symbol: "minus") { minutes = customMinutes(shown, by: -1) }
+            Text(customLabel(shown))
+                .font(.system(size: 11, weight: .medium))
+                .monospacedDigit()
+                .frame(minWidth: 70)
+            StepButton(symbol: "plus") { minutes = customMinutes(shown, by: 1) }
+            DurationButton(title: "Start", on: chosen == shown) { start(shown) }
+                .frame(width: 64)
+        }
+    }
+}
+
+struct StepButton: View {
+    var symbol: String
+    var action: () -> Void
+    @State private var hovered = false
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: 10, weight: .bold))
+            .frame(width: 24, height: 24)
+            .background(hovered ? AnyShapeStyle(.fill.secondary) : AnyShapeStyle(.fill.tertiary), in: .circle)
+            .contentShape(.circle)
+            .onHover { hovered = $0 }
+            .onTapGesture(perform: action)
+            .accessibilityAddTraits(.isButton)
     }
 }
 
