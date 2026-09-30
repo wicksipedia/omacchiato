@@ -49,16 +49,38 @@ public func isColorEmoji(_ s: String) -> Bool {
 public func drawIcon(_ s: String, _ font: NSFont, _ color: NSColor, centeredIn box: CGRect) {
     let ink = inkBox(s, font)
     let origin = CGPoint(x: box.midX - ink.midX, y: box.midY - ink.midY)
-    guard isColorEmoji(s), let ctx = NSGraphicsContext.current?.cgContext else {
+    guard isColorEmoji(s) else {
         drawLine(s, font, color, baseline: origin)
         return
     }
-    ctx.saveGState()
-    ctx.setShadow(offset: .zero, blur: 2.5, color: color.cgColor)
-    // two passes: one shadow alone is too faint to lift a pale glyph
-    drawLine(s, font, color, baseline: origin)
-    drawLine(s, font, color, baseline: origin)
-    ctx.restoreGState()
+    let halo = haloImage(s, font, color)
+    halo.draw(at: CGPoint(x: origin.x + ink.minX - haloPad, y: origin.y + ink.minY - haloPad),
+              from: .zero, operation: .sourceOver, fraction: 1)
+}
+
+// The halo is drawn once into a small image and cached. A shadow drawn
+// straight into the bar made the window server paint the whole bar
+// through a 300 MB offscreen buffer on every redraw.
+let haloPad: CGFloat = 5
+private var haloCache: [String: NSImage] = [:]
+
+func haloImage(_ s: String, _ font: NSFont, _ color: NSColor) -> NSImage {
+    let key = "\(s)|\(font.pointSize)|\(color.usingColorSpace(.sRGB)?.description ?? "")"
+    if let cached = haloCache[key] { return cached }
+    let ink = inkBox(s, font)
+    let image = NSImage(size: CGSize(width: ink.width + 2 * haloPad, height: ink.height + 2 * haloPad),
+                        flipped: false) { _ in
+        guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
+        ctx.setShadow(offset: .zero, blur: 2.5, color: color.cgColor)
+        let baseline = CGPoint(x: haloPad - ink.minX, y: haloPad - ink.minY)
+        // two passes: one shadow alone is too faint to lift a pale glyph
+        drawLine(s, font, color, baseline: baseline)
+        drawLine(s, font, color, baseline: baseline)
+        return true
+    }
+    if haloCache.count > 32 { haloCache.removeAll() }
+    haloCache[key] = image
+    return image
 }
 
 // a text run: advance-centred across, cap-height-centred down
