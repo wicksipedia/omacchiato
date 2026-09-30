@@ -148,7 +148,7 @@ last window closes.
   apps.
 - **Decision:** after a window closes, wait 1 second. Then read
   `kAXWindowsAttribute`. Count only windows with the subrole
-  `AXStandardWindow`, and count minimized windows as open. If the count
+  `AXStandardWindow` or `AXDialog`, and count minimized windows as open. If the count
   is 0, the app is not in the exceptions, and the app is not frontmost
   with a sheet or dialog open, call `NSRunningApplication.terminate()`.
   That is a normal quit, so an app with unsaved work still asks.
@@ -159,8 +159,13 @@ last window closes.
   showed one, the bar and other Omacchiato apps, OmniWM, and every
   `com.apple.*` system agent that has no Dock icon.
 - **OmniWM:** OmniWM parks windows off screen on other workspaces. They
-  are still in `kAXWindowsAttribute`, so they count as open. First
-  check: confirm this with windows on two workspaces.
+  are still in `kAXWindowsAttribute`, so they count as open. Test on
+  2026-09-30: Outlook, Teams and Safari, each on a workspace that was
+  not on screen, each listed one `AXStandardWindow` at x = 1799, the
+  parking spot. Finder listed only an `AXDesktop` window, which must not
+  count. So count `AXStandardWindow` and `AXDialog` (a settings window
+  that stays open means the app is in use), minimized ones too, and not
+  `AXDesktop` or floating panels.
 - **Exceptions:** `~/.config/omacchiato/quit-on-close.conf`, one bundle
   ID per line, with `#` comments. The first install writes the
   Vorssaint list, if Vorssaint has one, else a default list: Finder,
