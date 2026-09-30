@@ -219,16 +219,20 @@ struct LinkRow: View {
     }
 }
 
-// The rows that open a full monitor.
+// The foot of every activity panel: the Quit on Close card, then the rows
+// that open a full monitor.
 struct MonitorLinks: View {
     var actions: ActivityActions
 
     var body: some View {
-        VStack(spacing: 0) {
-            if let on = actions.quitOnClose {
+        if let on = actions.quitOnClose {
+            PanelCard {
                 ControlTile(title: "Quit Apps on Close", subtitle: on ? "On" : "Off",
                             symbol: "xmark.square.fill", on: on) { actions.setQuitOnClose(!on) }
+                CustomizeRow(title: "Customize Quit on Close", action: actions.customizeQuitOnClose)
             }
+        }
+        VStack(spacing: 0) {
             LinkRow(title: "Activity Monitor", symbol: "chart.bar.xaxis", action: actions.openActivityMonitor)
             if let btop = actions.openTerminalMonitor {
                 LinkRow(title: "btop in a terminal", symbol: "apple.terminal", action: btop)

@@ -314,13 +314,19 @@ struct PanelBackground: ViewModifier {
 
 // The link to the pill's page in Omacchiato Settings. Muted, so it reads
 // as a way out of the panel, not as one more setting.
-struct CustomizeRow: View {
+public struct CustomizeRow: View {
+    var title: String
     var action: () -> Void
 
-    var body: some View {
+    public init(title: String = "Customize Pill", action: @escaping () -> Void) {
+        self.title = title
+        self.action = action
+    }
+
+    public var body: some View {
         HoverRow(action: action) {
             HStack {
-                Text("Customize Pill")
+                Text(title)
                 Spacer()
                 Image(systemName: "arrow.up.forward").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
             }

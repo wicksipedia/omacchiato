@@ -157,6 +157,7 @@ func panelContent(_ name: String) -> AnyView? {
         var actions = activityActions
         actions.quitOnClose = pillModes["quit_on_close"] == "on"
         actions.setQuitOnClose = { settingsActions.set("quit_on_close", $0 ? "on" : nil) }
+        actions.customizeQuitOnClose = { showSettings(page: .quitOnClose) }
         return activityPanel(pillModes["activity_panel"], activityReport(), actions)
     case "volume": return soundReport().map { AnyView(SoundPanel(report: $0, actions: soundActions)) }
     case "brightness": return AnyView(DisplayPanel(report: displayReport(), actions: displayActions))
