@@ -47,6 +47,8 @@ func reloadConfig() {
     change.stop.filter { !restarting.contains($0) }.forEach(stopPlugin)
     change.start.forEach(startPlugin)
     startProviders()
+    // The volume pill has no timer, so a new `volume` mode applies here.
+    updateVolume()
 
     // The popup of a pill that left the bar closes, built-in or plugin.
     if let open = openPopup, oldOrder.contains(open), !rightOrder.contains(open) { closePopup() } else { refreshPopup() }

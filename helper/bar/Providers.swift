@@ -329,29 +329,23 @@ func setDefaultOutputDevice(_ id: AudioDeviceID) {
 
 func updateVolume() {
     guard let v = readVolume() else { return }
-    let silent = v.muted || v.percent == 0
-    // `volume = muted` makes it the mic pill's twin: draw only while the
-    // output is silent.
-    if pillModes["volume"] == "muted" {
-        set("volume") {
-            $0.drawing = silent
-            $0.icon = silent ? "󰝟" : ""
-            $0.iconColor = silent ? palette.red : nil
-            $0.label = ""
-        }
-        return
+    let pill = volumePill(percent: v.percent, muted: v.muted, mode: pillModes["volume"])
+    set("volume") {
+        $0.drawing = pill.drawing
+        $0.icon = pill.icon
+        $0.iconColor = pill.red ? palette.red : nil
+        $0.label = pill.label
     }
-    let icon: String
-    if silent {
-        icon = "󰝟"
-    } else if v.percent >= 70 {
-        icon = "󰕾"
-    } else if v.percent >= 30 {
-        icon = "󰖀"
-    } else {
-        icon = "󰕿"
-    }
-    set("volume") { $0.icon = icon; $0.iconColor = nil; $0.label = v.muted ? "mute" : "\(v.percent)%" }
+}
+
+// `volume = muted` makes it the mic pill's twin: draw only while the
+// output is silent. Every other mode draws, so a change of mode must set
+// `drawing` again.
+func volumePill(percent: Int, muted: Bool, mode: String?) -> (drawing: Bool, icon: String, label: String, red: Bool) {
+    let silent = muted || percent == 0
+    if mode == "muted" { return (silent, silent ? "󰝟" : "", "", silent) }
+    let icon = silent ? "󰝟" : percent >= 70 ? "󰕾" : percent >= 30 ? "󰖀" : "󰕿"
+    return (true, icon, muted ? "mute" : "\(percent)%", false)
 }
 
 // --- shade (dims below the hardware minimum, with no overlay window) -----

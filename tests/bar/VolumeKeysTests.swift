@@ -25,3 +25,13 @@ import Testing
         #expect(nextVolume(50, up: true, fine: true) == 52)
     }
 }
+
+@Suite struct VolumePillTests {
+    @Test("a mode other than muted draws the pill again, so a change of mode shows at once")
+    func modes() {
+        #expect(volumePill(percent: 44, muted: false, mode: "muted").drawing == false)
+        #expect(volumePill(percent: 44, muted: false, mode: nil) == (true, "󰖀", "44%", false))
+        #expect(volumePill(percent: 44, muted: false, mode: "icon").drawing)
+        #expect(volumePill(percent: 44, muted: true, mode: "muted") == (true, "󰝟", "", true))
+    }
+}
