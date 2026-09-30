@@ -98,7 +98,7 @@ other. The lid (T10–T11) depends only on T3.
 
 - [x] T12: Spike: AX windows of an app with windows parked by OmniWM
 - [x] T13: The quit decision as a pure function
-- [ ] T14: Watch windows and quit the app
+- [x] T14: Watch windows and quit the app
 - [ ] T15: Seed the exceptions from Vorssaint
 - [ ] T16: Quit on Close settings page and docs
 

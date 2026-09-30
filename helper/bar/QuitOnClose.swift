@@ -28,3 +28,102 @@ func parseExceptions(_ text: String) -> Set<String> {
         return id.isEmpty ? nil : id
     })
 }
+
+let quitOnCloseFile = configDir.appendingPathComponent("quit-on-close.conf")
+
+// An AXObserver per app with regular activation policy. A new window gets a
+// destroyed notification of its own, because AX sends that one only to the
+// element that goes away.
+final class QuitWatch {
+    var observers: [pid_t: AXObserver] = [:]
+    var showedWindow: Set<pid_t> = []
+    var pending: [pid_t: DispatchWorkItem] = [:]
+
+    func start() {
+        NSWorkspace.shared.runningApplications.forEach(add)
+        let center = NSWorkspace.shared.notificationCenter
+        center.addObserver(forName: NSWorkspace.didLaunchApplicationNotification, object: nil, queue: .main) { note in
+            // a new app can take a moment to answer AX
+            guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { self.add(app) }
+        }
+        center.addObserver(forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main) { note in
+            guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
+            self.remove(app.processIdentifier)
+        }
+    }
+
+    func add(_ app: NSRunningApplication) {
+        let pid = app.processIdentifier
+        guard app.activationPolicy == .regular, !app.isTerminated, observers[pid] == nil, pid != getpid() else { return }
+        var observer: AXObserver?
+        let callback: AXObserverCallback = { _, element, notification, _ in
+            var pid: pid_t = 0
+            AXUIElementGetPid(element, &pid)
+            quitWatch.changed(pid, element, notification as String)
+        }
+        guard AXObserverCreate(pid, callback, &observer) == .success, let observer else { return }
+        let ax = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(ax, 0.25)
+        AXObserverAddNotification(observer, ax, kAXWindowCreatedNotification as CFString, nil)
+        let open = windows(ax)
+        for window in open { watchWindow(observer, window) }
+        if !open.isEmpty { showedWindow.insert(pid) }
+        CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .defaultMode)
+        observers[pid] = observer
+    }
+
+    func remove(_ pid: pid_t) {
+        if let observer = observers.removeValue(forKey: pid) {
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .defaultMode)
+        }
+        showedWindow.remove(pid)
+        pending.removeValue(forKey: pid)?.cancel()
+    }
+
+    func windows(_ ax: AXUIElement) -> [AXUIElement] {
+        var value: AnyObject?
+        guard AXUIElementCopyAttributeValue(ax, kAXWindowsAttribute as CFString, &value) == .success else { return [] }
+        return value as? [AXUIElement] ?? []
+    }
+
+    func subrole(_ window: AXUIElement) -> String {
+        var value: AnyObject?
+        AXUIElementCopyAttributeValue(window, kAXSubroleAttribute as CFString, &value)
+        return value as? String ?? ""
+    }
+
+    func watchWindow(_ observer: AXObserver, _ window: AXUIElement) {
+        AXObserverAddNotification(observer, window, kAXUIElementDestroyedNotification as CFString, nil)
+    }
+
+    func changed(_ pid: pid_t, _ element: AXUIElement, _ notification: String) {
+        if notification == kAXWindowCreatedNotification, let observer = observers[pid] {
+            showedWindow.insert(pid)
+            watchWindow(observer, element)
+            return
+        }
+        guard notification == kAXUIElementDestroyedNotification else { return }
+        // An app can close one window and open the next, so look again after a second.
+        pending[pid]?.cancel()
+        let check = DispatchWorkItem { self.check(pid) }
+        pending[pid] = check
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: check)
+    }
+
+    func check(_ pid: pid_t) {
+        pending[pid] = nil
+        guard pillModes["quit_on_close"] == "on",
+              let app = NSRunningApplication(processIdentifier: pid), !app.isTerminated else { return }
+        let ax = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(ax, 0.25)
+        let exceptions = parseExceptions((try? String(contentsOf: quitOnCloseFile, encoding: .utf8)) ?? "")
+        guard shouldQuit(windows: windows(ax).map(subrole), bundleID: app.bundleIdentifier,
+                         exceptions: exceptions, everShowedWindow: showedWindow.contains(pid)) else { return }
+        tlog("quit on close: \(app.bundleIdentifier ?? "\(pid)")")
+        // a normal quit, so an app with unsaved work still asks
+        app.terminate()
+    }
+}
+
+let quitWatch = QuitWatch()
