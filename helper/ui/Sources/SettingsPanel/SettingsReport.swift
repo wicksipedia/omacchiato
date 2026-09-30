@@ -186,17 +186,54 @@ public struct SettingsReport {
         }
     }
 
+    // Quit on close: the switch, the apps that stay open, and the running
+    // apps that could join them.
+    public struct QuitOnClose {
+        public struct App: Identifiable {
+            public var id: String            // the bundle ID
+            public var name: String
+            public var path: String?         // the app bundle, for its icon
+
+            public init(id: String, name: String, path: String? = nil) {
+                self.id = id
+                self.name = name
+                self.path = path
+            }
+        }
+
+        public var on: Bool
+        public var kept: [App]
+        public var running: [App]
+
+        public init(on: Bool, kept: [App], running: [App] = []) {
+            self.on = on
+            self.kept = kept
+            self.running = running
+        }
+    }
+
     public var pills: [Pill]
     public var numbers: [Number]
     public var files: [File]
     public var theme: ThemeReport?
+    public var quitOnClose: QuitOnClose?
 
-    public init(pills: [Pill], numbers: [Number] = [], files: [File] = [], theme: ThemeReport? = nil) {
+    public init(pills: [Pill], numbers: [Number] = [], files: [File] = [], theme: ThemeReport? = nil,
+                quitOnClose: QuitOnClose? = nil) {
         self.pills = pills
         self.numbers = numbers
         self.files = files
         self.theme = theme
+        self.quitOnClose = quitOnClose
     }
+}
+
+// Keep in sync with the header that install.sh writes.
+public let quitExceptionsHeader = "# Apps that stay open when their last window closes: one bundle ID a line."
+
+public func quitExceptionsText(_ ids: [String]) -> String {
+    var seen = Set<String>()
+    return ([quitExceptionsHeader] + ids.filter { seen.insert($0).inserted }).joined(separator: "\n") + "\n"
 }
 
 public struct SettingsActions {
@@ -208,6 +245,8 @@ public struct SettingsActions {
     public var setPlugin: (_ plugin: String, _ key: String, _ value: String) -> Void = { _, _, _ in }
     public var addPlugin: (_ name: String, _ command: String) -> Void = { _, _ in }
     public var removePlugin: (_ name: String) -> Void = { _ in }
+    // Writes quit-on-close.conf with these bundle IDs.
+    public var setQuitExceptions: ([String]) -> Void = { _ in }
     public var theme = ThemeActions()
     // A design drawn with sample data, or nil for a panel with no preview.
     public var preview: (_ kind: String, _ design: String?) -> AnyView? = { _, _ in nil }

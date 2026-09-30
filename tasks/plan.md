@@ -100,7 +100,7 @@ other. The lid (T10–T11) depends only on T3.
 - [x] T13: The quit decision as a pure function
 - [x] T14: Watch windows and quit the app
 - [x] T15: Seed the exceptions from Vorssaint
-- [ ] T16: Quit on Close settings page and docs
+- [x] T16: Quit on Close settings page and docs
 
 ### Checkpoint D
 - [ ] `bin/omacchiato-test` passes

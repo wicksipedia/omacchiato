@@ -137,7 +137,25 @@ func settingsReport() -> SettingsReport {
     let files = liveConfigFiles.enumerated().map { i, name in
         SettingsReport.File(name: name, url: configDir.appendingPathComponent(name), text: configTexts[i])
     }
-    return SettingsReport(pills: pills, numbers: numbers, files: files, theme: settingsThemes)
+    return SettingsReport(pills: pills, numbers: numbers, files: files, theme: settingsThemes,
+                          quitOnClose: quitOnCloseReport())
+}
+
+func quitOnCloseReport() -> SettingsReport.QuitOnClose {
+    func app(_ id: String) -> SettingsReport.QuitOnClose.App {
+        let path = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id)?.path
+        let name = path.map { FileManager.default.displayName(atPath: $0) } ?? id
+        return .init(id: id, name: name.hasSuffix(".app") ? String(name.dropLast(4)) : name, path: path)
+    }
+    let text = (try? String(contentsOf: quitOnCloseFile, encoding: .utf8)) ?? ""
+    // the file's order, which is the order the user added them in
+    let kept = text.split(separator: "\n").compactMap { parseExceptions(String($0)).first }
+    let running = NSWorkspace.shared.runningApplications
+        .filter { $0.activationPolicy == .regular }
+        .compactMap(\.bundleIdentifier)
+        .filter { id in !kept.contains(id) && !neverQuitPrefixes.contains(where: { id.hasPrefix($0) }) }
+    return .init(on: pillModes["quit_on_close"] == "on", kept: kept.map(app),
+                 running: Set(running).map(app).sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending })
 }
 
 // A change applies at once: the bar reloads here, so it does not wait for
@@ -164,6 +182,10 @@ let settingsActions: SettingsActions = {
     }
     actions.removePlugin = { name in
         applyConfig("bar-plugins.conf", iniRemove(confText("bar-plugins.conf"), section: name))
+    }
+    actions.setQuitExceptions = { ids in
+        try? quitExceptionsText(ids).write(to: quitOnCloseFile, atomically: true, encoding: .utf8)
+        refreshSettings()
     }
     actions.reveal = { url in
         if FileManager.default.fileExists(atPath: url.path) {

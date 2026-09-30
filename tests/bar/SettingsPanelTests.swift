@@ -111,4 +111,11 @@ import Testing
         #expect(f.with(argument: "ram") == "omacchiato-stats ram")
         #expect(f.with(argument: "") == "omacchiato-stats")
     }
+
+    @Test("the quit-on-close exceptions write one bundle ID a line, once each, in order, under the header")
+    func quitExceptions() {
+        #expect(quitExceptionsText(["com.apple.Music", "com.raycast.macos", "com.apple.Music"])
+                == quitExceptionsHeader + "\ncom.apple.Music\ncom.raycast.macos\n")
+        #expect(quitExceptionsText([]) == quitExceptionsHeader + "\n")
+    }
 }

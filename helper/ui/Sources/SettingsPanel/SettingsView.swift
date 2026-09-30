@@ -9,7 +9,7 @@ import ThemePanel
 // this window becomes key, so it uses the system controls.
 public struct SettingsView: View {
     public enum Page: Hashable {
-        case layout, theme, files, addPlugin
+        case layout, theme, files, addPlugin, quitOnClose
         case pill(String)
     }
 
@@ -29,6 +29,10 @@ public struct SettingsView: View {
                 Section("General") {
                     SettingsSidebarRow(title: "Theme", symbol: "paintpalette.fill", tint: "indigo").tag(Page.theme)
                     SettingsSidebarRow(title: "Layout", symbol: "rectangle.split.3x1", tint: "gray").tag(Page.layout)
+                    if report.quitOnClose != nil {
+                        SettingsSidebarRow(title: "Quit on Close", symbol: "xmark.square.fill", tint: "red")
+                            .tag(Page.quitOnClose)
+                    }
                     SettingsSidebarRow(title: "Config Files", symbol: "doc.text", tint: "gray").tag(Page.files)
                 }
                 Section("Bar") { rows(.bar) }
@@ -58,6 +62,8 @@ public struct SettingsView: View {
                 .navigationTitle("Theme")
             case .files?:
                 SettingsFilesPage(report: report, actions: actions)
+            case .quitOnClose?:
+                if let quit = report.quitOnClose { SettingsQuitOnClosePage(quit: quit, actions: actions) }
             case .addPlugin?:
                 SettingsAddPluginPage(taken: Set(report.pills.map(\.key)), actions: actions) { page = .pill($0) }
             default:
@@ -626,5 +632,66 @@ struct SettingsFilesPage: View {
             }
         }
         .navigationTitle("Config Files")
+    }
+}
+
+struct SettingsQuitOnClosePage: View {
+    var quit: SettingsReport.QuitOnClose
+    var actions: SettingsActions
+
+    var body: some View {
+        Form {
+            Section {
+                HStack(spacing: 12) {
+                    SettingsIcon(symbol: "xmark.square.fill", tint: "red", size: 40)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Quit on Close").font(.headline)
+                        Text("When the last window of an app closes, the app quits. An app with unsaved work still asks.")
+                            .font(.callout).foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.vertical, 4)
+                Toggle("Quit an app when its last window closes",
+                       isOn: Binding(get: { quit.on }, set: { actions.set("quit_on_close", $0 ? "on" : nil) }))
+            }
+            Section("Keep These Apps Open") {
+                ForEach(quit.kept) { app in
+                    HStack {
+                        SettingsAppIcon(path: app.path)
+                        Text(app.name)
+                        Spacer()
+                        Button("Remove", systemImage: "minus.circle.fill") {
+                            actions.setQuitExceptions(quit.kept.map(\.id).filter { $0 != app.id })
+                        }
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+                Menu("Add an App") {
+                    ForEach(quit.running) { app in
+                        Button(app.name) { actions.setQuitExceptions(quit.kept.map(\.id) + [app.id]) }
+                    }
+                }
+                .disabled(quit.running.isEmpty)
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle("Quit on Close")
+    }
+}
+
+struct SettingsAppIcon: View {
+    var path: String?
+
+    var body: some View {
+        Group {
+            if let path {
+                Image(nsImage: NSWorkspace.shared.icon(forFile: path)).resizable()
+            } else {
+                Image(systemName: "app.fill").resizable().foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: 20, height: 20)
     }
 }

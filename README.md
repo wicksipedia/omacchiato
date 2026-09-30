@@ -416,6 +416,17 @@ wallpaper set: `tokyo-night`, `catppuccin`, `catppuccin-latte`,
 `gruvbox` and `osaka-jade`. Copy a directory under `themes/` to add
 one.
 
+### Quit on close
+
+With `quit_on_close = on` in `bar-pills.conf`, the bar quits an app when
+its last window closes, as on Windows. It counts standard windows and
+dialogs, minimized ones and the ones OmniWM parks on other workspaces,
+and it asks the app to quit normally, so unsaved work still gets its
+prompt. The apps in `~/.config/omacchiato/quit-on-close.conf`, one
+bundle ID a line, stay open. Finder, Omacchiato and OmniWM always do.
+The first `install.sh` run copies the list and the on/off setting from
+Vorssaint if it finds them. Settings has a Quit on Close page for both.
+
 ### Parking the setup
 
 `omacchiato-toggle off` returns to a vanilla Mac in one command (OmniWM

@@ -266,6 +266,18 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   `/tmp/omacchiato-bar.err` and
   `launchctl print "gui/$(id -u)/com.omacchiato.bar"` (runs, last exit code).
 
+## Quit on close (`QuitOnClose.swift`)
+
+- An `AXObserver` per app with `.regular` activation policy. AX sends
+  `kAXUIElementDestroyedNotification` only to the element that goes away,
+  so each window gets its own, and `kAXWindowCreatedNotification` adds
+  new ones. A second after a close, `shouldQuit` reads the windows.
+- Count `AXStandardWindow` and `AXDialog`. OmniWM's parked windows are
+  still in `AXWindows` as `AXStandardWindow`. Finder lists an
+  `AXDesktop`, which does not count.
+- Off unless `quit_on_close = on`, because a new user would not expect
+  apps to quit.
+
 ## Menu bar apps pill
 
 The design and the test results are in

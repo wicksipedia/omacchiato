@@ -82,7 +82,12 @@ extension SettingsReport {
                  text: "bluetooth = hide\nvolume = muted\nmedia = 49\n"),
             File(name: "bar-plugins.conf", url: URL(fileURLWithPath: "/Users/me/.config/omacchiato/bar-plugins.conf"),
                  text: "[github]\ncommand = omacchiato-github-prs\ninterval = 300\n"),
-        ])
+        ],
+        quitOnClose: QuitOnClose(on: true, kept: [
+            .init(id: "com.apple.finder", name: "Finder", path: "/System/Library/CoreServices/Finder.app"),
+            .init(id: "com.apple.Music", name: "Music", path: "/System/Applications/Music.app"),
+            .init(id: "com.raycast.macos", name: "Raycast"),
+        ], running: [.init(id: "com.apple.Safari", name: "Safari", path: "/Applications/Safari.app")]))
 }
 
 private let size = (width: CGFloat(760), height: CGFloat(580))
@@ -115,6 +120,7 @@ private func page(_ page: SettingsView.Page, height: CGFloat = size.height) -> s
 #Preview("Stats") { page(.pill("cpu")) }
 #Preview("A custom plugin") { page(.pill("hello")) }
 #Preview("Keep Awake") { page(.pill("keepawake")) }
+#Preview("Quit on Close") { page(.quitOnClose) }
 #Preview("Music") { page(.pill("media")) }
 #Preview("Sound, with a mode") { page(.pill("volume")) }
 #Preview("Microphone") { page(.pill("mic")) }
