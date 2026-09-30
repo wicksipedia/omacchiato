@@ -84,4 +84,14 @@ import Testing
             #expect(keys.contains(pill), "no settings page for \(pill)")
         }
     }
+
+    @Test("the Bar page lists every right-hand pill once, in the bar's order, with its page")
+    func barPageOrder() {
+        let report = settingsReport()
+        let all = ["menubar"] + rightOrderAll + barPlugins.map(\.name)
+        #expect(Set(report.order) == Set(all))
+        #expect(report.order.count == all.count)
+        #expect(report.order == fullPillOrder(modes: pillModes, plugins: barPlugins))
+        #expect(report.order.allSatisfy { key in report.pills.contains { $0.key == key } })
+    }
 }

@@ -217,9 +217,13 @@ public struct SettingsReport {
     public var files: [File]
     public var theme: ThemeReport?
     public var quitOnClose: QuitOnClose?
+    public var order: [String]           // the right-hand pills in bar order, hidden ones too
+    public var orderSaved: Bool          // bar-pills.conf names an order, so Reset Order has work
 
     public init(pills: [Pill], numbers: [Number] = [], files: [File] = [], theme: ThemeReport? = nil,
-                quitOnClose: QuitOnClose? = nil) {
+                quitOnClose: QuitOnClose? = nil, order: [String] = [], orderSaved: Bool = false) {
+        self.order = order
+        self.orderSaved = orderSaved
         self.pills = pills
         self.numbers = numbers
         self.files = files
@@ -249,6 +253,8 @@ public struct SettingsActions {
     public var setQuitExceptions: ([String]) -> Void = { _ in }
     // Asks for an app with an open panel, and adds it to the apps that stay open.
     public var pickQuitException: () -> Void = {}
+    // Saves the right-hand order; nil goes back to the default order.
+    public var setOrder: ([String]?) -> Void = { _ in }
     public var theme = ThemeActions()
     // A design drawn with sample data, or nil for a panel with no preview.
     public var preview: (_ kind: String, _ design: String?) -> AnyView? = { _, _ in nil }

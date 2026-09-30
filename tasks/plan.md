@@ -73,7 +73,7 @@ git history (commit 257d382 and earlier).
 
 ### Phase 1: pill order
 - [x] S1: The `order` key in pillOrder
-- [ ] S2: The Bar page, with the drag-to-reorder list
+- [x] S2: The Bar page, with the drag-to-reorder list
 
 ### Checkpoint A
 - [ ] `bin/omacchiato-test` passes

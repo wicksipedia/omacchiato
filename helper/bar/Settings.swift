@@ -138,7 +138,9 @@ func settingsReport() -> SettingsReport {
         SettingsReport.File(name: name, url: configDir.appendingPathComponent(name), text: configTexts[i])
     }
     return SettingsReport(pills: pills, numbers: numbers, files: files, theme: settingsThemes,
-                          quitOnClose: quitOnCloseReport())
+                          quitOnClose: quitOnCloseReport(),
+                          order: fullPillOrder(modes: pillModes, plugins: barPlugins),
+                          orderSaved: pillModes["order"] != nil)
 }
 
 func quitOnCloseReport() -> SettingsReport.QuitOnClose {
@@ -186,6 +188,10 @@ let settingsActions: SettingsActions = {
     actions.setQuitExceptions = { ids in
         try? quitExceptionsText(ids).write(to: quitOnCloseFile, atomically: true, encoding: .utf8)
         refreshSettings()
+    }
+    actions.setOrder = { keys in
+        applyConfig("bar-pills.conf", confSet(confText("bar-pills.conf"), key: "order",
+                                              value: keys?.joined(separator: ", ")))
     }
     actions.pickQuitException = {
         let panel = NSOpenPanel()

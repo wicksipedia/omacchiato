@@ -87,7 +87,10 @@ extension SettingsReport {
             .init(id: "com.apple.finder", name: "Finder", path: "/System/Library/CoreServices/Finder.app"),
             .init(id: "com.apple.Music", name: "Music", path: "/System/Applications/Music.app"),
             .init(id: "com.raycast.macos", name: "Raycast"),
-        ], running: [.init(id: "com.apple.Safari", name: "Safari", path: "/Applications/Safari.app")]))
+        ], running: [.init(id: "com.apple.Safari", name: "Safari", path: "/Applications/Safari.app")]),
+        order: ["menubar", "github", "claude", "keepawake", "cpu", "hello", "weather", "wifi", "bluetooth",
+                "brightness", "mic", "volume", "status", "battery", "clock", "activity"],
+        orderSaved: true)
 }
 
 private let size = (width: CGFloat(760), height: CGFloat(580))

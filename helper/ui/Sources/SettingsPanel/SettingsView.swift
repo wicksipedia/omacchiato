@@ -28,7 +28,7 @@ public struct SettingsView: View {
             List(selection: $page) {
                 Section("General") {
                     SettingsSidebarRow(title: "Theme", symbol: "paintpalette.fill", tint: "indigo").tag(Page.theme)
-                    SettingsSidebarRow(title: "Layout", symbol: "rectangle.split.3x1", tint: "gray").tag(Page.layout)
+                    SettingsSidebarRow(title: "Bar", symbol: "rectangle.split.3x1", tint: "gray").tag(Page.layout)
                     if report.quitOnClose != nil {
                         SettingsSidebarRow(title: "Quit on Close", symbol: "xmark.square.fill", tint: "red")
                             .tag(Page.quitOnClose)
@@ -67,7 +67,7 @@ public struct SettingsView: View {
             case .addPlugin?:
                 SettingsAddPluginPage(taken: Set(report.pills.map(\.key)), actions: actions) { page = .pill($0) }
             default:
-                SettingsLayoutPage(report: report, actions: actions)
+                SettingsBarPage(report: report, actions: actions) { page = $0 }
             }
         }
         .frame(minWidth: 680, idealWidth: 760, minHeight: 460, idealHeight: 580)
@@ -548,20 +548,64 @@ struct SettingsAddPluginPage: View {
     }
 }
 
-struct SettingsLayoutPage: View {
+// The first page: the right-hand pills in bar order, to drag into a new
+// order and to show or hide, then the gaps. Music and the workspaces keep
+// their places on the left.
+struct SettingsBarPage: View {
     var report: SettingsReport
     var actions: SettingsActions
+    var open: (SettingsView.Page) -> Void
+
+    var pills: [SettingsReport.Pill] {
+        report.order.compactMap { key in report.pills.first { $0.key == key } }
+    }
 
     var body: some View {
         Form {
             Section {
+                ForEach(pills) { pill in
+                    HStack(spacing: 10) {
+                        SettingsIcon(symbol: pill.symbol, tint: pill.tint, size: 22).opacity(pill.shown ? 1 : 0.45)
+                        Text(pill.title).foregroundStyle(pill.shown ? .primary : .secondary)
+                        Spacer()
+                        if pill.canHide {
+                            Toggle("Show \(pill.title)", isOn: Binding(get: { pill.shown },
+                                                                     set: { actions.set(pill.key, pill.value(shown: $0)) }))
+                                .labelsHidden()
+                                .toggleStyle(.switch)
+                                .controlSize(.small)
+                        }
+                        Button("Open \(pill.title) Settings", systemImage: "chevron.right") { open(.pill(pill.key)) }
+                            .labelStyle(.iconOnly)
+                            .buttonStyle(.borderless)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .onMove { from, to in
+                    var keys = pills.map(\.key)
+                    keys.move(fromOffsets: from, toOffset: to)
+                    actions.setOrder(keys)
+                }
+            } header: {
+                Text("Right Side")
+            } footer: {
+                HStack {
+                    Text("Drag to change the order. A hidden pill keeps its place.")
+                    Spacer()
+                    Button("Reset Order") { actions.setOrder(nil) }.disabled(!report.orderSaved)
+                    Button("Add Plugin…") { open(.addPlugin) }
+                }
+            }
+            Section {
                 ForEach(report.numbers) { SettingsNumberRow(number: $0, actions: actions) }
+            } header: {
+                Text("Spacing")
             } footer: {
                 Text("Changes apply at once and save to bar-pills.conf.")
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("Layout")
+        .navigationTitle("Bar")
     }
 }
 

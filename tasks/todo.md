@@ -7,7 +7,7 @@ Plan: `tasks/plan.md`.
 
 ## Phase 1: pill order
 - [x] S1 The `order` key in pillOrder (S)
-- [ ] S2 The Bar page, with the drag-to-reorder list (M)
+- [x] S2 The Bar page, with the drag-to-reorder list (M)
 - [ ] Checkpoint A: drag Clock above Status; review with the user
 
 ## Phase 2: sidebar by task
