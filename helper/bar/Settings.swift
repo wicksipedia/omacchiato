@@ -243,9 +243,19 @@ var settingsThemes: ThemeReport?
 var settingsWindow: SettingsWindow?
 var settingsPrevApp: NSRunningApplication?
 
-func showSettings() {
+// A link from a popup opens its pill's page. A new id resets the page
+// that the window keeps as state; a refresh keeps the id and the page.
+var settingsLink = (page: SettingsView.Page.layout, id: 0)
+
+func showSettings() { showSettings(page: nil) }
+
+func showSettings(page: SettingsView.Page?) {
     closePopup()
     settingsThemes = themeReport()
+    if let page {
+        settingsLink = (page, settingsLink.id + 1)
+        (settingsWindow?.contentViewController as? NSHostingController<AnyView>)?.rootView = settingsRoot()
+    }
     if settingsWindow == nil {
         let window = SettingsWindow(contentRect: NSRect(x: 0, y: 0, width: 720, height: 540),
                                     styleMask: [.titled, .closable, .miniaturizable, .resizable],
@@ -254,8 +264,7 @@ func showSettings() {
         window.isReleasedWhenClosed = false
         // A hosting controller, not a bare hosting view: only it keeps the
         // page below the toolbar that the split view adds.
-        window.contentViewController = NSHostingController(rootView: AnyView(SettingsView(report: settingsReport(),
-                                                                                          actions: settingsActions)))
+        window.contentViewController = NSHostingController(rootView: settingsRoot())
         window.setContentSize(NSSize(width: 760, height: 580))
         window.center()
         NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window,
@@ -275,5 +284,9 @@ func showSettings() {
 func refreshSettings() {
     guard let window = settingsWindow, window.isVisible,
           let host = window.contentViewController as? NSHostingController<AnyView> else { return }
-    host.rootView = AnyView(SettingsView(report: settingsReport(), actions: settingsActions))
+    host.rootView = settingsRoot()
+}
+
+func settingsRoot() -> AnyView {
+    AnyView(SettingsView(report: settingsReport(), actions: settingsActions, page: settingsLink.page).id(settingsLink.id))
 }

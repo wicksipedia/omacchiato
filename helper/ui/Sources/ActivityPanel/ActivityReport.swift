@@ -77,6 +77,8 @@ public struct ActivityReport {
 public struct ActivityActions {
     public var openActivityMonitor: () -> Void = {}
     public var openTerminalMonitor: (() -> Void)?   // nil when btop is not installed
+    public var quitOnClose: Bool?                    // nil draws no switch
+    public var setQuitOnClose: (Bool) -> Void = { _ in }
 
     public init() {}
 }

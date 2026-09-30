@@ -138,7 +138,13 @@ func demoPanel(_ name: String) -> AnyView? {
     }
 }
 
+// Every popup with a Settings page links to it.
 func panelView(_ name: String) -> AnyView? {
+    let page = builtinPills[name] != nil || name == "media" || barPlugins.contains { $0.name == name }
+    return panelContent(name).map { AnyView($0.environment(\.panelSettings, page ? { showSettings(page: .pill(name)) } : nil)) }
+}
+
+func panelContent(_ name: String) -> AnyView? {
     if demoMode, let view = demoPanel(name) { return view }
     switch name {
     case "weather":
@@ -148,7 +154,10 @@ func panelView(_ name: String) -> AnyView? {
     case "menubar":
         return menuBarPanel(pillModes["menubar_panel"], menuBarReport(), menuBarActions)
     case "activity":
-        return activityPanel(pillModes["activity_panel"], activityReport(), activityActions)
+        var actions = activityActions
+        actions.quitOnClose = pillModes["quit_on_close"] == "on"
+        actions.setQuitOnClose = { settingsActions.set("quit_on_close", $0 ? "on" : nil) }
+        return activityPanel(pillModes["activity_panel"], activityReport(), actions)
     case "volume": return soundReport().map { AnyView(SoundPanel(report: $0, actions: soundActions)) }
     case "brightness": return AnyView(DisplayPanel(report: displayReport(), actions: displayActions))
     case "bluetooth": return AnyView(BluetoothPanel(report: bluetoothReport(), actions: bluetoothActions))

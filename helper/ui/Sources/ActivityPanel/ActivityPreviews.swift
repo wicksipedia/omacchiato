@@ -19,6 +19,13 @@ private var withBtop: ActivityActions {
 #Preview("Widgets") { Desk { WidgetsActivityPanel(report: .building, actions: withBtop) } }
 #Preview("Top") { Desk { TopActivityPanel(report: .building, actions: withBtop) } }
 
+// As the bar shows it: the Quit on Close switch, and the link to Settings.
+#Preview("Monitor, in the bar") {
+    var actions = withBtop
+    actions.quitOnClose = true
+    return Desk { MonitorActivityPanel(report: .building, actions: actions).environment(\.panelSettings, {}) }
+}
+
 #Preview("Monitor: every minute") {
     Desk { HStack(alignment: .top, spacing: 16) { ForEach(minutes.indices, id: \.self) { MonitorActivityPanel(report: minutes[$0]) } } }
 }

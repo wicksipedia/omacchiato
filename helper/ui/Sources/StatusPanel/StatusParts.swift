@@ -295,16 +295,33 @@ public struct SettingsRow: View {
 // A fill instead keeps text legible over any window.
 struct PanelBackground: ViewModifier {
     var width: CGFloat = 320
+    @Environment(\.panelSettings) private var settings
 
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: 22)
-        content
+        VStack(spacing: 10) {
+            content
+            if let settings { SettingsRow(title: "Omacchiato Settings", action: settings) }
+        }
             .padding(12)
             .frame(width: width)
             .background {
                 Color.clear.glassEffect(.regular, in: shape)
                 shape.fill(.background.opacity(0.6))
             }
+    }
+}
+
+// Opens Omacchiato Settings at the page of the pill whose popup this is.
+// The bar sets it. A preview leaves it nil, and the panel draws no row.
+public struct PanelSettingsKey: EnvironmentKey {
+    public static let defaultValue: (() -> Void)? = nil
+}
+
+extension EnvironmentValues {
+    public var panelSettings: (() -> Void)? {
+        get { self[PanelSettingsKey.self] }
+        set { self[PanelSettingsKey.self] = newValue }
     }
 }
 

@@ -225,6 +225,10 @@ struct MonitorLinks: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if let on = actions.quitOnClose {
+                ControlTile(title: "Quit Apps on Close", subtitle: on ? "On" : "Off",
+                            symbol: "xmark.square.fill", on: on) { actions.setQuitOnClose(!on) }
+            }
             LinkRow(title: "Activity Monitor", symbol: "chart.bar.xaxis", action: actions.openActivityMonitor)
             if let btop = actions.openTerminalMonitor {
                 LinkRow(title: "btop in a terminal", symbol: "apple.terminal", action: btop)
