@@ -187,6 +187,15 @@ let settingsActions: SettingsActions = {
         try? quitExceptionsText(ids).write(to: quitOnCloseFile, atomically: true, encoding: .utf8)
         refreshSettings()
     }
+    actions.pickQuitException = {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.application]
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        panel.prompt = "Keep Open"
+        guard panel.runModal() == .OK, let url = panel.url,
+              let id = Bundle(url: url)?.bundleIdentifier else { return }
+        settingsActions.setQuitExceptions(quitOnCloseReport().kept.map(\.id) + [id])
+    }
     actions.reveal = { url in
         if FileManager.default.fileExists(atPath: url.path) {
             NSWorkspace.shared.activateFileViewerSelecting([url])

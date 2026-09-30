@@ -247,6 +247,8 @@ public struct SettingsActions {
     public var removePlugin: (_ name: String) -> Void = { _ in }
     // Writes quit-on-close.conf with these bundle IDs.
     public var setQuitExceptions: ([String]) -> Void = { _ in }
+    // Asks for an app with an open panel, and adds it to the apps that stay open.
+    public var pickQuitException: () -> Void = {}
     public var theme = ThemeActions()
     // A design drawn with sample data, or nil for a panel with no preview.
     public var preview: (_ kind: String, _ design: String?) -> AnyView? = { _, _ in nil }

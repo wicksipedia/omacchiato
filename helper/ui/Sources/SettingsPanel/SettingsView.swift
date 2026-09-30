@@ -672,8 +672,9 @@ struct SettingsQuitOnClosePage: View {
                     ForEach(quit.running) { app in
                         Button(app.name) { actions.setQuitExceptions(quit.kept.map(\.id) + [app.id]) }
                     }
+                    if !quit.running.isEmpty { Divider() }
+                    Button("Other…", action: actions.pickQuitException)
                 }
-                .disabled(quit.running.isEmpty)
             }
         }
         .formStyle(.grouped)
