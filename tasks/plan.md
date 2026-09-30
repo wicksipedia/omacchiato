@@ -69,7 +69,7 @@ git history (commit 257d382 and earlier).
 ## Task list
 
 ### Phase 0: memory
-- [ ] S0: Log the bar's memory each minute with `debug = on`
+- [x] S0: Log the bar's memory each minute with `debug = on`
 
 ### Phase 1: pill order
 - [ ] S1: The `order` key in pillOrder

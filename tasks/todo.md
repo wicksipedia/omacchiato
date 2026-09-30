@@ -3,7 +3,7 @@
 Plan: `tasks/plan.md`.
 
 ## Phase 0: memory
-- [ ] S0 Log the bar's memory each minute with `debug = on` (S)
+- [x] S0 Log the bar's memory each minute with `debug = on` (S)
 
 ## Phase 1: pill order
 - [ ] S1 The `order` key in pillOrder (S)

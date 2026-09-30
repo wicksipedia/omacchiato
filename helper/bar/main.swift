@@ -799,6 +799,7 @@ startVolumeKeys()
 startMicWatch()
 startKeepAwake()
 quitWatch.start()
+startMemoryLog()
 
 // brightness: DisplayServices publishes, so the keyboard keys land here
 // without the bar being told about them by anyone else
