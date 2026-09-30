@@ -526,7 +526,13 @@ interval = 300
 not have yet, and hides when there are none. It fetches the branch that
 your local branch tracks, as `omacchiato-update` does. The popup lists
 the new commits. Click "update now" to run `omacchiato-update` in a
-terminal. A fetch goes to the network, so set a long interval:
+terminal. The menu under the title picks what to follow: Latest Release
+(the newest date tag), or Edge (the newest commit, as
+`omacchiato-update --edge`). The choice is kept in
+`~/.local/state/omacchiato/update-channel`, and
+`omacchiato-updates --channel release|edge` sets it too. The pill counts
+only the commits of that choice. A fetch goes to the network, so set a
+long interval:
 
 ```
 [updates]

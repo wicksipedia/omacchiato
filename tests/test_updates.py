@@ -53,6 +53,29 @@ class Panel(unittest.TestCase):
         self.assertEqual(out["panel"]["updated"], 1700000000)
 
 
+class Channel(unittest.TestCase):
+    def test_edge_updates_with_the_edge_flag(self):
+        out = updates.pill([commit("Fix a")], channel="edge", counts={"release": 0, "edge": 1})
+        self.assertTrue(out["panel"]["update"].startswith("/bin/sh -c '"))
+        self.assertIn("omacchiato-update --edge;", out["panel"]["update"])
+        self.assertIn("--edge", out["rows"][-1]["terminal"])
+        self.assertEqual(out["panel"]["channel"], "edge")
+        self.assertEqual(out["panel"]["counts"], {"release": 0, "edge": 1})
+
+    def test_release_updates_with_no_flag(self):
+        self.assertNotIn("--edge", updates.pill([commit("Fix a")])["panel"]["update"])
+
+    def test_the_file_picks_the_channel_and_junk_falls_back_to_release(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "update-channel"
+            with patch.object(updates, "CHANNEL_FILE", path):
+                self.assertEqual(updates.read_channel(), "release")
+                path.write_text("edge\n")
+                self.assertEqual(updates.read_channel(), "edge")
+                path.write_text("nightly\n")
+                self.assertEqual(updates.read_channel(), "release")
+
+
 class FetchedAt(unittest.TestCase):
     def test_reads_the_mtime_of_fetch_head(self):
         with tempfile.TemporaryDirectory() as tmp:

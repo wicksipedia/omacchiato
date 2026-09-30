@@ -17,7 +17,10 @@ public struct UpdatesPanel: View {
     // The plugin fetches every hour: three missed fetches.
     static let staleAfter: TimeInterval = 3 * 3600
 
-    var title: String { report.target.map { "Omacchiato \($0)" } ?? "Omacchiato Update" }
+    var title: String {
+        if report.channel == "edge" { return "Omacchiato Edge" }
+        return report.target.map { "Omacchiato \($0)" } ?? "Omacchiato Update"
+    }
 
     var subtitle: String {
         let n = report.total
@@ -36,6 +39,9 @@ public struct UpdatesPanel: View {
                         Text(subtitle).font(.system(size: 12)).foregroundStyle(.secondary)
                     }
                     .multilineTextAlignment(.center)
+                    if !report.counts.isEmpty {
+                        UpdatesChannelPicker(channel: report.channel, counts: report.counts, pick: actions.setChannel)
+                    }
                     UpdatesButton(title: "Update Now") { actions.update(report.update) }
                 }
                 .frame(maxWidth: .infinity)
@@ -74,6 +80,75 @@ struct UpdatesCommitRow: View {
                 .foregroundStyle(.secondary)
             }
         }
+    }
+}
+
+// A dropdown drawn by hand, as a system menu draws grey in a window that is not key.
+// It opens in place, under its button.
+struct UpdatesChannelPicker: View {
+    var channel: String
+    var counts: [String: Int]
+    var pick: (String) -> Void
+    @State private var open = false
+
+    static let names = ["release": "Latest Release", "edge": "Edge"]
+    static let details = ["release": "The newest tagged release", "edge": "The newest commit"]
+
+    var body: some View {
+        VStack(spacing: 4) {
+            HStack(spacing: 4) {
+                Text(Self.names[channel] ?? channel).font(.system(size: 12, weight: .medium))
+                Image(systemName: "chevron.up.chevron.down").font(.system(size: 9, weight: .semibold))
+            }
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 10).padding(.vertical, 4)
+            .background(.quaternary.opacity(open ? 1 : 0.5), in: .capsule)
+            .contentShape(.capsule)
+            .onTapGesture { open.toggle() }
+            .accessibilityAddTraits(.isButton)
+            if open {
+                VStack(spacing: 2) {
+                    ForEach(["release", "edge"], id: \.self) { id in
+                        UpdatesChannelRow(name: Self.names[id] ?? id, detail: Self.details[id] ?? "",
+                                          count: counts[id] ?? 0, selected: id == channel) {
+                            open = false
+                            if id != channel { pick(id) }
+                        }
+                    }
+                }
+                .padding(4)
+                .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 10))
+            }
+        }
+    }
+}
+
+struct UpdatesChannelRow: View {
+    var name: String
+    var detail: String
+    var count: Int
+    var selected: Bool
+    var action: () -> Void
+    @State private var hovered = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "checkmark").font(.system(size: 10, weight: .bold))
+                .opacity(selected ? 1 : 0)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(name).font(.system(size: 12, weight: .medium))
+                Text(detail).font(.system(size: 10)).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Text(count == 0 ? "Up to date" : "\(count) new")
+                .font(.system(size: 10)).foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 8).padding(.vertical, 5)
+        .background(hovered ? PanelColors.accent.opacity(0.2) : .clear, in: .rect(cornerRadius: 6))
+        .contentShape(.rect)
+        .onHover { hovered = $0 }
+        .onTapGesture(perform: action)
+        .accessibilityAddTraits(.isButton)
     }
 }
 

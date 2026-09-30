@@ -191,6 +191,9 @@ func panelContent(_ name: String) -> AnyView? {
             var actions = UpdatesActions()
             actions.update = { closePopup(); runInTerminal($0) }
             actions.refresh = { refreshPlugin(name) }
+            if let program = barPlugins.first(where: { $0.name == name })?.command.split(separator: " ").first {
+                actions.setChannel = { runPluginCommand(name, "\(program) --channel \($0)") }
+            }
             return AnyView(UpdatesPanel(report: report, actions: actions))
         }
         if let report = AirPodsReport(json: json) {

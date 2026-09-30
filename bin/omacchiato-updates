@@ -4,12 +4,17 @@
 The pill is hidden while the clone is up to date. Its panel lists the
 release it would move to and the new commits, with a button that runs
 omacchiato-update in a terminal.
+
+`omacchiato-updates --channel release|edge` picks what the pill follows:
+the newest release, or the tip of the branch, as `omacchiato-update --edge`.
 """
 
 import json
+import os
 import re
 import shlex
 import subprocess
+import sys
 from pathlib import Path
 
 UPDATE_ICON = "\U000f06b0"
@@ -20,11 +25,25 @@ LOG_FORMAT = "%h\x1f%s\x1f%cr"
 
 # ~/.local/bin holds a link to this file, so resolve it to find the clone
 REPO = Path(__file__).resolve().parent.parent
-# The terminal starts with a bare PATH, so name the script by its path.
-# Wait for Return, or the window closes before you can read the result.
-UPDATE = "/bin/sh -c " + shlex.quote(
-    shlex.quote(str(REPO / "bin" / "omacchiato-update"))
-    + "; echo; printf 'Press Return to close. '; read _")
+CHANNEL_FILE = Path(os.path.expanduser("~/.local/state/omacchiato/update-channel"))
+CHANNELS = ("release", "edge")
+
+
+def update_command(channel="release"):
+    """The terminal command for "Update Now" on this channel."""
+    # The terminal starts with a bare PATH, so name the script by its path.
+    # Wait for Return, or the window closes before you can read the result.
+    script = shlex.quote(str(REPO / "bin" / "omacchiato-update")) + (" --edge" if channel == "edge" else "")
+    return "/bin/sh -c " + shlex.quote(script + "; echo; printf 'Press Return to close. '; read _")
+
+
+
+def read_channel():
+    try:
+        channel = CHANNEL_FILE.read_text().strip()
+    except OSError:
+        return "release"
+    return channel if channel in CHANNELS else "release"
 
 
 def git(*args, timeout=10):
@@ -67,15 +86,15 @@ def fetched_at():
         return None
 
 
-def panel_updates(commits, target, fetched):
+def panel_updates(commits, target, fetched, channel="release", counts=None):
     """The "panel" object for the bar's SwiftUI panel. Keep in sync with
     UpdatesReport.init(json:) in helper/ui/Sources/UpdatesPanel."""
-    return {"kind": "updates", "target": target, "update": UPDATE,
+    return {"kind": "updates", "target": target, "update": update_command(channel),
             "commits": commits[:SHOWN], "more": max(0, len(commits) - SHOWN),
-            "updated": fetched}
+            "updated": fetched, "channel": channel, "counts": counts or {}}
 
 
-def pill(commits, target=None, fetched=None):
+def pill(commits, target=None, fetched=None, channel="release", counts=None):
     """The pill JSON for the commits that the clone does not have yet."""
     if not commits:
         return {"icon": "", "label": ""}
@@ -85,9 +104,9 @@ def pill(commits, target=None, fetched=None):
     if len(subjects) > SHOWN:
         rows.append({"text": "And %d more" % (len(subjects) - SHOWN), "dim": True})
     rows += [{"separator": True},
-             {"text": "Update Now", "icon": UPDATE_ICON, "terminal": UPDATE}]
+             {"text": "Update Now", "icon": UPDATE_ICON, "terminal": update_command(channel)}]
     return {"icon": UPDATE_ICON, "label": str(len(commits)), "color": "yellow", "rows": rows,
-            "panel": panel_updates(commits, target, fetched)}
+            "panel": panel_updates(commits, target, fetched, channel, counts)}
 
 
 def newest_release(tags):
@@ -96,8 +115,16 @@ def newest_release(tags):
 
 
 def main():
+    if sys.argv[1:2] == ["--channel"]:
+        channel = sys.argv[2] if len(sys.argv) > 2 else ""
+        if channel not in CHANNELS:
+            sys.exit("usage: omacchiato-updates [--channel release|edge]")
+        CHANNEL_FILE.parent.mkdir(parents=True, exist_ok=True)
+        CHANNEL_FILE.write_text(channel + "\n")
+        return
+    channel = read_channel()
     upstream = git("rev-parse", "--abbrev-ref", "@{upstream}")
-    commits, target, fetched = [], None, None
+    commits, target, fetched, counts = [], None, None, {}
     if upstream:
         # With no arguments, fetch uses the remote that the branch tracks.
         # If the fetch fails, the last fetched state stays.
@@ -107,8 +134,13 @@ def main():
         # has no release yet
         tags = git("tag", "--list", "v*", "--merged", "@{upstream}", "--sort=-v:refname") or ""
         target = newest_release(tags)
-        commits = git_log(target or "@{upstream}")
-    print(json.dumps(pill(commits, target, fetched)))
+        release = git_log(target or "@{upstream}")
+        edge = git_log("@{upstream}")
+        counts = {"release": len(release), "edge": len(edge)}
+        commits = edge if channel == "edge" else release
+        if channel == "edge":
+            target = None
+    print(json.dumps(pill(commits, target, fetched, channel, counts)))
 
 
 if __name__ == "__main__":

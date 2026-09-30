@@ -33,6 +33,10 @@ extension UpdatesReport {
               age: "3 weeks ago"),
     ], update: updateCommand, updated: Date().addingTimeInterval(-3000))
 
+    static let edge = UpdatesReport(commits: [commit("Drop a variable that the Settings report no longer changes")] + few.commits,
+                                    update: updateCommand, updated: Date().addingTimeInterval(-120),
+                                    channel: "edge", counts: ["release": 3, "edge": 4])
+
     static let stale = UpdatesReport(target: "v2026.10.01", commits: [commit("Fix a race in the theme watcher")],
                                      update: updateCommand, updated: Date().addingTimeInterval(-5 * 3600))
 }
@@ -42,6 +46,7 @@ extension UpdatesReport {
 #Preview("Many commits") { Desk { UpdatesPanel(report: .many) } }
 #Preview("No release yet") { Desk { UpdatesPanel(report: .noRelease) } }
 #Preview("A long subject") { Desk { UpdatesPanel(report: .longSubject) } }
+#Preview("Edge") { Desk { UpdatesPanel(report: .edge) } }
 #Preview("Stale fetch") { Desk { UpdatesPanel(report: .stale) } }
 #Preview("Light") { Desk(colors: [.mint, .cyan, .teal]) { UpdatesPanel(report: .few) }.preferredColorScheme(.light) }
 #endif

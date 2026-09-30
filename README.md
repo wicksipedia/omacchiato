@@ -358,7 +358,8 @@ popup rows, and the bar draws the result. The format is under
   that use the most CPU or memory, and the free space on the disk.
 - **Updates** (`omacchiato-updates`): shows only when a newer release
   is out, with the number of new commits. The popup lists them, and a row
-  runs `omacchiato-update` in a terminal.
+  runs `omacchiato-update` in a terminal. A menu in the popup switches
+  between the latest release and Edge, the newest commit.
 - **AirPods** (`omacchiato-airpods`): shows only while AirPods Pro or
   AirPods Max are connected, with the lowest battery level. The popup
   lists the battery of each earbud and the case, lists the noise

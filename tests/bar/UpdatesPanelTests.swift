@@ -34,6 +34,18 @@ import Testing
         #expect(UpdatesReport(json: ["kind": "github-prs"]) == nil)
     }
 
+    @Test("the channel and its counts decode, and an older script gives release with no choice")
+    func channel() {
+        var edge = json
+        edge["channel"] = "edge"
+        edge["counts"] = ["release": 0, "edge": 2]
+        let report = UpdatesReport(json: edge)
+        #expect(report?.channel == "edge")
+        #expect(report?.counts == ["release": 0, "edge": 2])
+        #expect(UpdatesReport(json: json)?.channel == "release")
+        #expect(UpdatesReport(json: json)?.counts.isEmpty == true)
+    }
+
     @Test("no release tag yet leaves the target empty")
     func noTarget() {
         let noTarget: [String: Any] = ["kind": "updates", "commits": [], "update": ""]
