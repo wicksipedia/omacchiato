@@ -567,8 +567,9 @@ func rowsForMenu(_ element: AXUIElement, context: String = "", depth: Int,
         if !axChildren(item).isEmpty {
             rows.append(submenuRow(title, item, depth: depth))
         } else {
+            let split = menuBadge(title)
             rows.append(PopupRow(image: recents ? recentItemIcon(title, section: section) : nil,
-                                 text: title, detail: menuShortcut(item), action: {
+                                 text: split.text, detail: menuShortcut(item), badge: split.badge, action: {
                 closePopup()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                     AXUIElementPerformAction(item, "AXPress" as CFString)
@@ -601,6 +602,13 @@ func frontAppAXMenuBar() -> AXUIElement? {
 // rowsForMenu, like the app menu, then appends omacchiato's own extras. It
 // falls back to hand-rolled rows when Accessibility is off or AX returns
 // nothing.
+// AX titles the item "System Settings…, 1 update", where the macOS menu
+// draws the count as a badge. English only: other locales keep the title.
+func menuBadge(_ title: String) -> (text: String, badge: String) {
+    guard let at = title.range(of: #", \d+ updates?$"#, options: .regularExpression) else { return (title, "") }
+    return (String(title[..<at.lowerBound]), String(title[at].dropFirst(2)))
+}
+
 func appleMenuRows() -> [PopupRow] {
     guard AXIsProcessTrusted(),
           let menubar = frontAppAXMenuBar(),

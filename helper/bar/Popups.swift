@@ -41,6 +41,7 @@ struct PopupRow {
     var image: NSImage? // 16pt leading icon — Recent Items entries
     var text = ""
     var detail = "" // right-aligned, dim — menu shortcuts live here
+    var badge = ""  // a count in a rounded box, as "1 update"
     var subtitle = "" // follows the text, small and quiet: a title's second half
     var separator = false // a thin rule instead of content
     var hero = false // accent, bold — the title row
@@ -339,6 +340,7 @@ func panelRow(_ row: PopupRow) -> PanelRow {
     out.image = row.image
     out.text = row.text
     out.detail = row.detail
+    out.badge = row.badge
     out.subtitle = row.subtitle
     out.separator = row.separator
     out.hero = row.hero

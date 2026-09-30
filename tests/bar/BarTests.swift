@@ -220,3 +220,13 @@ struct BarTests {
         #expect(NSColor.clear.clickable.alphaComponent > 0)
     }
 }
+
+@Suite struct MenuBadgeTests {
+    @Test("an update count in a menu title becomes a badge, as the macOS menu draws it")
+    func badge() {
+        #expect(menuBadge("System Settings…, 1 update") == ("System Settings…", "1 update"))
+        #expect(menuBadge("System Settings…, 12 updates") == ("System Settings…", "12 updates"))
+        #expect(menuBadge("System Settings…") == ("System Settings…", ""))
+        #expect(menuBadge("Log Out Matt Wicks…") == ("Log Out Matt Wicks…", ""))
+    }
+}

@@ -11,6 +11,7 @@ public struct PanelRow {
     public var image: NSImage?
     public var text = ""
     public var detail = ""                  // right-aligned and quiet
+    public var badge = ""                   // a count in a rounded box, as "1 update" in the Apple menu
     public var subtitle = ""                // follows the text, small and quiet
     public var separator = false
     public var hero = false
@@ -221,6 +222,14 @@ struct RowView: View {
 
     // Shortcuts and numbers, then the mark of a submenu, a section or the current choice.
     @ViewBuilder var trail: some View {
+        if !row.badge.isEmpty {
+            Text(row.badge).font(.system(size: 11)).lineLimit(1).fixedSize()
+                .foregroundStyle(lit ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 1)
+                .background(lit ? AnyShapeStyle(.white.opacity(0.2)) : AnyShapeStyle(.fill.tertiary),
+                            in: .rect(cornerRadius: 5))
+        }
         if !row.detail.isEmpty {
             Text(row.detail).font(.system(size: 12)).monospacedDigit()
                 .foregroundStyle(lit ? AnyShapeStyle(.white.opacity(0.85)) : AnyShapeStyle(.secondary))
