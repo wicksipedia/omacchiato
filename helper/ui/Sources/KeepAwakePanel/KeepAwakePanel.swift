@@ -10,6 +10,7 @@ import StatusPanel
 public struct KeepAwakePanel: View {
     var report: KeepAwakeReport
     var actions: KeepAwakeActions
+    @State private var customPick: Int?
 
     public init(report: KeepAwakeReport, actions: KeepAwakeActions = .init()) {
         self.report = report
@@ -23,15 +24,25 @@ public struct KeepAwakePanel: View {
                 ControlTile(title: "Keep Awake", subtitle: subtitle, symbol: "cup.and.saucer.fill", on: report.on) {
                     actions.set("toggle")
                 }
-                HStack(spacing: 6) {
-                    ForEach(Self.durations, id: \.arg) { d in
-                        DurationButton(title: d.title, on: report.last == d.arg) { actions.set(d.arg) }
+                // one grid, so the custom row lines up under the presets
+                Grid(horizontalSpacing: 6, verticalSpacing: 6) {
+                    GridRow {
+                        ForEach(Self.durations, id: \.arg) { d in
+                            DurationButton(title: d.title, on: report.last == d.arg) { actions.set(d.arg) }
+                        }
+                    }
+                    GridRow {
+                        Text("Custom")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .fixedSize()
+                        CustomStepper(minutes: shownCustom) { customPick = customMinutes(shownCustom, by: $0) }
+                            .gridCellColumns(2)
+                        DurationButton(title: "Start", on: custom == shownCustom) { actions.set("for \(shownCustom)") }
                     }
                 }
                 .padding(.horizontal, 6)
-                CustomDuration(chosen: custom, start: { actions.set("for \($0)") })
-                    .padding(.horizontal, 6)
-                    .padding(.bottom, 4)
+                .padding(.bottom, 4)
             }
             PanelCard(title: "Also Keeping Awake", symbol: "cup.and.saucer.fill") {
                 if report.holders.isEmpty {
@@ -57,6 +68,8 @@ public struct KeepAwakePanel: View {
         return minutes
     }
 
+    var shownCustom: Int { customPick ?? custom ?? 45 }
+
     var subtitle: String {
         guard report.on else { return "Off" }
         guard let until = report.until else { return "Until turned off" }
@@ -75,26 +88,22 @@ func customLabel(_ minutes: Int) -> String {
     return m == 0 ? "\(h) hr" : "\(h) hr \(m) min"
 }
 
-// A time of the user's own: − and + step it, and Start begins it.
-struct CustomDuration: View {
-    var chosen: Int?                     // the custom time last chosen, lit while it is the choice
-    var start: (Int) -> Void
-    @State private var minutes: Int?
+// − and + around the custom time, as one capsule the width of two presets.
+struct CustomStepper: View {
+    var minutes: Int
+    var step: (Int) -> Void
 
     var body: some View {
-        let shown = minutes ?? chosen ?? 45
-        HStack(spacing: 6) {
-            Text("Custom").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
-            Spacer(minLength: 4)
-            StepButton(symbol: "minus") { minutes = customMinutes(shown, by: -1) }
-            Text(customLabel(shown))
+        HStack(spacing: 0) {
+            StepButton(symbol: "minus") { step(-1) }
+            Text(customLabel(minutes))
                 .font(.system(size: 11, weight: .medium))
                 .monospacedDigit()
-                .frame(minWidth: 70)
-            StepButton(symbol: "plus") { minutes = customMinutes(shown, by: 1) }
-            DurationButton(title: "Start", on: chosen == shown) { start(shown) }
-                .frame(width: 64)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity)
+            StepButton(symbol: "plus") { step(1) }
         }
+        .background(.fill.tertiary, in: .capsule)
     }
 }
 
@@ -107,7 +116,7 @@ struct StepButton: View {
         Image(systemName: symbol)
             .font(.system(size: 10, weight: .bold))
             .frame(width: 24, height: 24)
-            .background(hovered ? AnyShapeStyle(.fill.secondary) : AnyShapeStyle(.fill.tertiary), in: .circle)
+            .background(hovered ? AnyShapeStyle(.fill.secondary) : AnyShapeStyle(.clear), in: .circle)
             .contentShape(.circle)
             .onHover { hovered = $0 }
             .onTapGesture(perform: action)
