@@ -834,31 +834,38 @@ and the OmniWM settings Omacchiato writes or leaves to you.
 
 ## Memory use
 
-About **293MB** of physical footprint (what Activity Monitor calls
-Memory) across OmniWM, the bar, the overview daemon, the gesture
-daemon and Karabiner's two user processes. The measurement, on
-2026-09-14 under OmniWM and docked to two external displays, came to
-306MB; that figure included 13MB for the borders daemon, which
-Omacchiato no longer runs. Footprint is the number to compare: resident set size
-counts each process's share of the shared system frameworks more than
-once. Karabiner's three root processes need root to measure, so they
-are not in the total; their resident size is about 39MB. Largest
-first:
+About **347MB** of physical footprint (what Activity Monitor calls
+Memory) on average across OmniWM, the bar, the overview daemon, the
+gesture daemon and Karabiner's two user processes. The figures below
+are averages of 30 samples taken 10 seconds apart, on 2026-09-30, on a
+MacBook with only its built-in display. An earlier measurement, on
+2026-09-14 and docked to two external displays, came to 293MB.
+Footprint is the number to compare: resident set size counts each
+process's share of the shared system frameworks more than once.
+Karabiner's three root processes need root to measure, so they are not
+in the total; their resident size is about 39MB. Largest first:
 
-| | footprint |
+| | average |
 |---|---|
-| OmniWM | 169MB |
-| Karabiner (2 user processes) | 47MB |
-| `omacchiato-bar` | 42MB |
-| `omacchiato-overview` | 24MB |
-| `omacchiato-gesture` | 11MB |
+| OmniWM | 184MB |
+| `omacchiato-overview` | 54MB |
+| Karabiner (2 user processes) | 52MB |
+| `omacchiato-bar` | 47MB |
+| `omacchiato-gesture` | 10MB |
 
 The figures move with uptime. `omacchiato-overview` caches a
 half-resolution capture per window shown, so it starts near 9MB and
-settles between about 25MB and 37MB. It plateaus there because it
+settles between about 25MB and 55MB. It plateaus there because it
 filters the cache to the visible set on each open. Packaging the bar
 as an `.app`, which is what unlocks the wi-fi network name, cost about
 1MB.
+
+The bar starts near 25MB and settles near 40MB once its popups have
+opened. The Settings window adds about 80MB while it is open, and the
+bar gives it back when the window closes. To watch it, set
+`debug = on` in `bar-pills.conf` (or use the Debug page in Settings):
+the bar then writes its footprint to `/tmp/omacchiato-bar.log` once a
+minute.
 
 ## Back to a normal Mac
 
