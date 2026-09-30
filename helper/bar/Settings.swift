@@ -253,9 +253,15 @@ var settingsLink = (page: SettingsView.Page.layout, id: 0)
 
 func showSettings() { showSettings(page: nil) }
 
+// Keep in sync with GLYPHS in install.sh.
+let glyphNamesFile = NSString(string: "~/.local/lib/nerd-font-glyphnames.json").expandingTildeInPath
+
 func showSettings(page: SettingsView.Page?) {
     closePopup()
     settingsThemes = themeReport()
+    if GlyphLibrary.glyphs.isEmpty, let data = FileManager.default.contents(atPath: glyphNamesFile) {
+        GlyphLibrary.glyphs = loadGlyphs(data)
+    }
     if let page {
         settingsLink = (page, settingsLink.id + 1)
         (settingsWindow?.contentViewController as? NSHostingController<AnyView>)?.rootView = settingsRoot()

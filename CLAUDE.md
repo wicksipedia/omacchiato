@@ -141,6 +141,10 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   keep in sync with `main()` in `bin/omacchiato-ai-usage`). `confSet`,
   `iniSet` and `iniRemove` change one line or section and keep comments
   and order.
+- The icon picker in Settings searches Nerd Fonts' `glyphnames.json`,
+  which `install.sh` downloads to `~/.local/lib/nerd-font-glyphnames.json`
+  at a pinned version and SHA-256. The bar loads it into `GlyphLibrary`
+  when Settings opens. With no file, the picker offers a short list.
 - A popup with designs shows them in the settings as thumbnails, each
   scaled to fit the whole panel. They are the real panels, drawn through
   the same `statusPanel`, `prPanel` and like functions in

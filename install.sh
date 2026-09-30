@@ -481,6 +481,24 @@ if [ ! -x "$TOKSCALE_DIR/tokscale" ]; then
   fi
   rm -rf "$tmp"
 fi
+
+# Nerd Font glyph names, for the icon search in Settings. Pinned by
+# version and checksum; change both together.
+GLYPHS_VERSION=v3.5.1
+GLYPHS_SHA256=d2fa6615a38eb527462cb71ff17aa44b1d6453d437ed263ab8d5b458393669e8
+GLYPHS="$HOME/.local/lib/nerd-font-glyphnames.json"
+if [ "$(shasum -a 256 "$GLYPHS" 2>/dev/null | cut -d' ' -f1)" != "$GLYPHS_SHA256" ]; then
+  log "Fetching the Nerd Font glyph names $GLYPHS_VERSION"
+  tmp="$(mktemp)"
+  if curl -fsSL -o "$tmp" "https://raw.githubusercontent.com/ryanoasis/nerd-fonts/$GLYPHS_VERSION/glyphnames.json" \
+     && [ "$(shasum -a 256 "$tmp" | cut -d' ' -f1)" = "$GLYPHS_SHA256" ]; then
+    mkdir -p "$(dirname "$GLYPHS")" && mv "$tmp" "$GLYPHS"
+    mark "copied-config $GLYPHS"
+  else
+    rm -f "$tmp"
+    log "WARNING: no glyph names; the icon picker in Settings offers a short list."
+  fi
+fi
 if [ -x "$TOKSCALE_DIR/tokscale" ]; then
   ln -sfn "$TOKSCALE_DIR/tokscale" "$HOME/.local/bin/tokscale"
 fi

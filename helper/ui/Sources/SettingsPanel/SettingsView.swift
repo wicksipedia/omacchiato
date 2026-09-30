@@ -411,7 +411,6 @@ struct SettingsIconRow: View {
     var fields: SettingsReport.PluginFields
     var change: (String) -> Void
     @State private var picking = false
-    @State private var custom = ""
 
     var body: some View {
         let shown = fields.icon.isEmpty ? fields.shownIcon : fields.icon
@@ -439,33 +438,9 @@ struct SettingsIconRow: View {
             .buttonStyle(.plain)
             Text("The plugin picks its icon.").font(.caption).foregroundStyle(.secondary)
             Divider()
-            LazyVGrid(columns: Array(repeating: GridItem(.fixed(34), spacing: 4), count: 7), spacing: 4) {
-                ForEach(SettingsReport.PluginFields.glyphs, id: \.0) { glyph, title in
-                    Button {
-                        change(glyph)
-                        picking = false
-                    } label: {
-                        SettingsGlyph(glyph: glyph, size: 16)
-                            .frame(width: 34, height: 30)
-                            .background(fields.icon == glyph ? AnyShapeStyle(Color.accentColor.opacity(0.25))
-                                                             : AnyShapeStyle(.fill.quaternary),
-                                        in: .rect(cornerRadius: 6))
-                    }
-                    .buttonStyle(.plain)
-                    .help(title)
-                    .accessibilityLabel(title)
-                }
-            }
-            Divider()
-            HStack {
-                TextField("Paste a glyph", text: $custom)
-                    .font(.custom("JetBrainsMono Nerd Font", size: 14))
-                    .frame(width: 140)
-                Button("Use") {
-                    change(custom.trimmingCharacters(in: .whitespaces))
-                    picking = false
-                }
-                .disabled(custom.trimmingCharacters(in: .whitespaces).isEmpty)
+            GlyphPicker(selected: fields.icon) { glyph in
+                change(glyph)
+                picking = false
             }
         }
         .padding(14)
@@ -669,6 +644,8 @@ struct SettingsFilesPage: View {
     @State private var selected = 0
     // Unsaved text by file name. No entry means the file as it is on disk.
     @State private var drafts: [String: String] = [:]
+    @State private var selection: TextSelection?
+    @State private var picking = false
 
     var body: some View {
         let index = min(selected, max(0, report.files.count - 1))
@@ -687,7 +664,7 @@ struct SettingsFilesPage: View {
                     .labelsHidden()
                     .fixedSize()
                     // the Nerd Font, so the icon glyphs in the files do not read as "?"
-                    TextEditor(text: Binding(get: { text }, set: { drafts[file.name] = $0 }))
+                    TextEditor(text: Binding(get: { text }, set: { drafts[file.name] = $0 }), selection: $selection)
                         .font(.custom("JetBrainsMono Nerd Font", size: 12))
                         .autocorrectionDisabled()
                         .scrollContentBackground(.hidden)
@@ -697,6 +674,14 @@ struct SettingsFilesPage: View {
                     HStack {
                         Button("Reveal in Finder") { actions.reveal(file.url) }
                         Button("Open in Editor") { actions.open(file.url) }
+                        Button("Insert Icon…") { picking = true }
+                            .popover(isPresented: $picking, arrowEdge: .top) {
+                                GlyphPicker { glyph in
+                                    drafts[file.name] = insertGlyph(glyph, into: text, at: selection)
+                                    picking = false
+                                }
+                                .padding(14)
+                            }
                         Spacer()
                         if dirty { Text("Edited").font(.caption).foregroundStyle(.secondary) }
                         Button("Revert") { drafts[file.name] = nil }.disabled(!dirty)

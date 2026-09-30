@@ -1,3 +1,5 @@
+import Foundation
+import SwiftUI
 import Testing
 @testable import SettingsPanel
 
@@ -166,6 +168,34 @@ import Testing
         #expect(battery.text(20) == "20%")
         #expect(Number(key: "left_gap", title: "Gap", range: 0...24, fallback: 6, value: nil, unit: "pt").text(0) == "0 pt")
         #expect(Number(key: "x", title: "X", range: 0...9, fallback: 1, value: nil).text(3) == "3")
+    }
+
+    @Test("the glyph list reads from glyphnames.json, and a search matches every word of the query")
+    func glyphs() throws {
+        let json = #"""
+        {"METADATA": {"version": "3.5.1"},
+         "md-coffee": {"char": "\#u{F0176}", "code": "f0176"},
+         "md-coffee_maker": {"char": "\#u{F109F}", "code": "f109f"},
+         "fa-coffee": {"char": "\#u{F0F4}", "code": "f0f4"},
+         "cod-github": {"char": "\#u{EA84}", "code": "ea84"}}
+        """#
+        let glyphs = loadGlyphs(Data(json.utf8))
+        #expect(glyphs.count == 4)
+        #expect(searchGlyphs(glyphs, "coffee").map(\.name) == ["fa-coffee", "md-coffee", "md-coffee_maker"])
+        #expect(searchGlyphs(glyphs, "md coffee").first?.char == "\u{F0176}")
+        #expect(searchGlyphs(glyphs, "GitHub").map(\.name) == ["cod-github"])
+        #expect(searchGlyphs(glyphs, "").count == 4)
+        #expect(loadGlyphs(Data("not json".utf8)).isEmpty)
+    }
+
+    @Test("an inserted icon goes at the cursor, over a selection, or at the end with no cursor")
+    func insertIcon() {
+        let text = "icon = \nx"
+        let cursor = text.index(text.startIndex, offsetBy: 7)
+        #expect(insertGlyph("*", into: text, at: TextSelection(insertionPoint: cursor)) == "icon = *\nx")
+        let word = text.startIndex..<text.index(text.startIndex, offsetBy: 4)
+        #expect(insertGlyph("*", into: text, at: TextSelection(range: word)) == "* = \nx")
+        #expect(insertGlyph("*", into: text, at: nil) == "icon = \nx*")
     }
 }
 

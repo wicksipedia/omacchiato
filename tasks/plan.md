@@ -96,7 +96,7 @@ git history (commit 257d382 and earlier).
 - [x] S7: Tell Activity and Stats apart
 
 ### Phase 3b: icons
-- [ ] S9: A searchable Nerd Font glyph picker
+- [x] S9: A searchable Nerd Font glyph picker
 
 ### Phase 4: docs
 - [ ] S8: README.md and docs/bar.md
