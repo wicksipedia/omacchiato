@@ -692,4 +692,9 @@ func applyPanelColors() {
     PanelColors.yellow = themed ? Color(nsColor: palette.yellow) : .yellow
     // themes carry no orange, and their yellow is amber enough for a warning
     PanelColors.orange = themed ? Color(nsColor: palette.yellow) : .orange
+    PanelColors.hudAccent = Color(nsColor: palette.accent)
+    PanelColors.hudRed = Color(nsColor: palette.red)
+    themeIsDark = darkTheme
 }
+
+var themeIsDark = false

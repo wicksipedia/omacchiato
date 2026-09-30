@@ -18,7 +18,7 @@ public struct MicOSD: View {
         HStack(spacing: 12) {
             Image(systemName: muted ? "mic.slash.fill" : "mic.fill")
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(muted ? PanelColors.red : PanelColors.accent)
+                .foregroundStyle(muted ? PanelColors.hudRed : PanelColors.hudAccent)
                 .contentTransition(.symbolEffect(.replace))
                 .frame(width: 26)
             VStack(alignment: .leading, spacing: 2) {

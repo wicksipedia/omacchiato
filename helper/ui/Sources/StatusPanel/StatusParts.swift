@@ -9,6 +9,10 @@ public enum PanelColors {
     public static var green = Color.green
     public static var orange = Color.orange
     public static var yellow = Color.yellow
+    // The HUDs draw their glass in the theme's brightness, so they can
+    // always take the theme's colours.
+    public static var hudAccent = Color.accentColor
+    public static var hudRed = Color.red
 }
 #if canImport(StatusGauge)
 import StatusGauge

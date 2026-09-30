@@ -19,7 +19,7 @@ public struct VolumeOSD: View {
         HStack(spacing: 12) {
             Image(systemName: report.speakerSymbol)
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(report.muted ? AnyShapeStyle(.secondary) : AnyShapeStyle(PanelColors.accent))
+                .foregroundStyle(report.muted ? AnyShapeStyle(.secondary) : AnyShapeStyle(PanelColors.hudAccent))
                 .contentTransition(.symbolEffect(.replace))
                 .frame(width: 26)
             VStack(alignment: .leading, spacing: 6) {
@@ -34,7 +34,7 @@ public struct VolumeOSD: View {
                 }
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.secondary)
-                Notches(level: level, tint: report.muted ? .gray : PanelColors.accent)
+                Notches(level: level, tint: report.muted ? .gray : PanelColors.hudAccent)
             }
         }
         .padding(.horizontal, 14)

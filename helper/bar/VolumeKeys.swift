@@ -141,6 +141,7 @@ func showHUD(_ view: AnyView) {
         window.setFrame(NSRect(x: frame.maxX - size.width - 10, y: frame.maxY - barHeight - 8 - size.height,
                                width: size.width, height: size.height), display: true)
     }
+    window.appearance = NSAppearance(named: themeIsDark ? .darkAqua : .aqua)
     window.orderFrontRegardless()
     NSAnimationContext.runAnimationGroup { ctx in
         ctx.duration = dur(0.12)

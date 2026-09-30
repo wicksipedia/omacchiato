@@ -17,7 +17,7 @@ public struct KeepAwakeOSD: View {
         HStack(spacing: 12) {
             Image(systemName: on ? "cup.and.saucer.fill" : "moon.zzz.fill")
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(on ? AnyShapeStyle(PanelColors.accent) : AnyShapeStyle(.secondary))
+                .foregroundStyle(on ? AnyShapeStyle(PanelColors.hudAccent) : AnyShapeStyle(.secondary))
                 .contentTransition(.symbolEffect(.replace))
                 .frame(width: 26)
             VStack(alignment: .leading, spacing: 2) {
