@@ -36,11 +36,29 @@ public func drawLine(_ s: String, _ font: NSFont, _ color: NSColor, baseline ori
     CTLineDraw(line, ctx)
 }
 
-// one glyph, centred on its ink in both axes
+// A colour emoji keeps its own colours whatever the theme, so it can
+// vanish into the bar, as a yellow moon does on a pale pink one.
+public func isColorEmoji(_ s: String) -> Bool {
+    guard let first = s.unicodeScalars.first else { return false }
+    return first.properties.isEmojiPresentation
+        || (first.properties.isEmoji && s.unicodeScalars.contains("\u{FE0F}"))
+}
+
+// one glyph, centred on its ink in both axes. A colour emoji gets a soft
+// halo in `color`, the bar's text colour, so it stands out on any theme.
 public func drawIcon(_ s: String, _ font: NSFont, _ color: NSColor, centeredIn box: CGRect) {
     let ink = inkBox(s, font)
-    drawLine(s, font, color,
-             baseline: CGPoint(x: box.midX - ink.midX, y: box.midY - ink.midY))
+    let origin = CGPoint(x: box.midX - ink.midX, y: box.midY - ink.midY)
+    guard isColorEmoji(s), let ctx = NSGraphicsContext.current?.cgContext else {
+        drawLine(s, font, color, baseline: origin)
+        return
+    }
+    ctx.saveGState()
+    ctx.setShadow(offset: .zero, blur: 2.5, color: color.cgColor)
+    // two passes: one shadow alone is too faint to lift a pale glyph
+    drawLine(s, font, color, baseline: origin)
+    drawLine(s, font, color, baseline: origin)
+    ctx.restoreGState()
 }
 
 // a text run: advance-centred across, cap-height-centred down
