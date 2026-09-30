@@ -9,11 +9,48 @@ extension PRReport.PR {
     var tint: Color { state == .closed ? .secondary : stage.tint }
 }
 
-// Mail's unread dot.
+// Mail's unread dot. With an action, it turns into a check under the
+// pointer, and a click marks the PR read.
 struct UnreadDot: View {
+    var pr: PRReport.PR
+    var actions: PRActions
+    @State private var hovered = false
+    @State private var marked = false
+
     var body: some View {
-        Circle().fill(PanelColors.accent).frame(width: 8, height: 8)
-            .accessibilityLabel("Updated")
+        if let markRead = actions.markRead, pr.markRead != nil {
+            ZStack {
+                if marked {
+                    Spinner(color: PanelColors.accent).frame(width: 12, height: 12)
+                } else if hovered {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(PanelColors.accent)
+                } else {
+                    Circle().fill(PanelColors.accent).frame(width: 8, height: 8)
+                }
+            }
+            .frame(width: 18, height: 18)
+            .contentShape(.rect)
+            .onHover { hovered = $0 }
+            .onTapGesture {
+                guard !marked else { return }
+                marked = true
+                markRead(pr)
+            }
+            // if the row is still here after 15 s, the mark failed
+            .task(id: marked) {
+                guard marked else { return }
+                try? await Task.sleep(for: .seconds(15))
+                marked = false
+            }
+            .help("Mark as Read")
+            .accessibilityLabel("Mark as Read")
+            .accessibilityAddTraits(.isButton)
+        } else {
+            Circle().fill(PanelColors.accent).frame(width: 8, height: 8)
+                .accessibilityLabel("Updated")
+        }
     }
 }
 
@@ -48,6 +85,8 @@ struct PRRow: View {
     var now: Date
     var actions: PRActions
     var showRepo = false
+    var revealed = false        // the previews draw the row swiped open,
+    var marking = false         // or waiting on GitHub
 
     var body: some View {
         HoverRow(action: pr.url.map { url in { actions.open(url) } }) {
@@ -78,7 +117,7 @@ struct PRRow: View {
                 VStack(alignment: .trailing, spacing: 4) {
                     Text(ageText(pr.updated, now: now))
                         .font(.system(size: 11)).foregroundStyle(.secondary).monospacedDigit()
-                    if pr.unread { UnreadDot() }
+                    if pr.unread { UnreadDot(pr: pr, actions: actions) }
                 }
             }
             .padding(.leading, CGFloat(pr.depth) * 14)
@@ -92,6 +131,7 @@ struct PRRow: View {
                 }
             }
         }
+        .modifier(SwipeToMarkRead(pr: pr, actions: actions, revealed: revealed, marking: marking))
     }
 }
 
@@ -165,5 +205,99 @@ struct EmptyPRs: View {
         }
         .padding(.vertical, 18)
         .frame(maxWidth: .infinity)
+    }
+}
+
+// Mail's swipe: two fingers to the left on a row show a Read button, and
+// a long swipe marks the PR read at once. A horizontal scroll
+// view reads the swipe, because it gets scroll events in a window that
+// never becomes key.
+struct SwipeToMarkRead: ViewModifier {
+    var pr: PRReport.PR
+    var actions: PRActions
+    var revealed = false
+    @State var marking = false
+    @State private var position = ScrollPosition(edge: .leading)
+
+    static let reveal: CGFloat = 72
+
+    func body(content: Content) -> some View {
+        if let markRead = actions.markRead, pr.markRead != nil {
+            ScrollView(.horizontal) {
+                HStack(spacing: 4) {
+                    content
+                        .opacity(marking ? 0.45 : 1)
+                        .containerRelativeFrame(.horizontal)
+                    Button { mark(markRead) } label: {
+                        VStack(spacing: 2) {
+                            if marking {
+                                Spinner().frame(width: 14, height: 14)
+                            } else {
+                                Image(systemName: "envelope.open.fill").font(.system(size: 13))
+                            }
+                            Text(marking ? "Marking" : "Read").font(.system(size: 10, weight: .semibold))
+                        }
+                        .foregroundStyle(.white)
+                        .frame(width: Self.reveal)
+                        .frame(maxHeight: .infinity)
+                        .background(PanelColors.accent.opacity(marking ? 0.7 : 1), in: .rect(cornerRadius: 7))
+                        .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(marking)
+                    .accessibilityLabel(marking ? "Marking as Read" : "Mark as Read")
+                }
+                .scrollTargetLayout()
+            }
+            .scrollIndicators(.never)
+            .scrollTargetBehavior(.viewAligned)
+            .scrollPosition($position)
+            .scrollDisabled(marking)
+            .defaultScrollAnchor(revealed || marking ? .trailing : .leading)
+            // the rubber band past the button is the long swipe
+            .onScrollGeometryChange(for: Bool.self) { geo in
+                geo.contentOffset.x > geo.contentSize.width - geo.containerSize.width + Self.reveal
+            } action: { _, past in
+                if past { mark(markRead) }
+            }
+            // The row goes when the list reads GitHub again. If it is still
+            // here after 15 s, the mark failed, so offer the button again.
+            .task(id: marking) {
+                guard marking else { return }
+                try? await Task.sleep(for: .seconds(15))
+                marking = false
+                withAnimation(.snappy(duration: 0.2)) { position.scrollTo(edge: .leading) }
+            }
+        } else {
+            content
+        }
+    }
+
+    func mark(_ markRead: (PRReport.PR) -> Void) {
+        guard !marking else { return }
+        marking = true
+        withAnimation(.snappy(duration: 0.2)) { position.scrollTo(edge: .trailing) }
+        markRead(pr)
+    }
+}
+
+// Drawn by hand: a system spinner draws grey in a window that is not key.
+struct Spinner: View {
+    var color: Color = .white
+    @State private var turning = false
+
+    var body: some View {
+        Circle()
+            .trim(from: 0, to: 0.7)
+            .stroke(color, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+            .rotationEffect(.degrees(turning ? 360 : 0))
+            .animation(.linear(duration: 0.8).repeatForever(autoreverses: false), value: turning)
+            .onAppear { turning = true }
+    }
+}
+
+extension View {
+    func swipeToMarkRead(_ pr: PRReport.PR, _ actions: PRActions) -> some View {
+        modifier(SwipeToMarkRead(pr: pr, actions: actions))
     }
 }

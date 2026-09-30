@@ -176,7 +176,7 @@ public struct TrackerPRPanel: View {
                                     Text("#\(pr.number)").foregroundStyle(.secondary).monospacedDigit()
                                     Text(pr.title).fontWeight(pr.unread ? .semibold : .regular).lineLimit(2)
                                     Spacer(minLength: 4)
-                                    if pr.unread { UnreadDot() }
+                                    if pr.unread { UnreadDot(pr: pr, actions: actions) }
                                 }
                                 .font(.system(size: 13))
                                 Steps(pr: pr)
@@ -192,6 +192,7 @@ public struct TrackerPRPanel: View {
                             }
                             .padding(.leading, CGFloat(pr.depth) * 14)
                         }
+                        .swipeToMarkRead(pr, actions)
                     }
                 }
             }

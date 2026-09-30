@@ -37,5 +37,28 @@ import StatusPanel
 
 #Preview("Reminders, dark") { Desk { RemindersPRPanel(report: .busy) }.preferredColorScheme(.dark) }
 
+// Point at an unread dot, or swipe left on an unread row in the live preview.
+extension PRActions {
+    static var markable: PRActions {
+        var actions = PRActions()
+        actions.markRead = { _ in }
+        return actions
+    }
+}
+
+#Preview("Mark as read") { Desk { RemindersPRPanel(report: .busy, actions: .markable) } }
+#Preview("Mark as read, Tracker") { Desk { TrackerPRPanel(report: .busy, actions: .markable) } }
+
+#Preview("Mark as read: swiped") {
+    Desk {
+        PanelCard {
+            PRRow(pr: PRReport.busy.prs[0], now: PRReport.morning, actions: .markable)
+            PRRow(pr: PRReport.busy.prs[0], now: PRReport.morning, actions: .markable, revealed: true)
+            PRRow(pr: PRReport.busy.prs[0], now: PRReport.morning, actions: .markable, marking: true)
+        }
+        .statusPanelBackground()
+    }
+}
+
 #Preview("Stale") { Desk { RemindersPRPanel(report: .stale) } }
 #endif

@@ -192,6 +192,7 @@ func panelView(_ name: String) -> AnyView? {
             }
             actions.open = open
             actions.openAll = { open(URL(string: "https://github.com/pulls")!) }
+            actions.markRead = { if let command = $0.markRead { runPluginCommand(name, command) } }
             actions.refresh = { refreshPlugin(name) }
             return prPanel(pillModes[name + "_panel"], report, actions)
         }

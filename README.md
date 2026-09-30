@@ -316,7 +316,9 @@ popup rows, and the bar draws the result. The format is under
   group. A red line under a PR that needs you says why, such as a failed
   check or a thread to resolve. Each row also shows the lines added and
   removed, and a blue dot marks an unread update. A PR based on another
-  PR in the list sits under it, indented.
+  PR in the list sits under it, indented. To mark a PR read, swipe left
+  on it with two fingers, or click its blue dot. It leaves the list
+  until GitHub updates it again, and its notification is marked read.
 - **Keep awake** (`omacchiato-keep-awake`): a cup while something holds
   the Mac awake, nothing otherwise. It reads the power assertions
   rather than any app's saved setting, ignores the ones the system

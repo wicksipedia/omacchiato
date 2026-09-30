@@ -17,6 +17,9 @@ def pr(n, ci="SUCCESS", state="OPEN", reviews=0, decision=None, threads=(), base
                 for who in threads]}}
 
 
+UNREAD = {"a/b#%d" % n: str(n) for n in range(1, 20)}
+
+
 def texts(payload):
     return [r.get("text", "") for r in payload["rows"]]
 
@@ -45,7 +48,7 @@ class Cache(unittest.TestCase):
 class Render(unittest.TestCase):
     def test_list(self):
         p = gh.render([pr(1), pr(2, ci="FAILURE", reviews=1, decision="APPROVED")],
-                      [pr(3, state="MERGED"), pr(4, state="CLOSED")], {"a/b#2", "a/b#3"}, "me")
+                      [pr(3, state="MERGED"), pr(4, state="CLOSED")], {"a/b#2": "20", "a/b#3": "30"}, "me")
         self.assertEqual((p["label"], p["color"]), ("2 !", "red"))
         t = texts(p)
         self.assertEqual((t[0], p["rows"][0]["detail"]), ("a/b", "3"))
@@ -63,25 +66,34 @@ class Render(unittest.TestCase):
         self.assertEqual(marks[5], gh.icon(pr(0), "me"))
 
     def test_label_counts_open_prs(self):
-        self.assertEqual(gh.render([pr(1)], [], set())["label"], "1")
+        self.assertEqual(gh.render([pr(1)], [], {})["label"], "1")
+
+    def test_a_pr_marked_read_hides_until_github_updates_it(self):
+        one, two = dict(pr(1), updatedAt="t1"), dict(pr(2), updatedAt="t1")
+        merged = dict(pr(3, state="MERGED"), updatedAt="t1")
+        read = {"a/b#1": "t1", "a/b#3": "t1"}
+        p = gh.render([one, two], [merged], {"a/b#3": "30"}, "me", read)
+        self.assertEqual([x["number"] for x in p["panel"]["prs"]], [2])
+        again = gh.render([dict(one, updatedAt="t2"), two], [], {}, "me", read)
+        self.assertEqual(sorted(x["number"] for x in again["panel"]["prs"]), [1, 2])
 
     def test_unsubscribed_pr_is_hidden(self):
         muted = dict(pr(5), viewerSubscription="UNSUBSCRIBED")
-        self.assertEqual(gh.render([pr(1), muted], [], {"a/b#5"})["label"], "1")
+        self.assertEqual(gh.render([pr(1), muted], [], {"a/b#5": "50"})["label"], "1")
 
     def test_stack(self):
-        stacked = texts(gh.render([pr(11), pr(12, base="branch-11"), pr(13, base="branch-12")], [], set()))
+        stacked = texts(gh.render([pr(11), pr(12, base="branch-11"), pr(13, base="branch-12")], [], UNREAD))
         self.assertTrue(stacked[1].startswith("#11 "))
         self.assertTrue(stacked[2].startswith("  ↳ #12 "))
         self.assertTrue(stacked[3].startswith("    ↳ #13 "))
 
     def test_stack_loop_lists_both_once(self):
-        loop = texts(gh.render([pr(14, base="branch-15"), pr(15, base="branch-14")], [], set()))
+        loop = texts(gh.render([pr(14, base="branch-15"), pr(15, base="branch-14")], [], UNREAD))
         self.assertEqual([sum("#%d " % n in x for x in loop) for n in (14, 15)], [1, 1])
 
     def test_no_branch_names_is_not_a_stack(self):
         blank = [dict(pr(n), baseRefName=None, headRefName=None) for n in (16, 17)]
-        self.assertFalse(any("↳" in x for x in texts(gh.render(blank, [], set()))))
+        self.assertFalse(any("↳" in x for x in texts(gh.render(blank, [], UNREAD))))
 
 
 class Marks(unittest.TestCase):
@@ -113,18 +125,21 @@ class Panel(unittest.TestCase):
         failing["commits"]["nodes"][0]["commit"]["statusCheckRollup"]["contexts"] = {
             "checkRunCountsByState": [{"state": "FAILURE", "count": 2}, {"state": "SUCCESS", "count": 9}],
             "statusContextCountsByState": [{"state": "SUCCESS", "count": 1}]}
-        p = gh.render([pr(1, decision="APPROVED"), failing], [], {"a/b#2"}, "me")["panel"]
+        p = gh.render([pr(1, decision="APPROVED"), failing], [], {"a/b#2": "20"}, "me")["panel"]
         self.assertEqual(p["kind"], "github-prs")
         first, second = p["prs"]
         self.assertEqual((first["number"], first["depth"], first["review"]), (1, 0, "approved"))
         self.assertEqual((second["number"], second["depth"], second["checks"]), (2, 1, "failed"))
         self.assertEqual(second["check_counts"], {"failed": 2, "passed": 10})
         self.assertTrue(second["unread"] and not first["unread"])
+        self.assertTrue(second["mark_read"].endswith(" --mark-read 'a/b#2' '' 20"))
+        self.assertTrue(first["mark_read"].endswith(" --mark-read 'a/b#1' ''"), "a PR with nothing unread")
+
 
     def test_panel_updated_is_the_read_time(self):
         import time
         before = time.time()
-        after_read = gh.render([pr(1)], [], set())["panel"]["updated"]
+        after_read = gh.render([pr(1)], [], {})["panel"]["updated"]
         after = time.time()
         self.assertTrue(before <= after_read <= after)
 

@@ -4,7 +4,8 @@ import StatusPanel
 #endif
 
 // What the pull request popup shows: open PRs, plus merged or closed
-// ones with an unread notification. The bar decodes this from
+// ones with an unread notification. A PR marked read is left out until
+// GitHub updates it again. The bar decodes this from
 // omacchiato-github-prs; the previews build it by hand.
 public struct PRReport {
     public enum State: String { case open, merged, closed }
@@ -68,12 +69,14 @@ public struct PRReport {
         public var additions: Int
         public var deletions: Int
         public var updated: Date?
+        public var markRead: String?         // the command that hides it until its next update
         public var id: String { "\(repo)#\(number)" }
 
         public init(repo: String, number: Int, title: String, url: URL? = nil, state: State = .open,
                     draft: Bool = false, checks: Checks? = nil, checkCounts: [Checks: Int] = [:],
                     conflicts: Bool = false, review: Review? = nil, threads: Int = 0, unread: Bool = false,
-                    depth: Int = 0, additions: Int = 0, deletions: Int = 0, updated: Date? = nil) {
+                    depth: Int = 0, additions: Int = 0, deletions: Int = 0, updated: Date? = nil,
+                    markRead: String? = nil) {
             self.repo = repo
             self.number = number
             self.title = title
@@ -90,6 +93,7 @@ public struct PRReport {
             self.additions = additions
             self.deletions = deletions
             self.updated = updated
+            self.markRead = markRead
         }
 
         public var stage: Stage {
@@ -172,6 +176,8 @@ public struct PRReport {
 public struct PRActions {
     public var open: (URL) -> Void = { _ in }
     public var openAll: () -> Void = {}
+    // A click on the unread dot. nil draws the dot plain.
+    public var markRead: ((PRReport.PR) -> Void)?
     // Reads the data again, from a click on the "Updated" stamp. nil keeps the stamp plain.
     public var refresh: (() -> Void)?
 
@@ -207,7 +213,8 @@ extension PRReport {
                threads: p["threads"] as? Int ?? 0, unread: p["unread"] as? Bool ?? false,
                depth: p["depth"] as? Int ?? 0, additions: p["additions"] as? Int ?? 0,
                deletions: p["deletions"] as? Int ?? 0,
-               updated: (p["updated"] as? String).flatMap(stamp.date(from:)))
+               updated: (p["updated"] as? String).flatMap(stamp.date(from:)),
+               markRead: p["mark_read"] as? String)
         }
         self.init(now: now, prs: prs, problem: json["problem"] as? String,
                   updated: (json["updated"] as? NSNumber).map { Date(timeIntervalSince1970: $0.doubleValue) })

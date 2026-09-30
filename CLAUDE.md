@@ -424,7 +424,12 @@ The design and the test results are in
 
 - `omacchiato-github-prs [search qualifiers]` lists open PRs by
   `author:@me` through `gh`. An update is an unread GitHub notification.
-  PRs that the user unsubscribed from are hidden. Each PR carries one
+  PRs that the user unsubscribed from are hidden. A swipe in the panel
+  runs `--mark-read`, which stores the PR's `updatedAt` in
+  `github-prs-read.json` and marks its notification read. The PR stays
+  hidden until its `updatedAt` changes. It is not keyed on the
+  notification, because GitHub marks that read when the user views the
+  PR. Each PR carries one
   Nerd Font mark in `icon`, with `icon_color`, first match wins: a merge
   glyph for merged, an x for closed, a pencil for draft, a warning in
   red for a failed check or a merge conflict, a progress clock in yellow
