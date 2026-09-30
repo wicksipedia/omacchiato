@@ -158,18 +158,11 @@ struct SettingsPillPage: View {
                     }
                 }
                 .padding(.vertical, 4)
-                if pill.canHide {
-                    Toggle("Show in bar", isOn: Binding(get: { pill.shown },
-                                                        set: { actions.set(pill.key, pill.value(shown: $0)) }))
-                }
-            }
-            if pill.shown, pill.styles.count > 1 {
-                Section("Appearance") {
-                    Picker("Style", selection: Binding(get: { pill.style }, set: { actions.set(pill.key, $0) })) {
-                        ForEach(pill.shownStyles, id: \.self) { Text($0.title).tag($0.value) }
+                if pill.visibilityChoices.count > 1 {
+                    Picker("In the bar", selection: Binding(get: { pill.visibility }, set: { actions.set(pill.key, $0) })) {
+                        ForEach(pill.visibilityChoices, id: \.self) { Text($0.title).tag($0.value) }
                     }
-                    .pickerStyle(.inline)
-                    .labelsHidden()
+                    .pickerStyle(.menu)
                 }
             }
             // The options work without the pill: the volume HUD shows with the pill hidden.

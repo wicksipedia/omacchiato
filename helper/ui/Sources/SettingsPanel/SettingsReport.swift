@@ -84,6 +84,19 @@ public struct SettingsReport {
             styles.contains { $0.value == style } ? styles : styles + [Choice(style, style ?? "Default")]
         }
 
+        // One control for show, hide and style: the styles, then Hidden.
+        // An opt-in pill hides with no key; any other pill writes "hide".
+        var hiddenValue: String? { optIn ? nil : "hide" }
+
+        public var visibilityChoices: [Choice] {
+            // a value that no style names still shows, as the current choice
+            let listed = shown ? shownStyles : styles
+            let shownOnes = listed.isEmpty ? [Choice(optIn ? "show" : nil, "Shown")] : listed
+            return canHide ? shownOnes + [Choice(hiddenValue, "Hidden")] : shownOnes
+        }
+
+        public var visibility: String? { shown ? style : hiddenValue }
+
         public var shownPanelDesigns: [Choice] {
             panelDesigns.contains { $0.value == panelValue } || panelDesigns.isEmpty
                 ? panelDesigns : panelDesigns + [Choice(panelValue, panelValue ?? "Default")]

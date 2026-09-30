@@ -91,7 +91,7 @@ git history (commit 257d382 and earlier).
 - [ ] Review with the user
 
 ### Phase 3: controls
-- [ ] S5: One visibility control per pill
+- [x] S5: One visibility control per pill
 - [ ] S6: Units and Off on number rows
 - [ ] S7: Tell Activity and Stats apart
 

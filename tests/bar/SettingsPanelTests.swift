@@ -136,5 +136,22 @@ import Testing
         #expect(sidebar.hidden.map(\.key) == ["wifi"])
         #expect(sidebar.features.map(\.key) == ["keepawake"])
     }
+
+    @Test("one control shows, hides or styles a pill; an opt-in pill hides with no key")
+    func visibility() {
+        typealias Pill = SettingsReport.Pill
+        let styles: [SettingsReport.Choice] = [.init(nil, "Icon and label"), .init("icon", "Icon only")]
+        let volume = Pill(key: "volume", title: "Sound", symbol: "", value: "hide", styles: styles)
+        #expect(volume.visibilityChoices.map(\.title) == ["Icon and label", "Icon only", "Hidden"])
+        #expect(volume.visibility == "hide")
+        #expect(Pill(key: "volume", title: "Sound", symbol: "", value: "icon", styles: styles).visibility == "icon")
+
+        let wifi = Pill(key: "wifi", title: "Wi-Fi", symbol: "", optIn: true, styles: [.init("show", "Shown")])
+        #expect(wifi.visibilityChoices.map(\.value) == ["show", nil])
+        #expect(wifi.visibility == nil)
+
+        let music = Pill(key: "media", title: "Music", symbol: "", canHide: false)
+        #expect(!music.visibilityChoices.contains { $0.title == "Hidden" })
+    }
 }
 
