@@ -99,7 +99,7 @@ git history (commit 257d382 and earlier).
 - [x] S9: A searchable Nerd Font glyph picker
 
 ### Phase 4: docs
-- [ ] S8: README.md and docs/bar.md
+- [x] S8: README.md and docs/bar.md
 
 ### Checkpoint C
 - [ ] `bin/omacchiato-test` passes

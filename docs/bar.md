@@ -77,12 +77,55 @@ pill never runs under the notch.
 the pills on each side of the bar. The defaults are 6 on the left and
 6 on the right.
 
-The bar reads the file once at startup, so restart it to apply an
-edit:
+`order` sets the order of the right-hand pills, left to right. It takes
+built-in and plugin pills alike, so a plugin can sit between two
+built-in pills:
 
-```sh
-launchctl kickstart -k "gui/$(id -u)/com.omacchiato.bar"
 ```
+order = clock, github, status, weather
+```
+
+The pills it names come first. The rest follow in the default order:
+`menubar`, the plugins in the order of `bar-plugins.conf`, then the
+built-in pills. The bar ignores an unknown name. A hidden pill keeps
+its place, so it goes back there when it shows again. The Bar page in
+Settings writes this key when you drag a pill.
+
+The bar reloads the file when it changes, so an edit applies at once.
+The Settings window, from "Omacchiato Settings…" in the Apple menu,
+writes the same keys. Each popup also ends with "Customize Pill",
+which opens that pill's page in Settings.
+
+## HUDs, keys and features
+
+These keys in `bar-pills.conf` turn features on or off. Each is on by
+default unless it says otherwise. The HUDs & Sounds page in Settings
+holds the HUD and click switches.
+
+| Key | Effect |
+|---|---|
+| `volume_hud = off` | The volume keys change the volume with no HUD. The bar still takes the keys. |
+| `volume_click = off` | No click when a volume key goes up. |
+| `mic_hud = off` | No HUD when the microphone mutes or unmutes. `Super+M` still mutes it. |
+| `keep_awake_hud = off` | No HUD when keep awake turns on or off. |
+| `keep_awake_display = on` | Keep awake also keeps the display on. Off by default. |
+| `keep_awake_jiggle = <minutes>` | Move the mouse, without moving the pointer, every N minutes while keep awake is on, so chat apps do not show Away. The default is 1; `off` or `0` stops it. |
+| `keep_awake_battery = <percent>` | On battery, keep awake ends at this level. The default is 20; `off` or `0` stops the limit. |
+| `keep_awake_lid = off` | Keep awake no longer keeps the Mac awake with the lid closed. |
+| `quit_on_close = on` | Quit an app when its last window closes. Off by default. |
+| `debug = on` | Write the bar's memory to `/tmp/omacchiato-bar.log` once a minute. Off by default. |
+
+The bar takes the volume keys and shows its own HUD, so the macOS HUD
+does not show. Shift+Option steps a quarter step. Option alone still
+opens Sound settings. An output with no volume control, such as some
+HDMI displays, passes the key on to macOS.
+
+Quit on close counts standard windows and dialogs, minimized ones and
+the ones OmniWM parks on other workspaces. It never quits a menu bar
+app, an app with a menu bar icon, Finder, Omacchiato or OmniWM. The
+apps in `~/.config/omacchiato/quit-on-close.conf`, one bundle ID a
+line, stay open too. The first `install.sh` run copies that list, and
+the on or off setting, from Vorssaint if it finds them.
 
 `omacchiato-popup <item> [display]` opens a pill's popup from a script or
 a Karabiner chord, as a click on the pill does. The item is a pill
@@ -124,8 +167,9 @@ screen.
 The command is passed to `sh` as an argument, never spliced into a
 shell string. It runs with `~/.local/bin` and the Homebrew prefixes
 ahead of `PATH`, so a plugin can name a script or a `brew` binary
-directly, and it runs with the bar's own permission grants. Like the
-rest of this file it is read once at startup.
+directly, and it runs with the bar's own permission grants. The bar
+reloads the file when it changes, and restarts only the plugins whose
+section changed.
 
 A command that prints a JSON object instead of a line can also set the
 pill's colour and give it a popup:
@@ -150,7 +194,9 @@ or `x-apple.systempreferences:` `url` opens it when clicked, and a row
 with a `terminal` command opens your terminal on that command instead,
 the way the activity popup opens btop. A row with a `run` command runs
 it with no window, then runs the plugin again, so the popup shows what
-the command changed. Both run with the same trust as the plugin
+the command changed. A top-level `right_click` command runs when you
+right-click the pill, then the plugin runs again; the keep-awake pill
+uses it to turn keep awake on or off. Both run with the same trust as the plugin
 command that printed them. A colour emoji draws its own colours and
 ignores the icon tint, which is why the label carries it too. `icon`
 overrides the config.
@@ -395,8 +441,15 @@ The default is `inbox`.
 github_panel = reminders
 ```
 
-The pill turns red while CI fails on any open PR. To drop a PR from
-the list, unsubscribe from its notifications on GitHub.
+The pill turns red while CI fails on any open PR.
+
+To take a PR off the list, swipe left on its row with two fingers and
+click Read, swipe further to mark it read at once, or click its blue
+dot. The script stores the PR's last update time in
+`~/.config/omacchiato/github-prs-read.json` and marks its GitHub
+notification read. The PR comes back when GitHub updates it again, for
+example with a review or a push. Unsubscribing from a PR's
+notifications on GitHub also drops it.
 
 An update is an unread GitHub notification on the PR. It puts a blue
 dot on the row and a `!` on the pill. GitHub marks the notification
@@ -408,8 +461,32 @@ was fetched.
 
 ## The keep-awake pill
 
-`omacchiato-keep-awake` shows a cup while something is keeping the Mac
-awake, and hides otherwise. It names no particular app: it reads the
+`omacchiato-keep-awake` turns keep awake on and off, and shows the cup:
+dimmed while the Mac may sleep, in the accent colour while it stays
+awake.
+
+```sh
+omacchiato-keep-awake on        # until turned off
+omacchiato-keep-awake for 45    # for 45 minutes
+omacchiato-keep-awake toggle    # on for the time chosen last, or off
+omacchiato-keep-awake off
+```
+
+The command writes `~/.local/state/omacchiato/keep-awake`, and the bar
+holds the Mac awake while that file reads on. So if the bar stops, keep
+awake stops too. `Super+Esc` and a right-click on the cup run `toggle`.
+The popup has the switch, buttons for 30 minutes, 1 hour, 2 hours and
+until turned off, and a custom time in 15-minute steps. The time you
+pick is the one `toggle` uses next. The keys under
+[HUDs, keys and features](#huds-keys-and-features) set the jiggle, the
+battery limit, the display and the lid.
+
+The lid needs `pmset -a disablesleep`, which needs root.
+`omacchiato-lid-rule install`, which `install.sh` runs, adds a sudoers
+rule that allows only `pmset -a disablesleep 0` and `1`, and asks for
+the admin password once.
+
+The popup also lists the other apps that hold the Mac awake. It names no particular app: it reads the
 power assertions, and ignores the ones held from the system's own
 directories, because powerd, coreaudiod and sharingd hold one as a
 matter of course. It also ignores an assertion held by a coding agent,

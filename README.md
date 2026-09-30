@@ -187,7 +187,15 @@ Left to right:
   Mac, System Settings, Recent Items (with app and file-type icons
   resolved locally, because AX exposes none), Force Quit and the power
   verbs, plus Omacchiato Settings at the bottom. The settings window
-  has a page for each pill and plugin, and a Theme page. The Theme page
+  opens on the Bar page, where you drag the right-hand pills into any
+  order, built-in and plugin alike, and show or hide each one. The
+  sidebar lists the pills in bar order, then Features (Quit on Close,
+  Keep Awake, HUDs & Sounds) and Advanced (Config Files, Debug). Each
+  pill and plugin has a page, and each popup ends with "Customize
+  Pill", which opens that page. The icon picker searches every Nerd
+  Font icon by name, and Config Files can insert one at the cursor.
+  The Debug page logs the bar's memory once a minute. There is also a
+  Theme page. The Theme page
   shows each theme on a small desktop with its wallpaper, bar and
   window borders. Pick one theme, or one for the day and one for the
   night, and Apply saves the choice to `theme.conf`.
@@ -423,9 +431,13 @@ its last window closes, as on Windows. It counts standard windows and
 dialogs, minimized ones and the ones OmniWM parks on other workspaces,
 and it asks the app to quit normally, so unsaved work still gets its
 prompt. The apps in `~/.config/omacchiato/quit-on-close.conf`, one
-bundle ID a line, stay open. Finder, Omacchiato and OmniWM always do.
+bundle ID a line, stay open. Finder, Omacchiato, OmniWM, menu bar apps
+and apps with a menu bar icon always do.
 The first `install.sh` run copies the list and the on/off setting from
-Vorssaint if it finds them. Settings has a Quit on Close page for both.
+Vorssaint if it finds them. Settings has a Quit on Close page for both,
+where "Add an App" lists the running apps and "Other…" picks any app.
+The Activity popup has a Quit Apps on Close switch, with a link to that
+page.
 
 ### Parking the setup
 

@@ -24,5 +24,5 @@ Plan: `tasks/plan.md`.
 - [x] S9 A searchable Nerd Font glyph picker (M)
 
 ## Phase 4: docs
-- [ ] S8 README.md and docs/bar.md (M)
+- [x] S8 README.md and docs/bar.md (M)
 - [ ] Checkpoint C: tests pass; commit, push, release
