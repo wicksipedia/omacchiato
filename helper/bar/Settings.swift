@@ -245,6 +245,7 @@ final class SettingsWindow: NSWindow {
 var settingsThemes: ThemeReport?
 
 var settingsWindow: SettingsWindow?
+var settingsCloseObserver: NSObjectProtocol?
 var settingsPrevApp: NSRunningApplication?
 
 // A link from a popup opens its pill's page. A new id resets the page
@@ -277,10 +278,21 @@ func showSettings(page: SettingsView.Page?) {
         window.contentViewController = NSHostingController(rootView: settingsRoot())
         window.setContentSize(NSSize(width: 760, height: 580))
         window.center()
-        NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window,
+        settingsCloseObserver = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window,
                                                queue: .main) { _ in
             settingsPrevApp?.activate()
             settingsPrevApp = nil
+            // A closed window kept every page's views, the theme wallpapers
+            // and the icon list: about 80 MB. The next open builds them again.
+            DispatchQueue.main.async {
+                settingsCloseObserver.map(NotificationCenter.default.removeObserver)
+                settingsCloseObserver = nil
+                settingsWindow = nil
+                settingsThemes = nil
+                GlyphLibrary.glyphs = []
+                // the allocator keeps freed pages until asked; give them back now
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) { malloc_zone_pressure_relief(nil, 0) }
+            }
         }
         settingsWindow = window
     }
