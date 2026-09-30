@@ -1,448 +1,290 @@
-# Implementation plan: keep awake, lid closed, quit on close
+# Implementation plan: Settings layout, pill order and a memory log
 
 ## Overview
 
-Move the last two Vorssaint features into Omacchiato: keep awake, with
-the options that are set in Vorssaint now, and quit on close, with the
-same exceptions. The design and the Vorssaint settings are in
-`docs/plans/2026-09-30-keep-awake-and-quit-on-close-design.md`. Both
-decisions there are A: the keep-awake cup always shows, and the Mac can
-stay awake with the lid closed.
+Make the bar's pills reorderable, built-in and plugin pills alike, and
+reorganise the Settings window by task instead of by how a pill is
+built. Add a debug log of the bar's memory. Then bring README.md and
+docs/bar.md up to date with every feature added since the last release.
+The findings come from a design review (apple-skills:macos,
+design:design-critique), a code review of pill order, and a memory
+check, all on 2026-09-30.
+
+The keep-awake and quit-on-close plan that this file held before is in
+git history (commit 257d382 and earlier).
+
+## Findings
+
+- **Memory:** the bar used about 45 MB after a restart this morning,
+  and 104 MB after 22 minutes this evening, steady over a minute.
+  `leaks` finds 144 bytes. The live heap is about 35 MB; most of the
+  rest is "Malloc Small" pages that the allocator keeps after the bar
+  frees them (popups, Settings, HUDs). One reading cannot show a trend,
+  so S0 logs it.
+- **Order:** no control can reorder pills. `pillOrder`
+  (helper/bar/Plugins.swift:86) is always menubar, then the plugins in
+  file order, then `rightOrderAll` (helper/bar/bar.swift:649), which the
+  code fixes. A plugin can never sit between two built-in pills.
+- The Layout page holds only two gap steppers, and the window opens on it.
+- The sidebar groups pills by how they are built: Keep Awake is under
+  Plugins, and Activity (built-in) and Stats (plugin) show the same data
+  in different groups. Music is listed first, but it draws on the left.
+- Hidden pills show only as a faded icon. Two controls hide a pill: the
+  "Show in bar" switch and styles such as "Only while muted".
+- The HUD and click switches are on three pages: Sound, Microphone and
+  Keep Awake.
+- Config Files sits between features and pills. "Add Plugin" is a
+  sidebar row, not a button.
+- Labels put units and the off value in the text: "Move the mouse
+  every, in minutes (0 is off)".
+- README.md does not mention the "Customize Pill" link, the Quit on
+  Close switch in the Activity popup, "Other…" in Quit on Close, or
+  `right_click`. docs/bar.md does not mention volume_hud, volume_click,
+  mic_hud, keep_awake_*, quit_on_close, right_click, the PR swipe or
+  the keep-awake command.
 
 ## Architecture decisions
 
-- **The bar holds the state that must end with it.** The keep-awake
-  assertion, the jiggle timer, the lid setting and the window watch all
-  live in the bar. If the bar crashes, keep awake ends, and the next
-  start resets the lid setting.
-- **A state file connects the command to the bar.**
-  `omacchiato-keep-awake on|off|toggle|for <minutes>` writes
-  `~/.local/state/omacchiato/keep-awake`. The bar watches the file.
-  Karabiner, the popup and a right-click all run the same command.
-- **The plugin stays the view.** `omacchiato-keep-awake` still prints the
-  pill and the panel. It reads the state file, so it can show the cup
-  dimmed while off and the time left while on.
-- **A plugin can ask for a right-click command.** The plugin JSON gets a
-  `right_click` key. This is general, so the stale
-  `on_click = omacchiato-keep-awake toggle` line in `bar-plugins.conf`
-  can go.
-- **Pure functions carry the logic,** as the bar's tests need: the
-  keep-awake decision (state, time, battery, power source) and the
-  quit decision (windows, bundle ID, exceptions).
-- **Settings in `bar-pills.conf`,** as for the volume and mic:
-  `keep_awake_display`, `keep_awake_jiggle`, `keep_awake_battery`,
-  `keep_awake_hud`, `keep_awake_lid`, `quit_on_close`. Exceptions go in
-  `~/.config/omacchiato/quit-on-close.conf`, one bundle ID per line.
-
-## Dependency graph
-
-```
-T1 jiggle spike ──────────────────────────────┐
-T2 state file + command + pill ─┬─ T3 assertion in bar ─┬─ T4 Super+Esc + HUD
-                                │                       ├─ T6 popup controls
-                                └─ T5 right-click ──────┤
-                                                        ├─ T7 jiggle (needs T1)
-                                                        ├─ T8 battery limit
-                                                        └─ T9 settings + docs
-T10 sudoers rule ─ T11 lid in bar (needs T3)
-T12 AX spike ─ T13 quit decision ─ T14 window watch ─ T15 exceptions seed ─ T16 settings page
-```
-
-Keep awake (T1–T9) and quit on close (T12–T16) do not depend on each
-other. The lid (T10–T11) depends only on T3.
+- **`debug = on` in bar-pills.conf** turns on a memory line in
+  `/tmp/omacchiato-bar.log` each minute: the physical footprint and the
+  malloc bytes in use. The bar reads the key at each tick, so it
+  switches on and off live.
+- **One `order` key in bar-pills.conf** holds the right-hand order:
+  `order = github, weather, clock, status`. `pillOrder` takes the named
+  pills first, drops unknown names and duplicates, then adds every pill
+  it did not name in today's default order. So no key gives today's bar,
+  and a new pill or plugin still shows. Hidden pills keep their place
+  in the key, so showing one again puts it back where it was.
+- **The Bar page replaces Layout and opens first.** It holds a
+  drag-to-reorder list of the right-hand pills (a `List` with `onMove`;
+  Settings is a key window, so system controls work), a visibility
+  switch and a link per row, a + button for plugins, a Reset Order
+  button, and the gap steppers.
+- **Sidebar by task:** General (Theme, Bar), Pills (in bar order, with a
+  Hidden section, and Music under its own Left heading), Features (Quit
+  on Close, Keep Awake, HUDs & Sounds), Advanced (Config Files).
+- **No config change for the regroup.** Every key keeps its name; only
+  where Settings shows it changes.
 
 ## Task list
 
-### Phase 1: keep awake works from the command line
+### Phase 0: memory
+- [ ] S0: Log the bar's memory each minute with `debug = on`
 
-- [x] T1: Spike: which posted event resets the idle time that Teams reads
-- [x] T2: State file, command and always-on pill
-- [x] T3: The bar holds the assertion from the state file
+### Phase 1: pill order
+- [ ] S1: The `order` key in pillOrder
+- [ ] S2: The Bar page, with the drag-to-reorder list
 
 ### Checkpoint A
 - [ ] `bin/omacchiato-test` passes
-- [ ] `omacchiato-keep-awake on` makes `pmset -g assertions` list
-      "Omacchiato: keep the Mac awake"; `off` removes it
-- [ ] `omacchiato-keep-awake for 1` ends by itself after 1 minute
-- [ ] The cup shows dimmed while off and in the accent colour while on
-- [ ] Review with the user
+- [ ] Dragging Clock above Status in Settings moves it in the bar at once
+- [ ] A plugin can sit between two built-in pills
+- [ ] Reset Order brings back today's order
+- [ ] Review with the user, with a day of memory lines
 
-### Phase 2: every way in, and Vorssaint's options
-
-- [x] T4: Super+Esc and the keep-awake HUD
-- [x] T5: Right-click on a plugin pill
-- [x] T6: On/off and time buttons in the keep-awake popup
-- [x] T7: Mouse jiggle, paused while the screen is locked
-- [x] T8: Battery limit
-- [x] T9: Keep Awake settings page and docs
+### Phase 2: sidebar by task
+- [ ] S3: Regroup the sidebar
+- [ ] S4: A HUDs & Sounds page
 
 ### Checkpoint B
-- [ ] `bin/omacchiato-test` passes
-- [ ] Super+Esc, a right-click and the popup all turn it on and off
-- [ ] Teams stays "Available" after 10 minutes with no input
-- [ ] Commit, push, release. The user turns off keep awake in Vorssaint
-      (not the lid yet).
+- [ ] Every key still has a control (SettingsCoverageTests)
+- [ ] Review with the user
 
-### Phase 3: lid closed
+### Phase 3: controls
+- [ ] S5: One visibility control per pill
+- [ ] S6: Units and Off on number rows
+- [ ] S7: Tell Activity and Stats apart
 
-- [x] T10: Sudoers rule in install.sh and uninstall.sh
-- [x] T11: The bar sets `disablesleep` with keep awake
+### Phase 4: docs
+- [ ] S8: README.md and docs/bar.md
 
 ### Checkpoint C
-- [ ] The Mac stays awake with the lid closed while keep awake is on,
-      and sleeps with it off
-- [ ] Killing the bar and starting it again leaves `SleepDisabled 0`
-- [ ] Commit, push, release. The user removes Vorssaint's lid setting.
-
-### Phase 4: quit on close
-
-- [x] T12: Spike: AX windows of an app with windows parked by OmniWM
-- [x] T13: The quit decision as a pure function
-- [x] T14: Watch windows and quit the app
-- [x] T15: Seed the exceptions from Vorssaint
-- [x] T16: Quit on Close settings page and docs
-
-### Checkpoint D
 - [ ] `bin/omacchiato-test` passes
-- [ ] TextEdit quits when its last window closes; Finder does not; an
-      app with unsaved work asks; an app with a window on another
-      workspace stays
-- [ ] Commit, push, release. The user turns off quit on close in
-      Vorssaint, and can then remove Vorssaint.
+- [ ] Commit, push, release
 
 ## Tasks
 
-### T1: Spike: which posted event resets the idle time that Teams reads
+### S0: Log the bar's memory each minute with `debug = on`
 
-**Description:** Find the smallest input that keeps Teams and Slack from
-showing "Away". Post a mouse-moved event at the pointer's position from
-a scratch program, and read `ioreg -c IOHIDSystem` `HIDIdleTime` and
-`CGEventSourceSecondsSinceLastEventType` before and after. If a
-zero-distance move does not reset them, try a 1-point move and back.
-
-**Acceptance criteria:**
-- [ ] One method is chosen, with the readings that show it resets the
-      idle time
-- [ ] The pointer does not visibly move
-
-**Verification:**
-- [ ] Manual check, with the user's permission: the idle time drops to
-      near 0 after the event
-
-**Dependencies:** None. **Files:** scratch only. **Scope:** XS
-
-### T2: State file, command and always-on pill
-
-**Description:** `omacchiato-keep-awake` takes `on`, `off`, `toggle` and
-`for <minutes>`, and writes the state file (`on`, or an end time as a
-Unix time). With no argument, it prints the pill as now, plus: a dimmed
-cup while off, the accent cup while on, the time left for a timed run,
-`right_click` set to its own `toggle`, and `on` and `until` in the
-panel object. Remove the dead `on_click` line from this Mac's
-`bar-plugins.conf`.
+**Description:** A one-minute timer in the bar reads `task_info`
+(`TASK_VM_INFO` phys_footprint) and `mstats()` bytes in use. With
+`debug = on` in bar-pills.conf, it writes a `tlog` line such as
+`memory: footprint 104.2 MB, malloc 35.1 MB in use`. With the key off,
+it writes nothing. A switch on the Advanced page sets the key.
 
 **Acceptance criteria:**
-- [ ] Each argument writes the right state; an end time in the past
-      reads as off
-- [ ] The pill shows while off, dimmed
-- [ ] The existing holder list still works
+- [ ] One line a minute while `debug = on`, none while off, with no
+      restart
+- [ ] The number matches `footprint <pid>` to within a few MB
 
 **Verification:**
-- [ ] `python3 -m unittest tests/test_keep_awake.py`
-- [ ] `bin/omacchiato-test`
+- [ ] A test for the line's text from plain numbers; manual: turn it on,
+      read the log, turn it off
 
 **Dependencies:** None
-**Files:** `bin/omacchiato-keep-awake`, `tests/test_keep_awake.py`
+**Files:** helper/bar/bar.swift or a new helper/bar/Debug.swift,
+helper/bar/main.swift, helper/bar/Settings.swift, tests/bar/
 **Scope:** S
 
-### T3: The bar holds the assertion from the state file
+### S1: The `order` key in pillOrder
 
-**Description:** A new `helper/bar/KeepAwake.swift` watches the state
-file, holds `PreventUserIdleSystemSleep` while it reads on, and
-releases it when it reads off or the end time passes. A pure function,
-`keepAwakeNow(state:now:)`, decides. With `keep_awake_display = on`, it
-also holds `PreventUserIdleDisplaySleep`. The bar starts it in
-`main.swift`.
+**Description:** `pillOrder(modes:plugins:)` reads `modes["order"]`:
+the named pills first, then the rest in today's default order, then the
+hide and opt-in filter as now. `reloadConfig` and the first read of
+`rightOrder` use it, so a changed order redraws live. A reorder does
+not restart plugins.
 
 **Acceptance criteria:**
-- [ ] The assertion follows the file within 1 second
-- [ ] A timed run ends at its end time and writes `off`
-- [ ] Quitting the bar releases the assertion
+- [ ] With no `order` key, the order is the same as today
+- [ ] A saved order moves built-ins and plugins, for example a plugin
+      after Clock; unknown names and duplicates are ignored; missing
+      pills follow in default order
+- [ ] A hidden pill keeps its place and comes back to it
 
 **Verification:**
-- [ ] `swift test` with a new `KeepAwakeTests`
+- [ ] New cases in tests/bar/ConfigTests.swift; `bin/omacchiato-test`
+- [ ] Manual: add `order = clock, status` to bar-pills.conf and watch
+      the bar
+
+**Dependencies:** None
+**Files:** helper/bar/Plugins.swift, helper/bar/Config.swift,
+tests/bar/ConfigTests.swift
+**Scope:** S
+
+### S2: The Bar page, with the drag-to-reorder list
+
+**Description:** A "Bar" page replaces Layout and becomes the first
+page. It lists every right-hand pill in order, hidden ones dimmed, each
+with its icon, a Show switch and a chevron to its page. Drag to
+reorder writes `order` through `confSet`. Under the list: a + button
+that opens Add Plugin, and Reset Order, which removes the key. The gap
+steppers move to the bottom. `SettingsReport` gets the full order.
+
+**Acceptance criteria:**
+- [ ] A drag writes `order` and the bar redraws at once
+- [ ] Show/hide from the list works as on each pill's page
+- [ ] Previews show the page with sample pills
+
+**Verification:**
+- [ ] `swift build`; a test that the report's order covers every pill
 - [ ] Manual: Checkpoint A
 
-**Dependencies:** T2
-**Files:** `helper/bar/KeepAwake.swift`, `helper/bar/main.swift`,
-`tests/bar/KeepAwakeTests.swift`
+**Dependencies:** S1
+**Files:** helper/ui/Sources/SettingsPanel/SettingsView.swift,
+SettingsReport.swift, SettingsPreviews.swift, helper/bar/Settings.swift
 **Scope:** M
 
-### T4: Super+Esc and the keep-awake HUD
+### S3: Regroup the sidebar
 
-**Description:** A Karabiner rule runs `omacchiato-keep-awake toggle` on
-Super+Esc. The bar shows a glass HUD, "Keeping Awake" (with the end
-time for a timed run) or "Sleep Allowed", in the shared HUD window when
-the state changes. `keep_awake_hud = off` turns it off.
+**Description:** Sidebar sections: General (Theme, Bar); Pills in bar
+order, with Music under a Left heading and hidden pills in a Hidden
+section; Features (Quit on Close, Keep Awake, HUDs & Sounds); Advanced
+(Config Files, and the debug switch from S0). Remove the Add Plugin row
+(the + button on the Bar page replaces it). Pill summaries say where a
+pill draws when that is not obvious.
 
 **Acceptance criteria:**
-- [ ] Super+Esc turns keep awake on and off, and the cheatsheet lists it
-- [ ] The HUD shows on each change, from any source
-- [ ] Xcode previews show both HUD states
+- [ ] The sidebar order follows the bar order and changes with a drag
+- [ ] Every page is still reachable, including a deep link from a popup
 
 **Verification:**
-- [ ] `swift build`, `bin/omacchiato-test`
-- [ ] Manual: press Super+Esc twice
+- [ ] `swift build`, SettingsCoverageTests; rendered screenshots of the
+      sidebar, light and dark
 
-**Dependencies:** T3
-**Files:** `bin/omacchiato-karabiner-omniwm`,
-`helper/ui/Sources/KeepAwakePanel/KeepAwakeOSD.swift`,
-`helper/ui/Sources/KeepAwakePanel/KeepAwakePreviews.swift`,
-`helper/bar/KeepAwake.swift`
+**Dependencies:** S2
+**Files:** SettingsView.swift, helper/bar/Settings.swift,
+SettingsPreviews.swift
 **Scope:** M
 
-### T5: Right-click on a plugin pill
+### S4: A HUDs & Sounds page
 
-**Description:** `BarView` gets `rightMouseDown`. On a plugin pill whose
-last JSON had `right_click`, the bar runs that command through
-`runPluginCommand`. Other pills ignore a right-click, as now.
+**Description:** One page with the volume HUD, volume click, mic HUD
+and keep-awake HUD switches. They leave the Sound, Microphone and Keep
+Awake pages. The keys do not change.
 
 **Acceptance criteria:**
-- [ ] A right-click on the cup turns keep awake on and off
-- [ ] A right-click on other pills does nothing
-- [ ] `right_click` is listed with the other plugin keys in CLAUDE.md
+- [ ] Each switch writes the same key as before
+- [ ] The three pill pages no longer show them
 
 **Verification:**
-- [ ] `swift build`, `bin/omacchiato-test`
-- [ ] Manual: right-click the cup twice
+- [ ] SettingsCoverageTests; manual: turn each off and check its effect
 
-**Dependencies:** T2
-**Files:** `helper/bar/BarView.swift`, `helper/bar/Plugins.swift`,
-`CLAUDE.md`
+**Dependencies:** S3
+**Files:** helper/bar/Settings.swift, SettingsView.swift,
+SettingsReport.swift
 **Scope:** S
 
-### T6: On/off and time buttons in the keep-awake popup
+### S5: One visibility control per pill
 
-**Description:** `KeepAwakeReport` gets `on` and `until`. The panel gets
-a toggle and buttons for 30 minutes, 1 hour, 2 hours and "Until turned
-off", drawn by hand because the popup is never key. They run the
-command through `runPluginCommand`. The holder list stays, and names the
-bar's own assertion "Omacchiato".
+**Description:** Fold "Show in bar" into the style choice as a Hidden
+option, and draw the style as a menu or segmented picker instead of the
+inline radio card. Opt-in pills (Wi-Fi, Battery) keep their rule: they
+show only with a value.
 
 **Acceptance criteria:**
-- [ ] Each button sets the state, and the panel shows the time left
-- [ ] Previews show off, on, and a timed run
+- [ ] One control sets shown, hidden or a style
+- [ ] Opt-in pills behave as before
 
 **Verification:**
-- [ ] `swift test` (report parsing), `bin/omacchiato-test`
-- [ ] Manual: each button
+- [ ] SettingsCoverageTests; manual on Sound, Wi-Fi and a plugin
 
-**Dependencies:** T2, T3
-**Files:** `helper/ui/Sources/KeepAwakePanel/*.swift`,
-`helper/bar/Popups.swift`
+**Dependencies:** S3
+**Files:** SettingsView.swift, SettingsReport.swift
 **Scope:** M
 
-### T7: Mouse jiggle, paused while the screen is locked
+### S6: Units and Off on number rows
 
-**Description:** While keep awake is on, the bar posts the event chosen
-in T1 every `keep_awake_jiggle` minutes (default 1, `off` turns it
-off). It posts nothing while `screenLocked` is true.
-
-**Acceptance criteria:**
-- [ ] `pmset -g assertions` shows the `UserIsActive` entry each interval
-- [ ] No events while locked or while keep awake is off
-
-**Verification:**
-- [ ] Manual: Teams check at Checkpoint B
-
-**Dependencies:** T1, T3
-**Files:** `helper/bar/KeepAwake.swift`
-**Scope:** S
-
-### T8: Battery limit
-
-**Description:** On battery, at or below `keep_awake_battery` percent
-(default 20), the bar writes `off` and shows the HUD with "Battery low".
-`keepAwakeNow` takes the battery level and power source, so the tests
-cover it.
+**Description:** `Number` gets a unit and an optional off value, so the
+row reads "Move the mouse every · 1 min" and shows "Off" at 0.
 
 **Acceptance criteria:**
-- [ ] Turns off at the limit on battery; stays on while charging
-- [ ] `keep_awake_battery = off` turns the limit off
+- [ ] Keep Awake and Music rows read with units; 0 shows Off where 0
+      turns the option off
 
 **Verification:**
-- [ ] `swift test` cases for the limit
-
-**Dependencies:** T3, T4
-**Files:** `helper/bar/KeepAwake.swift`, `tests/bar/KeepAwakeTests.swift`
-**Scope:** S
-
-### T9: Keep Awake settings page and docs
-
-**Description:** The Keep Awake page in Settings gets: display sleep,
-jiggle interval, battery limit and HUD. README and CLAUDE.md describe
-the command, the state file, the keys and Super+Esc.
-
-**Acceptance criteria:**
-- [ ] Each control writes its key, and the bar reads it at the moment
-      of use
-- [ ] The Settings preview shows the page
-
-**Verification:**
-- [ ] `swift build`, `bin/omacchiato-test`
-- [ ] Manual: change each control and check its effect
-
-**Dependencies:** T4, T7, T8
-**Files:** `helper/bar/Settings.swift`,
-`helper/ui/Sources/SettingsPanel/SettingsPreviews.swift`, `README.md`,
-`CLAUDE.md`
-**Scope:** M
-
-### T10: Sudoers rule in install.sh and uninstall.sh
-
-**Description:** `install.sh` writes
-`/etc/sudoers.d/omacchiato-keep-awake`, which lets the user run only
-`/usr/bin/pmset -a disablesleep 0` and `... 1` with no password. It
-checks the file with `visudo -cf` before it moves it into place, asks
-for the admin password once, and adds the file to the manifest.
-`uninstall.sh` removes it and runs `pmset -a disablesleep 0`.
-
-**Acceptance criteria:**
-- [ ] `sudo -n /usr/bin/pmset -a disablesleep 0` runs with no prompt
-- [ ] No other command runs with no password
-- [ ] A second `install.sh` run asks for nothing
-
-**Verification:**
-- [ ] `bash -n` through `bin/omacchiato-test`
-- [ ] Manual: the user runs `install.sh`, then `sudo -n -l`
+- [ ] Rendered screenshot; `swift build`
 
 **Dependencies:** None
-**Files:** `install.sh`, `uninstall.sh`
+**Files:** SettingsReport.swift, SettingsView.swift,
+helper/bar/Settings.swift
 **Scope:** S
 
-### T11: The bar sets `disablesleep` with keep awake
+### S7: Tell Activity and Stats apart
 
-**Description:** With `keep_awake_lid = on` (on by default), the bar
-runs `sudo -n pmset -a disablesleep 1` when keep awake starts, and `0`
-when it ends and when the bar starts. If `sudo -n` fails, the bar logs
-it and keeps the assertion. The Settings page gets a lid switch.
+**Description:** Activity is the built-in CPU and memory popup with the
+busiest apps. Stats is a plugin pill that shows one number in the bar.
+Say so in both summaries. Do not merge them.
 
-**Acceptance criteria:**
-- [ ] `pmset -g` shows `SleepDisabled 1` only while keep awake is on
-- [ ] Bar restart resets it to 0
+**Dependencies:** None. **Files:** helper/bar/Settings.swift. **Scope:** XS
 
-**Verification:**
-- [ ] Manual: Checkpoint C
+### S8: README.md and docs/bar.md
 
-**Dependencies:** T3, T10
-**Files:** `helper/bar/KeepAwake.swift`, `helper/bar/Settings.swift`
-**Scope:** S
-
-### T12: Spike: AX windows of an app with windows parked by OmniWM
-
-**Description:** With a Finder window on another workspace, read
-`kAXWindowsAttribute` and each window's subrole and minimized state
-from a scratch program. Also check what a sheet, a settings window and
-a tabbed window report.
+**Description:** Document every feature since v2026.09.30 where a user
+looks for it. README: the Customize Pill link, the Quit on Close switch
+in the Activity popup, "Other…", the Bar page, pill order and the debug
+log. docs/bar.md: `order`, `debug`, `volume_hud`, `volume_click`,
+`mic_hud`, `keep_awake_display`, `keep_awake_jiggle`,
+`keep_awake_battery`, `keep_awake_lid`, `keep_awake_hud`,
+`quit_on_close`, `right_click`, the keep-awake command and state file,
+and the PR swipe and mark-read.
 
 **Acceptance criteria:**
-- [ ] Parked windows are in the list, or the plan changes to count them
-      another way
-- [ ] The subroles to count are known
+- [ ] Every key that Settings writes appears in docs/bar.md
+- [ ] stop-slop and STE rules applied
 
 **Verification:**
-- [ ] The readings are noted in the design doc
+- [ ] A grep of each key in docs/bar.md
 
-**Dependencies:** None. **Files:** scratch, design doc. **Scope:** XS
-
-### T13: The quit decision as a pure function
-
-**Description:** `shouldQuit(windows:bundleID:exceptions:everShowedWindow:)`
-returns quit or keep, from T12's rules: count standard windows,
-minimized ones too; never quit an exception, an app that never showed a
-window, Omacchiato's own apps or OmniWM.
-
-**Acceptance criteria:**
-- [ ] Tests cover each rule
-
-**Verification:**
-- [ ] `swift test` with a new `QuitOnCloseTests`
-
-**Dependencies:** T12
-**Files:** `helper/bar/QuitOnClose.swift`, `tests/bar/QuitOnCloseTests.swift`
-**Scope:** S
-
-### T14: Watch windows and quit the app
-
-**Description:** An `AXObserver` per `.regular` app, for window created
-and destroyed. After a window closes, wait 1 second, read the windows,
-ask `shouldQuit`, and call `terminate()`. Launch and quit notifications
-add and remove apps. The exceptions come from `quit-on-close.conf`,
-which the config watcher reloads. `quit_on_close = off` stops it.
-
-**Acceptance criteria:**
-- [ ] The Checkpoint D cases pass
-- [ ] Turning it off stops all quits at once
-
-**Verification:**
-- [ ] Manual: Checkpoint D
-- [ ] `/tmp/omacchiato-bar.log` has one line per quit
-
-**Dependencies:** T13
-**Files:** `helper/bar/QuitOnClose.swift`, `helper/bar/main.swift`,
-`helper/bar/Config.swift`
-**Scope:** M
-
-### T15: Seed the exceptions from Vorssaint
-
-**Description:** If `quit-on-close.conf` does not exist, `install.sh`
-writes it from `defaults read com.vorssaint.utils autoQuitExceptions`,
-or from a default list (Finder, Music, Raycast). It sets
-`quit_on_close = off` if Vorssaint had it off.
-
-**Acceptance criteria:**
-- [ ] On this Mac, the file holds the 7 Vorssaint apps
-- [ ] An existing file is never changed
-
-**Verification:**
-- [ ] `bash -n`; manual: run the block on this Mac
-
-**Dependencies:** T14
-**Files:** `install.sh`
-**Scope:** S
-
-### T16: Quit on Close settings page and docs
-
-**Description:** A Settings page with the on/off switch and the
-exceptions list: add one of the running apps, remove one. This needs a
-new list control in `SettingsReport` and `SettingsView`. README and
-CLAUDE.md describe the feature and the file.
-
-**Acceptance criteria:**
-- [ ] Adding and removing apps writes the file, and the bar reloads it
-- [ ] Previews show the page with the 7 apps
-
-**Verification:**
-- [ ] `swift build`, `bin/omacchiato-test`
-- [ ] Manual: add and remove an app
-
-**Dependencies:** T14, T15
-**Files:** `helper/bar/Settings.swift`,
-`helper/ui/Sources/SettingsPanel/*.swift`, `README.md`, `CLAUDE.md`
+**Dependencies:** S0–S7
+**Files:** README.md, docs/bar.md
 **Scope:** M
 
 ## Risks and mitigations
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| A posted event does not reset the idle time that Teams reads | High | T1 checks this first. The fallback is a 1-point move and back. |
-| Vorssaint and Omacchiato both run keep awake, quit on close or Super+Esc | Medium | Turn each one off in Vorssaint at its checkpoint. Super+Esc fires twice until then. |
-| The sudoers rule allows more than `pmset disablesleep` | High | Only the two exact commands. `visudo -cf` before the move. |
-| `SleepDisabled 1` is left on after a crash | Medium | The bar sets 0 at start. `uninstall.sh` sets 0. |
-| Quit on close quits an app with work in progress | High | `terminate()` is a polite quit, so apps ask about unsaved work. The 1-second wait and the exceptions cover the rest. |
-| OmniWM's parked windows are missing from AX | High | T12 checks this before any quit code exists. |
-| The window watch costs CPU with many apps | Low | One observer per app, events only; no polling. |
-
-## Open questions
-
-- None that block Phase 1.
+| A saved order names a pill that is gone | Low | Unknown names are dropped; missing ones are added |
+| `List.onMove` inside a grouped Form draws oddly | Medium | Render screenshots in both modes before commit |
+| Folding Show into the style picker breaks opt-in pills | Medium | Keep their "show" value; test Wi-Fi and Battery |
+| The regroup hides a page | Medium | SettingsCoverageTests, and deep links from popups |
+| The memory log itself costs memory | Low | One timer and one line a minute; nothing while off |
