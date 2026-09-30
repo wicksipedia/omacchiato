@@ -109,14 +109,25 @@ public struct SettingsReport {
         public var range: ClosedRange<Int>
         public var fallback: Int
         public var value: Int?
+        public var unit: String              // "min", "%", "pt"; empty for a bare count
+        public var zeroIsOff: Bool           // 0 turns the option off, so it reads as Off
         public var id: String { key }
 
-        public init(key: String, title: String, range: ClosedRange<Int>, fallback: Int, value: Int?) {
+        public init(key: String, title: String, range: ClosedRange<Int>, fallback: Int, value: Int?,
+                    unit: String = "", zeroIsOff: Bool = false) {
             self.key = key
             self.title = title
             self.range = range
             self.fallback = fallback
             self.value = value
+            self.unit = unit
+            self.zeroIsOff = zeroIsOff
+        }
+
+        public func text(_ value: Int) -> String {
+            if value == 0 && zeroIsOff { return "Off" }
+            if unit.isEmpty { return "\(value)" }
+            return unit == "%" ? "\(value)%" : "\(value) \(unit)"
         }
     }
 

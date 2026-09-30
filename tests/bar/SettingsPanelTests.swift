@@ -153,5 +153,19 @@ import Testing
         let music = Pill(key: "media", title: "Music", symbol: "", canHide: false)
         #expect(!music.visibilityChoices.contains { $0.title == "Hidden" })
     }
+
+    @Test("a number reads with its unit, and 0 reads as Off where 0 turns the option off")
+    func numberText() {
+        typealias Number = SettingsReport.Number
+        let jiggle = Number(key: "keep_awake_jiggle", title: "Move the mouse every", range: 0...10, fallback: 1,
+                            value: nil, unit: "min", zeroIsOff: true)
+        #expect(jiggle.text(1) == "1 min")
+        #expect(jiggle.text(0) == "Off")
+        let battery = Number(key: "keep_awake_battery", title: "Turn off on battery at", range: 0...90, fallback: 20,
+                             value: nil, unit: "%", zeroIsOff: true)
+        #expect(battery.text(20) == "20%")
+        #expect(Number(key: "left_gap", title: "Gap", range: 0...24, fallback: 6, value: nil, unit: "pt").text(0) == "0 pt")
+        #expect(Number(key: "x", title: "X", range: 0...9, fallback: 1, value: nil).text(3) == "3")
+    }
 }
 

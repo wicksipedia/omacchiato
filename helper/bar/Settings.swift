@@ -99,8 +99,8 @@ func settingsReport() -> SettingsReport {
                             shownIcon: rightItems[plugin.name]?.icon ?? "")
         if kind == "ai-usage" { page.aiUsage = AIUsageOptions(command: plugin.command) }
         if kind == "keep-awake" {
-            page.numbers = [number("keep_awake_jiggle", "Move the mouse every, in minutes (0 is off)", 0...10, 1),
-                            number("keep_awake_battery", "Turn off on battery at, in percent (0 is off)", 0...90, 20)]
+            page.numbers = [number("keep_awake_jiggle", "Move the mouse every", 0...10, 1, unit: "min", zeroIsOff: true),
+                            number("keep_awake_battery", "Turn off on battery at", 0...90, 20, unit: "%", zeroIsOff: true)]
             // on by default, so the switch is off when the key holds its "off" value
             page.switches = [.init(key: "keep_awake_display", title: "Let the display sleep", off: "on",
                                    value: pillModes["keep_awake_display"]),
@@ -109,19 +109,21 @@ func settingsReport() -> SettingsReport {
         }
         pills.append(page)
     }
-    func number(_ key: String, _ title: String, _ range: ClosedRange<Int>, _ fallback: Int) -> SettingsReport.Number {
-        .init(key: key, title: title, range: range, fallback: fallback, value: pillModes[key].flatMap { Int($0) })
+    func number(_ key: String, _ title: String, _ range: ClosedRange<Int>, _ fallback: Int,
+                unit: String = "", zeroIsOff: Bool = false) -> SettingsReport.Number {
+        .init(key: key, title: title, range: range, fallback: fallback, value: pillModes[key].flatMap { Int($0) },
+              unit: unit, zeroIsOff: zeroIsOff)
     }
     // The music pill shows while Music plays, so it has no key to hide it.
     pills.insert(.init(key: "media", title: "Music", symbol: "music.note", tint: "pink",
                        summary: "The song that plays in Music, at the left of the bar, while Music plays.",
                        canHide: false,
-                       numbers: [number("media", "Title length, in characters", 8...80, 28),
-                                 number("media_notch", "Title length beside the notch", 8...80, 20)],
+                       numbers: [number("media", "Title length", 8...80, 28, unit: "characters"),
+                                 number("media_notch", "Title length beside the notch", 8...80, 20, unit: "characters")],
                        switches: [.init(key: "media_notch_fill", title: "Grow up to the notch", off: "no",
                                         value: pillModes["media_notch_fill"])]), at: 0)
-    let numbers = [number("left_gap", "Gap between left pills", 0...24, 6),
-                   number("right_gap", "Gap between right pills", 0...24, 6)]
+    let numbers = [number("left_gap", "Gap between left pills", 0...24, 6, unit: "pt"),
+                   number("right_gap", "Gap between right pills", 0...24, 6, unit: "pt")]
     let files = liveConfigFiles.enumerated().map { i, name in
         SettingsReport.File(name: name, url: configDir.appendingPathComponent(name), text: configTexts[i])
     }

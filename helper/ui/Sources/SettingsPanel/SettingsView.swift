@@ -653,7 +653,7 @@ struct SettingsNumberRow: View {
         let value = number.value ?? number.fallback
         LabeledContent(number.title) {
             HStack(spacing: 6) {
-                Text("\(value)").monospacedDigit()
+                Text(number.text(value)).monospacedDigit()
                 Stepper(number.title, value: Binding(get: { value }, set: {
                     actions.set(number.key, $0 == number.fallback ? nil : String($0))
                 }), in: number.range)
