@@ -44,7 +44,7 @@ let builtinPills: [String: PillInfo] = [
     "clock": .init(title: "Clock", symbol: "clock.fill", tint: "red",
                    summary: "The date and time, and today’s events."),
     "activity": .init(title: "Activity", symbol: "cpu", tint: "gray",
-                      summary: "CPU and memory, and the busiest apps.", styled: false),
+                      summary: "CPU and memory in one icon. Its popup lists the busiest apps.", styled: false),
 ]
 
 // A plugin's page takes its look from the script it runs. A plugin prints
@@ -63,7 +63,8 @@ let pluginKinds: [String: PillInfo] = [
                         summary: "Shows while an app keeps the Mac awake."),
     "updates": .init(title: "Updates", symbol: "arrow.down.circle.fill", tint: "blue",
                      summary: "Shows when a new Omacchiato release is out."),
-    "stats": .init(title: "Stats", symbol: "chart.bar.fill", tint: "teal", summary: "CPU, memory or disk use."),
+    "stats": .init(title: "Stats", symbol: "chart.bar.fill", tint: "teal",
+                   summary: "One number in the bar: CPU, memory or disk use. For the busiest apps, use Activity."),
 ]
 
 let panelDesigns = panelDesignNames.mapValues { $0.map { SettingsReport.Choice($0.value, $0.title) } }

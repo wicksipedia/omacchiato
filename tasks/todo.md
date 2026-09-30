@@ -18,7 +18,7 @@ Plan: `tasks/plan.md`.
 ## Phase 3: controls
 - [x] S5 One visibility control per pill (M)
 - [x] S6 Units and Off on number rows (S)
-- [ ] S7 Tell Activity and Stats apart (XS)
+- [x] S7 Tell Activity and Stats apart (XS)
 
 ## Phase 3b: icons
 - [ ] S9 A searchable Nerd Font glyph picker (M)
