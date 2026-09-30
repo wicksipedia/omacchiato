@@ -1,5 +1,10 @@
 import AppKit
 import IOKit.pwr_mgt
+// swiftc builds helper/ui into this module, and SwiftPM builds it as its own.
+import SwiftUI
+#if canImport(StatusGauge)
+import KeepAwakePanel
+#endif
 
 // --- keep awake ---------------------------------------------------------------
 // `omacchiato-keep-awake on | off | toggle | for <minutes>` writes the state
@@ -23,7 +28,22 @@ func keepAwakeNow(state: String, now: Date) -> KeepAwake {
     return until > now ? .on(until: until) : .off
 }
 
+func keepAwakeDetail(_ state: KeepAwake, reason: String?, timeZone: TimeZone = .current,
+                     locale: Locale = .current) -> String {
+    switch state {
+    case .off: return reason ?? "Turned off"
+    case .on(nil): return "Until turned off"
+    case .on(let until?):
+        let f = DateFormatter()
+        f.locale = locale
+        f.timeZone = timeZone
+        f.timeStyle = .short
+        return "Until " + f.string(from: until)
+    }
+}
+
 var keepAwakeAssertions: [IOPMAssertionID] = []
+var keepAwakeShown: KeepAwake?
 var keepAwakeHeldDisplay = false
 var keepAwakeEnd: Timer?
 
@@ -35,8 +55,13 @@ func writeKeepAwake(_ text: String) {
     try? (text + "\n").write(toFile: keepAwakeStateFile, atomically: true, encoding: .utf8)
 }
 
-func applyKeepAwake() {
+func applyKeepAwake(reason: String? = nil) {
     let state = readKeepAwake()
+    // no HUD for the state the bar finds at startup
+    if let shown = keepAwakeShown, shown != state, pillModes["keep_awake_hud"] != "off" {
+        showHUD(AnyView(KeepAwakeOSD(on: state != .off, detail: keepAwakeDetail(state, reason: reason))))
+    }
+    keepAwakeShown = state
     let display = pillModes["keep_awake_display"] == "on"
     if state == .off || display != keepAwakeHeldDisplay {
         keepAwakeAssertions.forEach { IOPMAssertionRelease($0) }
@@ -62,7 +87,7 @@ func applyKeepAwake() {
     if case .on(let until?) = state {
         keepAwakeEnd = Timer.scheduledTimer(withTimeInterval: max(0, until.timeIntervalSinceNow), repeats: false) { _ in
             writeKeepAwake("off")
-            applyKeepAwake()
+            applyKeepAwake(reason: "Timer ended")
         }
     }
     // the pill reads the same file, so it can show the change now

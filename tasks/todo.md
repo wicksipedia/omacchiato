@@ -6,10 +6,10 @@ Plan: `tasks/plan.md`. Design: `docs/plans/2026-09-30-keep-awake-and-quit-on-clo
 - [x] T1 Spike: which posted event resets the idle time (XS)
 - [x] T2 State file, command and always-on pill (S)
 - [x] T3 The bar holds the assertion from the state file (M)
-- [ ] Checkpoint A: assertion follows the command; review with the user
+- [x] Checkpoint A: assertion follows the command; review with the user
 
 ## Phase 2: every way in, and Vorssaint's options
-- [ ] T4 Super+Esc and the keep-awake HUD (M)
+- [x] T4 Super+Esc and the keep-awake HUD (M)
 - [ ] T5 Right-click on a plugin pill (S)
 - [ ] T6 On/off and time buttons in the popup (M)
 - [ ] T7 Mouse jiggle, paused while locked (S)

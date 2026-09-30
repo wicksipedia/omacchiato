@@ -32,4 +32,13 @@ extension KeepAwakeReport {
 #Preview("Many holders") { Desk { KeepAwakePanel(report: .many) } }
 #Preview("Nothing holding it") { Desk { KeepAwakePanel(report: .empty) } }
 #Preview("Light") { Desk(colors: [.mint, .cyan, .teal]) { KeepAwakePanel(report: .few) }.preferredColorScheme(.light) }
+#Preview("Keep awake HUD") {
+    Desk {
+        VStack(spacing: 12) {
+            KeepAwakeOSD(on: true, detail: "Until turned off")
+            KeepAwakeOSD(on: true, detail: "Until 5:30 PM")
+            KeepAwakeOSD(on: false, detail: "Timer ended")
+        }
+    }
+}
 #endif

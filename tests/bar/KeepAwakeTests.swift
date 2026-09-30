@@ -18,4 +18,15 @@ import Testing
     func expired() {
         #expect(keepAwakeNow(state: "99", now: now) == .off)
     }
+
+    @Test("the HUD says how long keep awake lasts, or why it ended")
+    func hudDetail() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let at = calendar.date(from: DateComponents(year: 2026, month: 9, day: 30, hour: 17, minute: 30))!
+        #expect(keepAwakeDetail(.on(until: nil), reason: nil, timeZone: calendar.timeZone, locale: Locale(identifier: "en_US")) == "Until turned off")
+        #expect(keepAwakeDetail(.on(until: at), reason: nil, timeZone: calendar.timeZone, locale: Locale(identifier: "en_US")) == "Until 5:30\u{202F}PM") // macOS puts a narrow no-break space before PM
+        #expect(keepAwakeDetail(.off, reason: "Timer ended", timeZone: calendar.timeZone, locale: Locale(identifier: "en_US")) == "Timer ended")
+        #expect(keepAwakeDetail(.off, reason: nil, timeZone: calendar.timeZone, locale: Locale(identifier: "en_US")) == "Turned off")
+    }
 }
