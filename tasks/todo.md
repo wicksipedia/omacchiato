@@ -14,7 +14,7 @@ Plan: `tasks/plan.md`. Design: `docs/plans/2026-09-30-keep-awake-and-quit-on-clo
 - [x] T6 On/off and time buttons in the popup (M)
 - [x] T7 Mouse jiggle, paused while locked (S)
 - [x] T8 Battery limit (S)
-- [ ] T9 Keep Awake settings page and docs (M)
+- [x] T9 Keep Awake settings page and docs (M)
 - [ ] Checkpoint B: release; turn off keep awake in Vorssaint
 
 ## Phase 3: lid closed

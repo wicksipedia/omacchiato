@@ -27,7 +27,9 @@ extension SettingsReport {
             Pill(key: "brightness", title: "Display", symbol: "sun.max.fill", tint: "yellow",
                  summary: "Brightness, extra dimming and Night Shift.", value: "hide", styles: iconOrLabel),
             Pill(key: "mic", title: "Microphone", symbol: "mic.slash.fill", tint: "red",
-                 summary: "Shows only while the microphone is muted.", styles: shownOnly),
+                 summary: "Shows only while the microphone is muted. Super+M mutes it.", styles: shownOnly,
+                 switches: [.init(key: "mic_hud", title: "Show a HUD when the microphone mutes", off: "off",
+                                  value: nil)]),
             Pill(key: "volume", title: "Sound", symbol: "speaker.wave.2.fill", tint: "pink",
                  summary: "Volume and the output device.", value: "muted",
                  styles: iconOrLabel + [.init("muted", "Only while muted")],
@@ -57,6 +59,16 @@ extension SettingsReport {
                  group: .plugins, styles: iconOrLabel,
                  plugin: PluginFields(command: "omacchiato-stats cpu", interval: 10, icon: "\u{f4bc}", iconColor: "accent",
                                       args: .stats)),
+            Pill(key: "keepawake", title: "Keep Awake", symbol: "cup.and.saucer.fill", tint: "orange",
+                 summary: "Shows while an app keeps the Mac awake.", group: .plugins, styles: iconOrLabel,
+                 numbers: [Number(key: "keep_awake_jiggle", title: "Move the mouse every, in minutes (0 is off)",
+                                  range: 0...10, fallback: 1, value: nil),
+                           Number(key: "keep_awake_battery", title: "Turn off on battery at, in percent (0 is off)",
+                                  range: 0...90, fallback: 20, value: nil)],
+                 switches: [.init(key: "keep_awake_display", title: "Let the display sleep", off: "on", value: nil),
+                            .init(key: "keep_awake_hud", title: "Show a HUD when keep awake changes", off: "off",
+                                  value: nil)],
+                 plugin: PluginFields(command: "omacchiato-keep-awake", interval: 10)),
             Pill(key: "hello", title: "Hello", symbol: "puzzlepiece.extension.fill", tint: "purple", summary: "A plugin pill.",
                  group: .plugins, styles: iconOrLabel, plugin: PluginFields(command: "echo hi", interval: 45)),
         ],
@@ -101,6 +113,7 @@ private func page(_ page: SettingsView.Page, height: CGFloat = size.height) -> s
 #Preview("Pull Requests") { page(.pill("github"), height: 900) }
 #Preview("Stats") { page(.pill("cpu")) }
 #Preview("A custom plugin") { page(.pill("hello")) }
+#Preview("Keep Awake") { page(.pill("keepawake")) }
 #Preview("Music") { page(.pill("media")) }
 #Preview("Sound, with a mode") { page(.pill("volume")) }
 #Preview("Microphone") { page(.pill("mic")) }

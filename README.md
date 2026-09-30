@@ -327,11 +327,19 @@ popup rows, and the bar draws the result. The format is under
   PR in the list sits under it, indented. To mark a PR read, swipe left
   on it with two fingers, or click its blue dot. It leaves the list
   until GitHub updates it again, and its notification is marked read.
-- **Keep awake** (`omacchiato-keep-awake`): a cup while something holds
-  the Mac awake, nothing otherwise. It reads the power assertions
-  rather than any app's saved setting, ignores the ones the system
-  holds as a matter of course, and lists the holders and how long each
-  has held on a click.
+- **Keep awake** (`omacchiato-keep-awake`): a cup, dimmed while the Mac
+  may sleep, in the accent colour while Omacchiato or another app keeps
+  it awake. A right-click or `Super+Esc` turns keep awake on or off. The
+  popup has the switch, buttons for 30 minutes, 1 hour, 2 hours and
+  until turned off, and the other apps that hold the Mac awake, read
+  from the power assertions. `omacchiato-keep-awake on | off | toggle |
+  for <minutes>` does the same from a shell. While it is on, the bar
+  holds the Mac awake and lets the display sleep
+  (`keep_awake_display = on` keeps the display on too), moves the mouse
+  without moving the pointer every minute so chat apps do not show
+  Away (`keep_awake_jiggle = <minutes>` or `off`), and turns off on
+  battery at 20 % (`keep_awake_battery = <percent>` or `off`). A HUD
+  shows each change (`keep_awake_hud = off` turns it off).
 - **CPU, memory and disk** (`omacchiato-stats`): the percentage in use,
   in yellow from 75 % and red from 90 %. The popups list the processes
   that use the most CPU or memory, and the free space on the disk.
@@ -546,6 +554,7 @@ from the live config, and you can type to filter it.
 | `Super+Shift+B` | next wallpaper of the current theme (*Karabiner*) |
 | `Super+Shift+L` | lock the screen (*Karabiner*) |
 | `Super+M` | mute or unmute the microphone (*Karabiner*) |
+| `Super+Esc` | keep awake on or off (*Karabiner*) |
 | `Super+K` | keybinding cheatsheet (*Karabiner*) |
 | `Cmd+Space` | Raycast, once you give it that hotkey in Raycast's settings |
 

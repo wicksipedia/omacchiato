@@ -119,7 +119,8 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   `media = <characters>`, `<pill>_panel = <design>`, and
   `volume_hud = off` and `volume_click = off` for the volume keys, and
   `mic_hud = off`. The mic watch runs with the mic pill hidden, so the
-  mic HUD still shows.
+  mic HUD still shows. `keep_awake_display`, `keep_awake_jiggle`,
+  `keep_awake_battery` and `keep_awake_hud` tune keep awake.
 - `Config.swift` watches `bar-pills.conf` and `bar-plugins.conf`, and
   their folder, because an editor saves by a rename and `echo >>` writes
   in place. When the text changes, `reloadConfig()` rereads both and
@@ -442,6 +443,11 @@ The design and the test results are in
   muted clock for waiting. The sentence under a PR appears only when it
   says more than the mark: merged, closed, conflicts, a failed check,
   changes requested, or the number of threads to resolve.
+- `omacchiato-keep-awake on | off | toggle | for <minutes>` writes
+  `~/.local/state/omacchiato/keep-awake`: `on`, `off`, or an end time.
+  `KeepAwake.swift` watches that folder and holds the assertion, so a
+  crash of the bar ends keep awake. With no argument, the script prints
+  the pill and leaves the bar's own assertion out of the holder list.
 - `omacchiato-ai-usage --pill <id>[:<window>],... --panel <id>,...` reads
   plan usage from `tokscale usage --json` and the week from
   `tokscale graph`. `PROVIDERS` maps each id to a status page and a

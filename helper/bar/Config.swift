@@ -49,6 +49,8 @@ func reloadConfig() {
     startProviders()
     // The volume pill has no timer, so a new `volume` mode applies here.
     updateVolume()
+    // The jiggle interval and display sleep apply to a running keep awake.
+    applyKeepAwake()
 
     // The popup of a pill that left the bar closes, built-in or plugin.
     if let open = openPopup, oldOrder.contains(open), !rightOrder.contains(open) { closePopup() } else { refreshPopup() }

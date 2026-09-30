@@ -108,6 +108,15 @@ func settingsReport() -> SettingsReport {
                             args: kind == "github-prs" ? .search : kind == "stats" ? .stats : .none,
                             shownIcon: rightItems[plugin.name]?.icon ?? "")
         if kind == "ai-usage" { page.aiUsage = AIUsageOptions(command: plugin.command) }
+        if kind == "keep-awake" {
+            page.numbers = [number("keep_awake_jiggle", "Move the mouse every, in minutes (0 is off)", 0...10, 1),
+                            number("keep_awake_battery", "Turn off on battery at, in percent (0 is off)", 0...90, 20)]
+            // on by default, so the switch is off when the key holds its "off" value
+            page.switches = [.init(key: "keep_awake_display", title: "Let the display sleep", off: "on",
+                                   value: pillModes["keep_awake_display"]),
+                             .init(key: "keep_awake_hud", title: "Show a HUD when keep awake changes", off: "off",
+                                   value: pillModes["keep_awake_hud"])]
+        }
         pills.append(page)
     }
     func number(_ key: String, _ title: String, _ range: ClosedRange<Int>, _ fallback: Int) -> SettingsReport.Number {
