@@ -155,6 +155,9 @@ if [ ! -e "$HOME/.zshrc" ] && [ -f "$HOME/Documents/config/.dotfiles/zshrc" ]; t
   ln -s "$HOME/Documents/config/.dotfiles/zshrc" "$HOME/.zshrc"
 fi
 
+# the keep-awake lid rule, and the Mac's normal sleep with the lid closed
+"$REPO_DIR/bin/omacchiato-lid-rule" remove || true
+
 # theme-set, theme-next and the omacchiato scripts out of ~/.local/bin,
 # only when they are OUR symlinks (a user's own script of the same name
 # survives). A clone made before the rename can still be named omacosy.

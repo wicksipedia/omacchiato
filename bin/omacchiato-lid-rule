@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# omacchiato-lid-rule <install|remove>: the sudoers rule that lets keep
+# awake hold the Mac awake with the lid closed.
+#
+# `pmset -a disablesleep` needs root. The rule lets this user run its two
+# forms, 0 and 1, with no password, and no other command. install.sh and
+# uninstall.sh run this script. It asks for the admin password only when
+# the rule is missing.
+set -euo pipefail
+
+RULE_FILE=/etc/sudoers.d/omacchiato-keep-awake
+PMSET=/usr/bin/pmset
+
+case "${1:-}" in
+  install)
+    # `sudo -n -l` passes for any admin, password or not, so check for this
+    # rule's own file. Only root can read it, but anyone can see it.
+    [ -e "$RULE_FILE" ] && exit 0
+    if [ ! -t 0 ]; then
+      echo "omacchiato-lid-rule: no terminal for the admin password. Run 'omacchiato-lid-rule install' to let keep awake work with the lid closed." >&2
+      exit 0
+    fi
+    tmp=$(mktemp)
+    trap 'rm -f "$tmp"' EXIT
+    printf '%s ALL=(root) NOPASSWD: %s -a disablesleep 0, %s -a disablesleep 1\n' \
+      "$(id -un)" "$PMSET" "$PMSET" > "$tmp"
+    echo "Keep awake needs the admin password once, to allow only 'pmset -a disablesleep 0' and '1' with the lid closed."
+    sudo /usr/sbin/visudo -cf "$tmp" >/dev/null
+    sudo /usr/bin/install -m 0440 -o root -g wheel "$tmp" "$RULE_FILE"
+    echo "Installed $RULE_FILE"
+    ;;
+  remove)
+    [ -e "$RULE_FILE" ] || exit 0
+    sudo "$PMSET" -a disablesleep 0 || true
+    sudo rm -f "$RULE_FILE"
+    ;;
+  *)
+    echo "usage: omacchiato-lid-rule <install|remove>" >&2
+    exit 2
+    ;;
+esac

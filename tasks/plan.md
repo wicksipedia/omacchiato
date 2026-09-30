@@ -85,7 +85,7 @@ other. The lid (T10–T11) depends only on T3.
 
 ### Phase 3: lid closed
 
-- [ ] T10: Sudoers rule in install.sh and uninstall.sh
+- [x] T10: Sudoers rule in install.sh and uninstall.sh
 - [ ] T11: The bar sets `disablesleep` with keep awake
 
 ### Checkpoint C

@@ -407,6 +407,7 @@ link "$REPO_DIR/bin/omacchiato-omniwmctl" "$HOME/.local/bin/omacchiato-omniwmctl
 link "$REPO_DIR/bin/omacchiato-herdr-worktree" "$HOME/.local/bin/omacchiato-herdr-worktree"
 link "$REPO_DIR/bin/omacchiato-popup" "$HOME/.local/bin/omacchiato-popup"
 link "$REPO_DIR/bin/omacchiato-permissions" "$HOME/.local/bin/omacchiato-permissions"
+link "$REPO_DIR/bin/omacchiato-lid-rule" "$HOME/.local/bin/omacchiato-lid-rule"
 
 # omacchiato-claude-usage became omacchiato-ai-usage, whose default is the
 # Claude pill. sed -i replaces a symlink with a file, so edit its target.
@@ -608,6 +609,10 @@ else
   log "Starting Karabiner-Elements (approve its driver extension, then quit the app)"
   open -a Karabiner-Elements
 fi
+
+# Keep awake with the lid closed needs a sudoers rule for pmset. It asks
+# for the admin password only while the rule is missing.
+"$REPO_DIR/bin/omacchiato-lid-rule" install || log "WARNING: no lid rule, so keep awake stops when the lid closes"
 
 log "Checking the permissions of the bar and the gesture daemon"
 "$REPO_DIR/bin/omacchiato-permissions" || log "WARNING: a permission above is still off. Run omacchiato-permissions to try again."

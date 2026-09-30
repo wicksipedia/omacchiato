@@ -15,10 +15,10 @@ Plan: `tasks/plan.md`. Design: `docs/plans/2026-09-30-keep-awake-and-quit-on-clo
 - [x] T7 Mouse jiggle, paused while locked (S)
 - [x] T8 Battery limit (S)
 - [x] T9 Keep Awake settings page and docs (M)
-- [ ] Checkpoint B: release; turn off keep awake in Vorssaint
+- [x] Checkpoint B: release; turn off keep awake in Vorssaint (tested locally, release pending)
 
 ## Phase 3: lid closed
-- [ ] T10 Sudoers rule in install.sh and uninstall.sh (S)
+- [x] T10 Sudoers rule in install.sh and uninstall.sh (S)
 - [ ] T11 The bar sets disablesleep with keep awake (S)
 - [ ] Checkpoint C: release; remove Vorssaint's lid setting
 
