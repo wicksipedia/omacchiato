@@ -84,7 +84,7 @@ git history (commit 257d382 and earlier).
 
 ### Phase 2: sidebar by task
 - [x] S3: Regroup the sidebar
-- [ ] S4: A HUDs & Sounds page
+- [x] S4: A HUDs & Sounds page
 
 ### Checkpoint B
 - [ ] Every key still has a control (SettingsCoverageTests)

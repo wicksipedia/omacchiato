@@ -221,10 +221,13 @@ public struct SettingsReport {
     public var order: [String]           // the right-hand pills in bar order, hidden ones too
     public var orderSaved: Bool          // bar-pills.conf names an order, so Reset Order has work
     public var debug: Bool               // debug = on: the bar logs its memory each minute
+    public var huds: [Switch]            // the HUD and click switches, on the HUDs & Sounds page
 
     public init(pills: [Pill], numbers: [Number] = [], files: [File] = [], theme: ThemeReport? = nil,
-                quitOnClose: QuitOnClose? = nil, order: [String] = [], orderSaved: Bool = false, debug: Bool = false) {
+                quitOnClose: QuitOnClose? = nil, order: [String] = [], orderSaved: Bool = false, debug: Bool = false,
+                huds: [Switch] = []) {
         self.order = order
+        self.huds = huds
         self.debug = debug
         self.orderSaved = orderSaved
         self.pills = pills

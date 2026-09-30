@@ -84,16 +84,6 @@ func settingsReport() -> SettingsReport {
     for key in rightOrderAll {
         guard let info = builtinPills[key] else { continue }
         var page = pill(key, info, group: .bar, designs: key)
-        if key == "mic" {
-            page.switches = [.init(key: "mic_hud", title: "Show a HUD when the microphone mutes", off: "off",
-                                   value: pillModes["mic_hud"])]
-        }
-        if key == "volume" {
-            page.switches = [.init(key: "volume_hud", title: "Show the volume HUD", off: "off",
-                                   value: pillModes["volume_hud"]),
-                             .init(key: "volume_click", title: "Click when the volume changes", off: "off",
-                                   value: pillModes["volume_click"])]
-        }
         pills.append(page)
     }
     for plugin in barPlugins {
@@ -115,9 +105,7 @@ func settingsReport() -> SettingsReport {
             page.switches = [.init(key: "keep_awake_display", title: "Let the display sleep", off: "on",
                                    value: pillModes["keep_awake_display"]),
                              .init(key: "keep_awake_lid", title: "Stay awake with the lid closed", off: "off",
-                                   value: pillModes["keep_awake_lid"]),
-                             .init(key: "keep_awake_hud", title: "Show a HUD when keep awake changes", off: "off",
-                                   value: pillModes["keep_awake_hud"])]
+                                   value: pillModes["keep_awake_lid"])]
         }
         pills.append(page)
     }
@@ -140,8 +128,15 @@ func settingsReport() -> SettingsReport {
     return SettingsReport(pills: pills, numbers: numbers, files: files, theme: settingsThemes,
                           quitOnClose: quitOnCloseReport(),
                           order: fullPillOrder(modes: pillModes, plugins: barPlugins),
-                          orderSaved: pillModes["order"] != nil, debug: pillModes["debug"] == "on")
+                          orderSaved: pillModes["order"] != nil, debug: pillModes["debug"] == "on",
+                          huds: hudSwitches.map { .init(key: $0.key, title: $0.title, off: "off", value: pillModes[$0.key]) })
 }
+
+// The HUDs and the volume click, on one page. Each is on unless its key is off.
+let hudSwitches = [(key: "volume_hud", title: "Volume HUD when a volume key is pressed"),
+                   (key: "volume_click", title: "Click when the volume changes"),
+                   (key: "mic_hud", title: "Microphone HUD when it mutes or unmutes"),
+                   (key: "keep_awake_hud", title: "Keep Awake HUD when it turns on or off")]
 
 func quitOnCloseReport() -> SettingsReport.QuitOnClose {
     func app(_ id: String) -> SettingsReport.QuitOnClose.App {

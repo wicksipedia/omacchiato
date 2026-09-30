@@ -85,6 +85,14 @@ import Testing
         }
     }
 
+    @Test("the HUD and click switches live on one page, not on the pill pages")
+    func hudPage() {
+        let report = settingsReport()
+        let keys = ["volume_hud", "volume_click", "mic_hud", "keep_awake_hud"]
+        #expect(report.huds.map(\.key) == keys)
+        #expect(!report.pills.contains { pill in pill.switches.contains { keys.contains($0.key) } })
+    }
+
     @Test("the Bar page lists every right-hand pill once, in the bar's order, with its page")
     func barPageOrder() {
         let report = settingsReport()

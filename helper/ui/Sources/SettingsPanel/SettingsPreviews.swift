@@ -27,15 +27,10 @@ extension SettingsReport {
             Pill(key: "brightness", title: "Display", symbol: "sun.max.fill", tint: "yellow",
                  summary: "Brightness, extra dimming and Night Shift.", value: "hide", styles: iconOrLabel),
             Pill(key: "mic", title: "Microphone", symbol: "mic.slash.fill", tint: "red",
-                 summary: "Shows only while the microphone is muted. Super+M mutes it.", styles: shownOnly,
-                 switches: [.init(key: "mic_hud", title: "Show a HUD when the microphone mutes", off: "off",
-                                  value: nil)]),
+                 summary: "Shows only while the microphone is muted. Super+M mutes it.", styles: shownOnly),
             Pill(key: "volume", title: "Sound", symbol: "speaker.wave.2.fill", tint: "pink",
                  summary: "Volume and the output device.", value: "muted",
-                 styles: iconOrLabel + [.init("muted", "Only while muted")],
-                 switches: [.init(key: "volume_hud", title: "Show the volume HUD", off: "off", value: nil),
-                            .init(key: "volume_click", title: "Click when the volume changes", off: "off",
-                                  value: "off")]),
+                 styles: iconOrLabel + [.init("muted", "Only while muted")]),
             Pill(key: "status", title: "Status", symbol: "gauge.with.dots.needle.67percent", tint: "green",
                  summary: "Battery and network in one gauge.", styles: shownOnly),
             Pill(key: "battery", title: "Battery", symbol: "battery.75percent", tint: "green",
@@ -66,9 +61,7 @@ extension SettingsReport {
                            Number(key: "keep_awake_battery", title: "Turn off on battery at, in percent (0 is off)",
                                   range: 0...90, fallback: 20, value: nil)],
                  switches: [.init(key: "keep_awake_display", title: "Let the display sleep", off: "on", value: nil),
-                            .init(key: "keep_awake_lid", title: "Stay awake with the lid closed", off: "off", value: nil),
-                            .init(key: "keep_awake_hud", title: "Show a HUD when keep awake changes", off: "off",
-                                  value: nil)],
+                            .init(key: "keep_awake_lid", title: "Stay awake with the lid closed", off: "off", value: nil)],
                  plugin: PluginFields(command: "omacchiato-keep-awake", interval: 10)),
             Pill(key: "hello", title: "Hello", symbol: "puzzlepiece.extension.fill", tint: "purple", summary: "A plugin pill.",
                  group: .plugins, styles: iconOrLabel, plugin: PluginFields(command: "echo hi", interval: 45)),
@@ -90,7 +83,11 @@ extension SettingsReport {
         ], running: [.init(id: "com.apple.Safari", name: "Safari", path: "/Applications/Safari.app")]),
         order: ["menubar", "github", "claude", "keepawake", "cpu", "hello", "weather", "wifi", "bluetooth",
                 "brightness", "mic", "volume", "status", "battery", "clock", "activity"],
-        orderSaved: true)
+        orderSaved: true,
+        huds: [.init(key: "volume_hud", title: "Volume HUD when a volume key is pressed", off: "off", value: nil),
+               .init(key: "volume_click", title: "Click when the volume changes", off: "off", value: "off"),
+               .init(key: "mic_hud", title: "Microphone HUD when it mutes or unmutes", off: "off", value: nil),
+               .init(key: "keep_awake_hud", title: "Keep Awake HUD when it turns on or off", off: "off", value: nil)])
 }
 
 private let size = (width: CGFloat(760), height: CGFloat(580))
@@ -124,6 +121,8 @@ private func page(_ page: SettingsView.Page, height: CGFloat = size.height) -> s
 #Preview("A custom plugin") { page(.pill("hello")) }
 #Preview("Keep Awake") { page(.pill("keepawake")) }
 #Preview("Quit on Close") { page(.quitOnClose) }
+#Preview("HUDs & Sounds") { page(.huds) }
+#Preview("Debug") { page(.debug) }
 #Preview("Music") { page(.pill("media")) }
 #Preview("Sound, with a mode") { page(.pill("volume")) }
 #Preview("Microphone") { page(.pill("mic")) }

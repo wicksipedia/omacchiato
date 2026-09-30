@@ -12,7 +12,7 @@ Plan: `tasks/plan.md`.
 
 ## Phase 2: sidebar by task
 - [x] S3 Regroup the sidebar (M)
-- [ ] S4 A HUDs & Sounds page (S)
+- [x] S4 A HUDs & Sounds page (S)
 - [ ] Checkpoint B: every key has a control; review with the user
 
 ## Phase 3: controls

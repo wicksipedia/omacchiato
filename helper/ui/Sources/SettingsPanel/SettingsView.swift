@@ -9,7 +9,7 @@ import ThemePanel
 // this window becomes key, so it uses the system controls.
 public struct SettingsView: View {
     public enum Page: Hashable {
-        case layout, theme, files, addPlugin, quitOnClose, debug
+        case layout, theme, files, addPlugin, quitOnClose, debug, huds
         case pill(String)
     }
 
@@ -40,6 +40,10 @@ public struct SettingsView: View {
                             .tag(Page.quitOnClose)
                     }
                     rows(sidebar.features)
+                    if !report.huds.isEmpty {
+                        SettingsSidebarRow(title: "HUDs & Sounds", symbol: "rectangle.inset.topright.filled", tint: "blue")
+                            .tag(Page.huds)
+                    }
                 }
                 Section("Advanced") {
                     SettingsSidebarRow(title: "Config Files", symbol: "doc.text", tint: "gray").tag(Page.files)
@@ -67,6 +71,8 @@ public struct SettingsView: View {
                 .navigationTitle("Theme")
             case .files?:
                 SettingsFilesPage(report: report, actions: actions)
+            case .huds?:
+                SettingsHUDsPage(switches: report.huds, actions: actions)
             case .debug?:
                 SettingsDebugPage(on: report.debug, actions: actions)
             case .quitOnClose?:
@@ -798,5 +804,24 @@ struct SettingsDebugPage: View {
         }
         .formStyle(.grouped)
         .navigationTitle("Debug")
+    }
+}
+
+struct SettingsHUDsPage: View {
+    var switches: [SettingsReport.Switch]
+    var actions: SettingsActions
+
+    var body: some View {
+        Form {
+            Section {
+                ForEach(switches) { s in
+                    Toggle(s.title, isOn: Binding(get: { s.on }, set: { actions.set(s.key, $0 ? nil : s.off) }))
+                }
+            } footer: {
+                Text("A HUD shows at the top right of the screen with the pointer, and works with its pill hidden.")
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle("HUDs & Sounds")
     }
 }
