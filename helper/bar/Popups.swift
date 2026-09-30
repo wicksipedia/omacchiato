@@ -171,6 +171,9 @@ func panelView(_ name: String) -> AnyView? {
         if let report = KeepAwakeReport(json: json) {
             var actions = KeepAwakeActions()
             actions.openSettings = openBatterySettings
+            if let program = barPlugins.first(where: { $0.name == name })?.command.split(separator: " ").first {
+                actions.set = { runPluginCommand(name, "\(program) \($0)") }
+            }
             return AnyView(KeepAwakePanel(report: report, actions: actions))
         }
         if let report = UpdatesReport(json: json) {

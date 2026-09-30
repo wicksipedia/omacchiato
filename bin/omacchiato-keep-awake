@@ -37,6 +37,11 @@ ASSERTION = re.compile(
 AGENT_PARENTS = {"claude"}
 
 
+def is_own(name):
+    """The bar's own hold. The panel shows it as the switch, not as a holder."""
+    return name == "omacchiato-bar"
+
+
 def process(pid):
     """(executable, parent pid) for one process.
 
@@ -67,7 +72,7 @@ def holders():
     found = []
     for line in out.stdout.splitlines():
         m = ASSERTION.match(line)
-        if not m or any(name == m.group(2) for name, _, _ in found):
+        if not m or is_own(m.group(2)) or any(name == m.group(2) for name, _, _ in found):
             continue
         pid = int(m.group(1))
         executable, parent = process(m.group(1))

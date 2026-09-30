@@ -4,8 +4,9 @@ import SwiftUI
 import StatusPanel
 #endif
 
-// The keep-awake popup: who is holding the Mac up and for how long, as the
-// Battery menu lists "Apps Using Significant Energy".
+// The keep-awake popup: the switch and how long to stay awake, then the
+// other apps that hold the Mac up, as the Battery menu lists "Apps Using
+// Significant Energy".
 public struct KeepAwakePanel: View {
     var report: KeepAwakeReport
     var actions: KeepAwakeActions
@@ -17,7 +18,20 @@ public struct KeepAwakePanel: View {
 
     public var body: some View {
         VStack(spacing: 10) {
-            PanelCard(title: "Keeping Awake", symbol: "cup.and.saucer.fill") {
+            PanelCard {
+                ControlTile(title: "Keep Awake", subtitle: subtitle, symbol: "cup.and.saucer.fill", on: report.on) {
+                    actions.set(report.on ? "off" : "on")
+                }
+                HStack(spacing: 6) {
+                    ForEach(Self.durations, id: \.arg) { d in
+                        DurationButton(title: d.title,
+                                       on: report.on && d.arg == "on" && report.until == nil) { actions.set(d.arg) }
+                    }
+                }
+                .padding(.horizontal, 6)
+                .padding(.bottom, 4)
+            }
+            PanelCard(title: "Also Keeping Awake", symbol: "cup.and.saucer.fill") {
                 if report.holders.isEmpty {
                     NothingAwake()
                 } else {
@@ -29,6 +43,37 @@ public struct KeepAwakePanel: View {
             SettingsRow(title: "Battery Settings", action: actions.openSettings)
         }
         .statusPanelBackground(width: 300)
+    }
+
+    static let durations = [(title: "30 min", arg: "for 30"), (title: "1 hr", arg: "for 60"),
+                            (title: "2 hr", arg: "for 120"), (title: "Until Off", arg: "on")]
+
+    var subtitle: String {
+        guard report.on else { return "Off" }
+        guard let until = report.until else { return "Until turned off" }
+        return "Until " + until.formatted(date: .omitted, time: .shortened)
+    }
+}
+
+// A time choice, drawn by hand: the popup is never key, so a system
+// button would draw grey.
+struct DurationButton: View {
+    var title: String
+    var on: Bool
+    var action: () -> Void
+    @State private var hovered = false
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(on ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+            .frame(maxWidth: .infinity, minHeight: 24)
+            .background(on ? AnyShapeStyle(PanelColors.accent)
+                           : hovered ? AnyShapeStyle(.fill.secondary) : AnyShapeStyle(.fill.tertiary), in: .capsule)
+            .contentShape(.capsule)
+            .onHover { hovered = $0 }
+            .onTapGesture(perform: action)
+            .accessibilityAddTraits(.isButton)
     }
 }
 
@@ -70,7 +115,7 @@ struct NothingAwake: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "checkmark.circle.fill").foregroundStyle(PanelColors.green)
-            Text("Nothing is keeping the Mac awake").foregroundStyle(.secondary)
+            Text("No other app is keeping the Mac awake").foregroundStyle(.secondary)
         }
         .font(.system(size: 12))
         .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)

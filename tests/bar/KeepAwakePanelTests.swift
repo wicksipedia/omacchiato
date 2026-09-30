@@ -29,4 +29,12 @@ import Testing
     func noHolders() {
         #expect(KeepAwakeReport(json: ["kind": "keep-awake"])?.holders.isEmpty == true)
     }
+
+    @Test("the panel object carries the bar's own state: on, and the end time of a timed run")
+    func state() throws {
+        let off = try #require(KeepAwakeReport(json: json))
+        #expect(!off.on && off.until == nil)
+        let timed = try #require(KeepAwakeReport(json: ["kind": "keep-awake", "on": true, "until": 1790748720]))
+        #expect(timed.on && timed.until == Date(timeIntervalSince1970: 1790748720))
+    }
 }

@@ -75,5 +75,11 @@ class Pill(unittest.TestCase):
         self.assertEqual(p["panel"]["holders"][0]["name"], "Steam")
 
 
+class OwnHold(unittest.TestCase):
+    def test_the_bar_is_not_listed_as_another_holder(self):
+        self.assertTrue(ka.is_own("omacchiato-bar"))
+        self.assertFalse(ka.is_own("Steam"))
+
+
 if __name__ == "__main__":
     unittest.main()

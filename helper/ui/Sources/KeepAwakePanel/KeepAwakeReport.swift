@@ -1,6 +1,7 @@
 import Foundation
 
-// What the keep-awake popup shows: everything holding a power assertion.
+// What the keep-awake popup shows: the bar's own keep awake, and every
+// other process that holds a power assertion.
 // The bar decodes this from omacchiato-keep-awake; the previews build it by hand.
 public struct KeepAwakeReport {
     public struct Holder: Identifiable {
@@ -16,15 +17,21 @@ public struct KeepAwakeReport {
         }
     }
 
+    public var on: Bool
+    public var until: Date?          // the end of a timed run
     public var holders: [Holder]
 
-    public init(holders: [Holder] = []) {
+    public init(on: Bool = false, until: Date? = nil, holders: [Holder] = []) {
+        self.on = on
+        self.until = until
         self.holders = holders
     }
 }
 
 public struct KeepAwakeActions {
     public var openSettings: () -> Void = {}
+    // Runs omacchiato-keep-awake with "on", "off" or "for <minutes>".
+    public var set: (String) -> Void = { _ in }
 
     public init() {}
 }
@@ -39,6 +46,8 @@ extension KeepAwakeReport {
                    pid: (h["pid"] as? Int).map(Int32.init),
                    duration: h["duration"] as? String ?? "")
         }
-        self.init(holders: holders)
+        self.init(on: json["on"] as? Bool ?? false,
+                  until: (json["until"] as? NSNumber).map { Date(timeIntervalSince1970: $0.doubleValue) },
+                  holders: holders)
     }
 }

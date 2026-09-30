@@ -31,6 +31,10 @@ extension KeepAwakeReport {
 #Preview("A long name") { Desk { KeepAwakePanel(report: .long) } }
 #Preview("Many holders") { Desk { KeepAwakePanel(report: .many) } }
 #Preview("Nothing holding it") { Desk { KeepAwakePanel(report: .empty) } }
+#Preview("On until turned off") { Desk { KeepAwakePanel(report: KeepAwakeReport(on: true)) } }
+#Preview("On for an hour") {
+    Desk { KeepAwakePanel(report: KeepAwakeReport(on: true, until: Date().addingTimeInterval(3600), holders: KeepAwakeReport.few.holders)) }
+}
 #Preview("Light") { Desk(colors: [.mint, .cyan, .teal]) { KeepAwakePanel(report: .few) }.preferredColorScheme(.light) }
 #Preview("Keep awake HUD") {
     Desk {
