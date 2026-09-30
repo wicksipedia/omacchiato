@@ -132,7 +132,8 @@ func settingsReport() -> SettingsReport {
                           quitOnClose: quitOnCloseReport(),
                           order: fullPillOrder(modes: pillModes, plugins: barPlugins),
                           orderSaved: pillModes["order"] != nil, debug: pillModes["debug"] == "on",
-                          huds: hudSwitches.map { .init(key: $0.key, title: $0.title, off: "off", value: pillModes[$0.key]) })
+                          huds: hudSwitches.map { .init(key: $0.key, title: $0.title, off: "off", value: pillModes[$0.key]) },
+                          hudPosition: pillModes["hud_position"])
 }
 
 // The HUDs and the volume click, on one page. Each is on unless its key is off.

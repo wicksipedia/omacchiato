@@ -111,6 +111,21 @@ func playVolumeClick() {
     sound.play()
 }
 
+// hud_position in bar-pills.conf: top-right (the default, under the bar,
+// where the macOS HUD shows), top-center, top-left, center or
+// bottom-center. The top ones keep clear of the bar.
+func hudOrigin(screen: CGRect, size: CGSize, position: String?, barHeight: CGFloat) -> CGPoint {
+    let top = screen.maxY - barHeight - 8 - size.height
+    let centerX = screen.midX - size.width / 2
+    switch position {
+    case "top-left": return CGPoint(x: screen.minX + 10, y: top)
+    case "top-center": return CGPoint(x: centerX, y: top)
+    case "center": return CGPoint(x: centerX, y: screen.midY - size.height / 2)
+    case "bottom-center": return CGPoint(x: centerX, y: screen.minY + 80)
+    default: return CGPoint(x: screen.maxX - size.width - 10, y: top)
+    }
+}
+
 func showVolumeOSD() {
     guard let report = soundReport() else { return }
     showHUD(AnyView(VolumeOSD(report: report)))
@@ -138,8 +153,8 @@ func showHUD(_ view: AnyView) {
     let mouse = NSEvent.mouseLocation
     let screen = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) } ?? NSScreen.main
     if let frame = screen?.frame, let size = window.contentView?.fittingSize {
-        window.setFrame(NSRect(x: frame.maxX - size.width - 10, y: frame.maxY - barHeight - 8 - size.height,
-                               width: size.width, height: size.height), display: true)
+        let origin = hudOrigin(screen: frame, size: size, position: pillModes["hud_position"], barHeight: barHeight)
+        window.setFrame(NSRect(origin: origin, size: size), display: true)
     }
     window.appearance = NSAppearance(named: themeIsDark ? .darkAqua : .aqua)
     window.orderFrontRegardless()

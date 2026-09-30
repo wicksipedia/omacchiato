@@ -74,7 +74,7 @@ public struct SettingsView: View {
             case .files?:
                 SettingsFilesPage(report: report, actions: actions)
             case .huds?:
-                SettingsHUDsPage(switches: report.huds, actions: actions)
+                SettingsHUDsPage(switches: report.huds, position: report.hudPosition, actions: actions)
             case .debug?:
                 SettingsDebugPage(on: report.debug, actions: actions)
             case .quitOnClose?:
@@ -789,10 +789,25 @@ struct SettingsDebugPage: View {
 
 struct SettingsHUDsPage: View {
     var switches: [SettingsReport.Switch]
+    var position: String?
     var actions: SettingsActions
+
+    // Keep in sync with hudOrigin in helper/bar/VolumeKeys.swift.
+    static let positions: [SettingsReport.Choice] = [
+        .init(nil, "Top Right"), .init("top-center", "Top Center"), .init("top-left", "Top Left"),
+        .init("center", "Center"), .init("bottom-center", "Bottom Center"),
+    ]
 
     var body: some View {
         Form {
+            Section {
+                Picker("Position", selection: Binding(get: { position }, set: { actions.set("hud_position", $0) })) {
+                    ForEach(Self.positions, id: \.self) { Text($0.title).tag($0.value) }
+                }
+                .pickerStyle(.menu)
+            } footer: {
+                Text("On the screen with the pointer. The top positions keep clear of the bar.")
+            }
             ForEach(switches) { s in
                 Section {
                     Toggle(s.title, isOn: Binding(get: { s.on }, set: { actions.set(s.key, $0 ? nil : s.off) }))
@@ -812,7 +827,7 @@ struct SettingsHUDsPage: View {
                 }
             }
             Section {} footer: {
-                Text("A HUD shows at the top right of the screen with the pointer, and works with its pill hidden.")
+                Text("A HUD works with its pill hidden.")
             }
         }
         .formStyle(.grouped)

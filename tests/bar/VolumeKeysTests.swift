@@ -1,3 +1,4 @@
+import CoreGraphics
 import Testing
 @testable import omacchiato_bar
 
@@ -33,5 +34,20 @@ import Testing
         #expect(volumePill(percent: 44, muted: false, mode: nil) == (true, "󰖀", "44%", false))
         #expect(volumePill(percent: 44, muted: false, mode: "icon").drawing)
         #expect(volumePill(percent: 44, muted: true, mode: "muted") == (true, "󰝟", "", true))
+    }
+}
+
+@Suite struct HUDPositionTests {
+    let screen = CGRect(x: 0, y: 0, width: 1000, height: 800)
+    let size = CGSize(width: 260, height: 50)
+
+    @Test("the HUD sits top right under the bar by default, or where hud_position puts it")
+    func positions() {
+        #expect(hudOrigin(screen: screen, size: size, position: nil, barHeight: 34) == CGPoint(x: 730, y: 708))
+        #expect(hudOrigin(screen: screen, size: size, position: "top-left", barHeight: 34) == CGPoint(x: 10, y: 708))
+        #expect(hudOrigin(screen: screen, size: size, position: "top-center", barHeight: 34) == CGPoint(x: 370, y: 708))
+        #expect(hudOrigin(screen: screen, size: size, position: "center", barHeight: 34) == CGPoint(x: 370, y: 375))
+        #expect(hudOrigin(screen: screen, size: size, position: "bottom-center", barHeight: 34) == CGPoint(x: 370, y: 80))
+        #expect(hudOrigin(screen: screen, size: size, position: "nonsense", barHeight: 34) == CGPoint(x: 730, y: 708))
     }
 }

@@ -246,11 +246,13 @@ public struct SettingsReport {
     public var orderSaved: Bool          // bar-pills.conf names an order, so Reset Order has work
     public var debug: Bool               // debug = on: the bar logs its memory each minute
     public var huds: [Switch]            // the HUD and click switches, on the HUDs & Sounds page
+    public var hudPosition: String?      // hud_position; nil is top right
 
     public init(pills: [Pill], numbers: [Number] = [], files: [File] = [], theme: ThemeReport? = nil,
                 quitOnClose: QuitOnClose? = nil, order: [String] = [], orderSaved: Bool = false, debug: Bool = false,
-                huds: [Switch] = []) {
+                huds: [Switch] = [], hudPosition: String? = nil) {
         self.order = order
+        self.hudPosition = hudPosition
         self.huds = huds
         self.debug = debug
         self.orderSaved = orderSaved

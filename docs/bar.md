@@ -113,6 +113,7 @@ holds the HUD and click switches.
 | `keep_awake_battery = <percent>` | On battery, keep awake ends at this level. The default is 20; `off` or `0` stops the limit. |
 | `keep_awake_lid = off` | Keep awake no longer keeps the Mac awake with the lid closed. |
 | `quit_on_close = on` | Quit an app when its last window closes. Off by default. |
+| `hud_position = <place>` | Where the HUDs show: `top-right` (the default), `top-center`, `top-left`, `center` or `bottom-center`, on the screen with the pointer. |
 | `debug = on` | Write the bar's memory to `/tmp/omacchiato-bar.log` once a minute. Off by default. |
 
 The bar takes the volume keys and shows its own HUD, so the macOS HUD
