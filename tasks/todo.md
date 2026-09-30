@@ -20,6 +20,9 @@ Plan: `tasks/plan.md`.
 - [ ] S6 Units and Off on number rows (S)
 - [ ] S7 Tell Activity and Stats apart (XS)
 
+## Phase 3b: icons
+- [ ] S9 A searchable Nerd Font glyph picker (M)
+
 ## Phase 4: docs
 - [ ] S8 README.md and docs/bar.md (M)
 - [ ] Checkpoint C: tests pass; commit, push, release

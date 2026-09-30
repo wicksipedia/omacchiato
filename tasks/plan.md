@@ -95,6 +95,9 @@ git history (commit 257d382 and earlier).
 - [ ] S6: Units and Off on number rows
 - [ ] S7: Tell Activity and Stats apart
 
+### Phase 3b: icons
+- [ ] S9: A searchable Nerd Font glyph picker
+
 ### Phase 4: docs
 - [ ] S8: README.md and docs/bar.md
 
@@ -256,6 +259,31 @@ busiest apps. Stats is a plugin pill that shows one number in the bar.
 Say so in both summaries. Do not merge them.
 
 **Dependencies:** None. **Files:** helper/bar/Settings.swift. **Scope:** XS
+
+### S9: A searchable Nerd Font glyph picker
+
+**Description:** Today a plugin page offers about 30 icons and a field to
+paste one. Make one picker that searches every Nerd Font glyph by name
+("coffee", "github", "wifi"), from Nerd Fonts' `glyphnames.json`, which
+`install.sh` downloads at a pinned version and checksum, as it does for
+tokscale. The plugin Icon row uses it. The Config Files editor gets an
+"Insert Icon…" button that puts the chosen glyph at the cursor
+(`TextEditor(text:selection:)`). The editor font from 037c3a9 already
+draws the glyphs.
+
+**Acceptance criteria:**
+- [ ] A search for "coffee" finds the cup that the keep-awake pill uses
+- [ ] Insert Icon puts the glyph at the cursor in the open file
+- [ ] With no glyph file, the picker falls back to today's short list
+
+**Verification:**
+- [ ] A test for the search from a small sample of glyphnames.json;
+      `bash -n install.sh`; manual: insert an icon into bar-plugins.conf
+
+**Dependencies:** None
+**Files:** install.sh, SettingsView.swift, SettingsReport.swift,
+helper/bar/Settings.swift, tests
+**Scope:** M
 
 ### S8: README.md and docs/bar.md
 
