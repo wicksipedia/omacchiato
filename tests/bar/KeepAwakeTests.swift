@@ -29,4 +29,13 @@ import Testing
         #expect(keepAwakeDetail(.off, reason: "Timer ended", timeZone: calendar.timeZone, locale: Locale(identifier: "en_US")) == "Timer ended")
         #expect(keepAwakeDetail(.off, reason: nil, timeZone: calendar.timeZone, locale: Locale(identifier: "en_US")) == "Turned off")
     }
+
+    @Test("the jiggle runs every keep_awake_jiggle minutes, 1 by default, and off turns it off")
+    func jiggleEvery() {
+        #expect(jiggleInterval(nil) == 60)
+        #expect(jiggleInterval("3") == 180)
+        #expect(jiggleInterval("off") == nil)
+        #expect(jiggleInterval("0") == nil)
+        #expect(jiggleInterval("x") == 60)
+    }
 }

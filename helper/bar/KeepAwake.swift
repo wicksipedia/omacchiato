@@ -42,7 +42,27 @@ func keepAwakeDetail(_ state: KeepAwake, reason: String?, timeZone: TimeZone = .
     }
 }
 
+// Seconds between jiggles, from `keep_awake_jiggle` in minutes. nil is off.
+func jiggleInterval(_ mode: String?) -> TimeInterval? {
+    guard let mode else { return 60 }
+    if mode == "off" { return nil }
+    guard let minutes = Double(mode) else { return 60 }
+    return minutes > 0 ? minutes * 60 : nil
+}
+
+// A mouse-moved event at the pointer's own position resets the idle time
+// that Teams and Slack read, and the pointer does not move. It posts only
+// after 30 s idle, so it never lands in the middle of a drag.
+func jiggle() {
+    guard !screenLocked,
+          CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!) >= 30,
+          let at = CGEvent(source: nil)?.location else { return }
+    CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: at, mouseButton: .left)?
+        .post(tap: .cghidEventTap)
+}
+
 var keepAwakeAssertions: [IOPMAssertionID] = []
+var keepAwakeJiggle: Timer?
 var keepAwakeShown: KeepAwake?
 var keepAwakeHeldDisplay = false
 var keepAwakeEnd: Timer?
@@ -81,6 +101,11 @@ func applyKeepAwake(reason: String? = nil) {
             }
         }
         keepAwakeHeldDisplay = display
+    }
+    keepAwakeJiggle?.invalidate()
+    keepAwakeJiggle = nil
+    if state != .off, let every = jiggleInterval(pillModes["keep_awake_jiggle"]) {
+        keepAwakeJiggle = Timer.scheduledTimer(withTimeInterval: every, repeats: true) { _ in jiggle() }
     }
     keepAwakeEnd?.invalidate()
     keepAwakeEnd = nil
