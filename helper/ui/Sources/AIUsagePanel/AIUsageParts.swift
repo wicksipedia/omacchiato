@@ -352,15 +352,19 @@ struct ModelShare: View {
             }
             .frame(height: 10)
             .clipShape(.capsule)
-            LazyVGrid(columns: [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)],
-                      alignment: .leading, spacing: 4) {
-                ForEach(parts, id: \.0) { name, n, color in
-                    HStack(spacing: 4) {
-                        Circle().fill(color).frame(width: 7, height: 7)
-                        Text(name).foregroundStyle(.primary)
-                        Text(tokenText(n)).foregroundStyle(.secondary)
+            Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 4) {
+                ForEach(Array(stride(from: 0, to: parts.count, by: 2)), id: \.self) { i in
+                    GridRow {
+                        ForEach(parts[i..<min(i + 2, parts.count)], id: \.0) { name, n, color in
+                            HStack(spacing: 4) {
+                                Circle().fill(color).frame(width: 7, height: 7)
+                                Text(name).foregroundStyle(.primary)
+                                Text(tokenText(n)).foregroundStyle(.secondary)
+                            }
+                            .lineLimit(1)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
-                    .lineLimit(1)
                 }
             }
             .font(.system(size: 11))
