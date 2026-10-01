@@ -78,6 +78,8 @@ request() {
   done
   wait "$opener" 2>/dev/null
   grep -v '^done' "$out"
+  # an app that exits early leaves out some permissions
+  grep -q '^done' "$out" || echo incomplete
   rm -f "$out"
 }
 
@@ -100,14 +102,21 @@ open -gj -b com.apple.systemevents 2>/dev/null || true
 
 off=()
 unanswered=0
+missing=0
 for app in omacchiato-bar omacchiato-gesture; do
   if [ ! -d "$APPS/$app.app" ]; then
     say "$app is not installed"
+    missing=$((missing + 1))
     continue
   fi
   say "$app"
   while read -r key state; do
     [ -n "$key" ] || continue
+    if [ "$key" = incomplete ]; then
+      unanswered=$((unanswered + 1))
+      echo "    ❔ $app stopped before it checked every permission. Run omacchiato-permissions again"
+      continue
+    fi
     case "$state" in
       granted) echo "    ✅ $(label "$key")" ;;
       denied)
@@ -129,7 +138,10 @@ EOF
 done
 
 if [ ${#off[@]} -eq 0 ]; then
-  if [ "$unanswered" = 0 ]; then
+  if [ "$missing" != 0 ]; then
+    say "Not every Omacchiato app is installed. Run install.sh"
+    exit 1
+  elif [ "$unanswered" = 0 ]; then
     say "All Omacchiato permissions are on"
   else
     say "No permission is off, but the ❔ ones above have no answer yet"
