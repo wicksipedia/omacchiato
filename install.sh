@@ -202,14 +202,19 @@ fi
 # configs living under ~/Documents (TCC folder protection) without Full
 # Disk Access. The repo copy is the source of truth on install.
 mkdir -p "$HOME/.config/karabiner"
-# preserve a pre-omacchiato karabiner config once, for uninstall to restore
+# preserve a pre-omacchiato karabiner config once, for uninstall to restore.
+# A file that an earlier install wrote is not the user's: it differs from
+# the template once the OmniWM rules are in it, or after a template change.
 if [ -f "$HOME/.config/karabiner/karabiner.json" ] \
   && [ ! -f "$HOME/.config/karabiner/karabiner.json.bak.omacchiato" ] \
+  && ! have "karabiner-config-copied" \
+  && ! grep -qE '"(omacchiato|omacosy)-omniwm:' "$HOME/.config/karabiner/karabiner.json" \
   && ! cmp -s "$REPO_DIR/config/karabiner/karabiner.json" "$HOME/.config/karabiner/karabiner.json"; then
   cp "$HOME/.config/karabiner/karabiner.json" "$HOME/.config/karabiner/karabiner.json.bak.omacchiato"
   mark "had-karabiner-config"
 fi
 cp "$REPO_DIR/config/karabiner/karabiner.json" "$HOME/.config/karabiner/karabiner.json"
+mark "karabiner-config-copied"
 launchctl kickstart -k "gui/$(id -u)/org.pqrs.service.agent.karabiner_console_user_server" 2>/dev/null || true
 # Karabiner's Menu and NotificationWindow helpers are disabled the
 # SUPPORTED way in karabiner.json (global.show_in_menu_bar and

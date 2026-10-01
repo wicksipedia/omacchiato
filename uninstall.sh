@@ -139,8 +139,10 @@ done
 
 # Karabiner's config is a copied real file (its daemons can't read
 # ~/Documents). Restore a pre-omacchiato config if install backed one up,
-# otherwise remove our copy.
-if have "had-karabiner-config" && [ -f "$HOME/.config/karabiner/karabiner.json.bak.omacchiato" ]; then
+# otherwise remove our copy. An older install backed up its own file, with
+# the OmniWM rules in it, as the user's: that backup is not restored.
+if have "had-karabiner-config" && [ -f "$HOME/.config/karabiner/karabiner.json.bak.omacchiato" ] \
+  && ! grep -qE '"(omacchiato|omacosy)-omniwm:' "$HOME/.config/karabiner/karabiner.json.bak.omacchiato"; then
   log "Restoring pre-omacchiato karabiner.json"
   mv "$HOME/.config/karabiner/karabiner.json.bak.omacchiato" "$HOME/.config/karabiner/karabiner.json"
 else
