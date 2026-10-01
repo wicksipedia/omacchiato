@@ -21,6 +21,29 @@ mkdir -p "$STATE_DIR"
 touch "$MANIFEST"
 mark() { grep -qxF "$1" "$MANIFEST" || printf '%s\n' "$1" >> "$MANIFEST"; }
 have() { grep -qxF "$1" "$MANIFEST" 2>/dev/null; }
+
+# copy_config <template> <live> <name>: copy a config that is copied, not
+# linked. Keep the live file if it changed since the last install wrote
+# it: snapshot <name> holds that write. OMACCHIATO_RESET_CONFIG=1 replaces it.
+# An install from before the snapshots cannot tell, so it backs up the file.
+# Returns 1 only when it keeps the file: a failed copy stops the install.
+# The caller writes the new snapshot. Until then there is none, so a run
+# that stops between the two does not take the template for user edits.
+copy_config() {
+  local snap="$STATE_DIR/$3.installed"
+  if [ -f "$2" ] && [ "${OMACCHIATO_RESET_CONFIG:-}" != 1 ]; then
+    if [ -f "$snap" ] && ! cmp -s "$2" "$snap"; then
+      log "Keeping $2, which has changes of your own. OMACCHIATO_RESET_CONFIG=1 ./install.sh replaces it"
+      return 1
+    fi
+    if [ ! -f "$snap" ] && ! cmp -s "$1" "$2"; then
+      cp "$2" "$2.bak.$(date +%Y%m%d%H%M%S)" || { log "ERROR: cannot back up $2"; exit 1; }
+      log "Replacing $2. The old file is in $2.bak.*"
+    fi
+  fi
+  rm -f "$snap" || { log "ERROR: cannot remove $snap"; exit 1; }
+  cp "$1" "$2" || { log "ERROR: cannot copy $1 to $2"; exit 1; }
+}
 export MANIFEST
 
 # Configs are SYMLINKED into the repo so edits go live — but TCC walls
@@ -213,7 +236,9 @@ if [ -f "$HOME/.config/karabiner/karabiner.json" ] \
   cp "$HOME/.config/karabiner/karabiner.json" "$HOME/.config/karabiner/karabiner.json.bak.omacchiato"
   mark "had-karabiner-config"
 fi
-cp "$REPO_DIR/config/karabiner/karabiner.json" "$HOME/.config/karabiner/karabiner.json"
+KARABINER_COPIED=0
+copy_config "$REPO_DIR/config/karabiner/karabiner.json" "$HOME/.config/karabiner/karabiner.json" karabiner.json \
+  && KARABINER_COPIED=1
 mark "karabiner-config-copied"
 launchctl kickstart -k "gui/$(id -u)/org.pqrs.service.agent.karabiner_console_user_server" 2>/dev/null || true
 # Karabiner's Menu and NotificationWindow helpers are disabled the
@@ -369,9 +394,14 @@ mkdir -p "$HOME/.config/omacchiato"
 printf 'TERMINAL=%s\nBROWSER=%s\nMUSIC=%s\nMESSENGER=%s\n' \
   "$TERMINAL" "$BROWSER" "$MUSIC" "$MESSENGER" > "$HOME/.config/omacchiato/apps.conf"
 
-# after apps.conf, so the injected rules launch the user's chosen apps
-"$REPO_DIR/bin/omacchiato-karabiner-omniwm" install \
-  || log "WARNING: the OmniWM Karabiner rules did not install. Re-run install.sh."
+# after apps.conf, so the injected rules launch the user's chosen apps.
+# A kept karabiner.json is the user's, rules too, so it stays as it is.
+if [ "$KARABINER_COPIED" = 1 ]; then
+  "$REPO_DIR/bin/omacchiato-karabiner-omniwm" install \
+    || log "WARNING: the OmniWM Karabiner rules did not install. Re-run install.sh."
+  # the snapshot holds the rules too
+  cp "$HOME/.config/karabiner/karabiner.json" "$STATE_DIR/karabiner.json.installed"
+fi
 
 cat > "$HOME/Library/LaunchAgents/com.omacchiato.bar.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -567,7 +597,8 @@ fi
 GESTURE_APP="$HOME/.local/share/omacchiato/omacchiato-gesture.app"
 GESTURE_BIN="$GESTURE_APP/Contents/MacOS/omacchiato-gesture"
 mkdir -p "$HOME/.config/omacchiato"
-cp "$REPO_DIR/config/gesture/config.json" "$HOME/.config/omacchiato/gesture.json"
+copy_config "$REPO_DIR/config/gesture/config.json" "$HOME/.config/omacchiato/gesture.json" gesture.json \
+  && cp "$HOME/.config/omacchiato/gesture.json" "$STATE_DIR/gesture.json.installed"
 # the aerospace-swipe era: retire its agent, and its clone if it was ours
 if [ -f "$HOME/Library/LaunchAgents/com.acsandmann.swipe.plist" ]; then
   launchctl unload "$HOME/Library/LaunchAgents/com.acsandmann.swipe.plist" 2>/dev/null || true

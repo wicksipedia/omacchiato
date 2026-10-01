@@ -402,7 +402,11 @@ The design and the test results are in
 ## install.sh
 
 - It copies `config/gesture/config.json` to
-  `~/.config/omacchiato/gesture.json` on every run. The daemon serves
+  `~/.config/omacchiato/gesture.json`, and `config/karabiner/karabiner.json`
+  over the live file, through `copy_config`. If the user changed the live
+  file since the last install wrote it, `copy_config` keeps that file. A
+  snapshot in `~/.local/state/omacchiato/<name>.installed` holds the last
+  write. `OMACCHIATO_RESET_CONFIG=1` replaces the file. The daemon serves
   all four directions. The horizontal ones need
   `workspaceSwipeEnabled = false` in `settings.toml`, or both engines
   answer the same swipe.
