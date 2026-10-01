@@ -99,18 +99,32 @@ public struct AIUsageReport {
         public var models: [String: Int]    // tokens by model name
         public var cost: Double
         public var priorModels: [String: Int]  // tokens by model on the same weekday a week earlier
+        public var modelCosts: [String: Double]
+        public var priorCosts: [String: Double]
         public var id: Date { date }
 
-        public init(date: Date, models: [String: Int], cost: Double, priorModels: [String: Int] = [:]) {
+        public init(date: Date, models: [String: Int], cost: Double, priorModels: [String: Int] = [:],
+                    modelCosts: [String: Double]? = nil, priorCosts: [String: Double] = [:]) {
             self.date = date
             self.models = models
             self.cost = cost
             self.priorModels = priorModels
+            self.modelCosts = modelCosts ?? (cost > 0 ? ["Other": cost] : [:])
+            self.priorCosts = priorCosts
         }
 
         public var prior: Int { priorModels.values.reduce(0, +) }
 
         public var tokens: Int { models.values.reduce(0, +) }
+
+        public func values(_ measure: UsageMeasure) -> [String: Double] {
+            measure == .tokens ? models.mapValues(Double.init) : modelCosts
+        }
+        public func priorValues(_ measure: UsageMeasure) -> [String: Double] {
+            measure == .tokens ? priorModels.mapValues(Double.init) : priorCosts
+        }
+        public func total(_ measure: UsageMeasure) -> Double { values(measure).values.reduce(0, +) }
+        public func priorTotal(_ measure: UsageMeasure) -> Double { priorValues(measure).values.reduce(0, +) }
     }
 
     public struct Model: Identifiable {
@@ -120,6 +134,8 @@ public struct AIUsageReport {
         // A shade of the provider's colour. Nil takes the next colour of modelPalette.
         public var color: Color?
         public var id: String { name }
+
+        public func value(_ measure: UsageMeasure) -> Double { measure == .tokens ? Double(tokens) : cost }
 
         public init(name: String, tokens: Int, cost: Double, color: Color? = nil) {
             self.name = name
@@ -156,6 +172,13 @@ public struct AIUsageReport {
         priorTokens > 0 ? Double(weekTokens - priorTokens) / Double(priorTokens) : nil
     }
     public var weekCost: Double { days.reduce(0) { $0 + $1.cost } }
+
+    public func weekValue(_ measure: UsageMeasure) -> Double { days.reduce(0) { $0 + $1.total(measure) } }
+    public func priorValue(_ measure: UsageMeasure) -> Double { days.reduce(0) { $0 + $1.priorTotal(measure) } }
+    public func weekChange(_ measure: UsageMeasure) -> Double? {
+        let before = priorValue(measure)
+        return before > 0 ? (weekValue(measure) - before) / before : nil
+    }
     public var activeDays: Int { days.filter { $0.tokens > 0 }.count }
 
     // The models that get a colour of their own. The rest chart as "Other".
@@ -182,6 +205,14 @@ public func tokenText(_ n: Int) -> String {
         return String(format: "%.1f%@", d / size, unit)
     }
     return "\(n)"
+}
+
+// What the week chart counts. A click on the chart switches it.
+public enum UsageMeasure: String {
+    case tokens, cost
+
+    public var toggled: UsageMeasure { self == .tokens ? .cost : .tokens }
+    public func text(_ value: Double) -> String { self == .tokens ? tokenText(Int(value)) : dollarText(value) }
 }
 
 public func dollarText(_ amount: Double) -> String {
@@ -245,7 +276,9 @@ extension AIUsageReport {
             guard let date = (d["date"] as? String).flatMap(day.date(from:)) else { return nil }
             return Day(date: date, models: (d["models"] as? [String: Int]) ?? [:], cost: number(d["cost"]) ?? 0,
                        priorModels: (d["prior_models"] as? [String: Int])
-                           ?? ((d["prior"] as? Int).map { ["Other": $0] } ?? [:]))
+                           ?? ((d["prior"] as? Int).map { ["Other": $0] } ?? [:]),
+                       modelCosts: (d["model_costs"] as? [String: Any])?.compactMapValues(number),
+                       priorCosts: (d["prior_costs"] as? [String: Any])?.compactMapValues(number) ?? [:])
         }
         let models = list(json["models"]).map {
             Model(name: $0["name"] as? String ?? "", tokens: $0["tokens"] as? Int ?? 0, cost: number($0["cost"]) ?? 0,

@@ -182,46 +182,49 @@ struct PaceTrack: View {
     }
 }
 
-// Seven days of tokens, one bar a day, split by model as Screen Time
-// splits by category. The dashed line is the daily average.
+// Seven days of tokens or cost, one bar a day, split by model as Screen
+// Time splits by category. The dashed line is the daily average.
 struct WeekChart: View {
     var report: AIUsageReport
     var height: CGFloat = 110
+    var measure: UsageMeasure = .tokens
+    // A click on the chart calls this, to switch the measure.
+    var toggle: (() -> Void)?
     @State private var hovered: Date?
 
     struct Slice: Identifiable {
         var day: Date
         var model: String
-        var tokens: Int
+        var value: Double
         var id: String { "\(day.timeIntervalSince1970)\(model)" }
     }
 
     var slices: [Slice] {
         let top = report.topModels
         return report.days.flatMap { day -> [Slice] in
-            var other = 0
+            var other = 0.0
             var out: [Slice] = []
-            for (model, n) in day.models {
-                if top.contains(model) { out.append(Slice(day: day.date, model: model, tokens: n)) } else { other += n }
+            for (model, n) in day.values(measure) {
+                if top.contains(model) { out.append(Slice(day: day.date, model: model, value: n)) } else { other += n }
             }
             out.sort { (top.firstIndex(of: $0.model) ?? 9) < (top.firstIndex(of: $1.model) ?? 9) }
-            return other > 0 ? out + [Slice(day: day.date, model: "Other", tokens: other)] : out
+            return other > 0 ? out + [Slice(day: day.date, model: "Other", value: other)] : out
         }
     }
 
     var body: some View {
-        let mean = report.days.isEmpty ? 0 : report.weekTokens / report.days.count
+        let mean = report.days.isEmpty ? 0 : report.weekValue(measure) / Double(report.days.count)
         Chart {
             // the week before, faded behind each day
-            ForEach(report.days.filter { $0.prior > 0 }) { day in
-                RectangleMark(x: .value("Day", day.date, unit: .day), yStart: .value("Tokens", 0),
-                              yEnd: .value("Tokens", day.prior), width: .ratio(0.8))
+            ForEach(report.days.filter { $0.priorTotal(measure) > 0 }) { day in
+                RectangleMark(x: .value("Day", day.date, unit: .day), yStart: .value("Value", 0),
+                              yEnd: .value("Value", day.priorTotal(measure)), width: .ratio(0.8))
                     .foregroundStyle(.primary.opacity(0.12))
                     .clipShape(.rect(cornerRadius: 3))
                     .accessibilityLabel("Week before")
             }
             ForEach(slices) { s in
-                BarMark(x: .value("Day", s.day, unit: .day), y: .value("Tokens", s.tokens), width: .ratio(0.6))
+                BarMark(x: .value("Day", s.day, unit: .day), y: .value("Value", s.value), width: .ratio(0.6))
                     .foregroundStyle(by: .value("Model", s.model))
                     .clipShape(.rect(cornerRadius: 3))
                     .opacity(hovered == nil || hovered == s.day ? 1 : 0.35)
@@ -231,7 +234,8 @@ struct WeekChart: View {
                     .foregroundStyle(.clear)
                     .annotation(position: .top, spacing: 0,
                                 overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
-                        DayTooltip(day: day, top: report.topModels, colors: report.modelColors, today: report.now)
+                        DayTooltip(day: day, top: report.topModels, colors: report.modelColors, today: report.now,
+                                   measure: measure)
                     }
             }
             if mean > 0 {
@@ -258,7 +262,7 @@ struct WeekChart: View {
         .chartYAxis {
             AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { value in
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                AxisValueLabel { if let n = value.as(Int.self) { Text(tokenText(n)) } }
+                AxisValueLabel { if let n = value.as(Double.self) { Text(measure.text(n)) } }
             }
         }
         .chartOverlay { proxy in
@@ -271,31 +275,33 @@ struct WeekChart: View {
                         let day = Calendar.current.startOfDay(for: date)
                         hovered = report.days.contains { $0.date == day } ? day : nil
                     }
+                    .onTapGesture { toggle?() }
             }
         }
         .frame(height: height)
     }
 }
 
-// A day's tokens by model, beside the same weekday a week earlier.
+// A day's tokens or cost by model, beside the same weekday a week earlier.
 struct DayTooltip: View {
     var day: AIUsageReport.Day
     var top: [String]
     var colors: [Color]
     var today: Date
+    var measure: UsageMeasure = .tokens
 
     // The chart's own groups: the top models, then the rest as Other.
-    func grouped(_ models: [String: Int]) -> [String: Int] {
+    func grouped(_ models: [String: Double]) -> [String: Double] {
         models.reduce(into: [:]) { out, pair in out[top.contains(pair.key) ? pair.key : "Other", default: 0] += pair.value }
     }
 
     // Green for more than last week and red for less, as the week headline shows it.
-    func tint(_ now: Int, _ before: Int) -> Color {
+    func tint(_ now: Double, _ before: Double) -> Color {
         now == before ? .primary : (now > before ? PanelColors.green : PanelColors.red)
     }
 
     var body: some View {
-        let now = grouped(day.models), before = grouped(day.priorModels)
+        let now = grouped(day.values(measure)), before = grouped(day.priorValues(measure))
         let names = (top + ["Other"]).filter { now[$0] != nil || before[$0] != nil }
         Grid(alignment: .trailing, horizontalSpacing: 10, verticalSpacing: 3) {
             GridRow {
@@ -312,15 +318,16 @@ struct DayTooltip: View {
                         Circle().fill(colors[top.firstIndex(of: name) ?? top.count]).frame(width: 7, height: 7)
                         Text(name)
                     }
-                    Text(now[name].map(tokenText) ?? "–").foregroundStyle(tint(now[name] ?? 0, before[name] ?? 0))
-                    Text(before[name].map(tokenText) ?? "–").foregroundStyle(.secondary)
+                    Text(now[name].map(measure.text) ?? "–").foregroundStyle(tint(now[name] ?? 0, before[name] ?? 0))
+                    Text(before[name].map(measure.text) ?? "–").foregroundStyle(.secondary)
                 }
             }
             Divider().gridCellUnsizedAxes(.horizontal)
             GridRow {
                 Text("Total").fontWeight(.semibold)
-                Text(tokenText(day.tokens)).fontWeight(.semibold).foregroundStyle(tint(day.tokens, day.prior))
-                Text(tokenText(day.prior)).foregroundStyle(.secondary)
+                let total = day.total(measure), prior = day.priorTotal(measure)
+                Text(measure.text(total)).fontWeight(.semibold).foregroundStyle(tint(total, prior))
+                Text(measure.text(prior)).foregroundStyle(.secondary)
             }
         }
         .font(.system(size: 11))
@@ -332,16 +339,18 @@ struct DayTooltip: View {
     }
 }
 
-// The week's tokens by model, as iPhone Storage shows space by app.
+// The week's tokens or cost by model, as iPhone Storage shows space by app.
 struct ModelShare: View {
     var report: AIUsageReport
+    var measure: UsageMeasure = .tokens
 
     var body: some View {
-        let total = max(1, report.weekTokens)
+        let week = report.weekValue(measure)
+        let total = week > 0 ? week : 1
         let shown = Array(report.models.prefix(3))
-        let other = report.weekTokens - shown.reduce(0) { $0 + $1.tokens }
+        let other = week - shown.reduce(0) { $0 + $1.value(measure) }
         let colors = report.modelColors
-        let parts: [(String, Int, Color)] = shown.enumerated().map { ($1.name, $1.tokens, colors[$0]) }
+        let parts: [(String, Double, Color)] = shown.enumerated().map { ($1.name, $1.value(measure), colors[$0]) }
             + (other > 0 ? [("Other", other, colors[shown.count])] : [])
         VStack(alignment: .leading, spacing: 8) {
             GeometryReader { geo in
@@ -361,7 +370,7 @@ struct ModelShare: View {
                             HStack(spacing: 4) {
                                 Circle().fill(color).frame(width: 7, height: 7)
                                 Text(name).foregroundStyle(.primary)
-                                Text(tokenText(n)).foregroundStyle(.secondary)
+                                Text(measure.text(n)).foregroundStyle(.secondary)
                             }
                             .lineLimit(1)
                             .frame(maxWidth: .infinity, alignment: .leading)

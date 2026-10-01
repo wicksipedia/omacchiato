@@ -10,6 +10,8 @@ import StatusPanel
 public struct RingsAIUsagePanel: View {
     var report: AIUsageReport
     var actions: AIUsageActions
+    // the bar's defaults keep it, so the panel opens on the last choice
+    @AppStorage("aiUsageMeasure") private var measure = UsageMeasure.tokens
 
     public init(report: AIUsageReport, actions: AIUsageActions = .init()) {
         self.report = report
@@ -34,9 +36,9 @@ public struct RingsAIUsagePanel: View {
             }
             if !report.days.isEmpty {
                 PanelCard(title: "Last 7 Days", symbol: "chart.bar.fill") {
-                    WeekHeadline(report: report)
-                    WeekChart(report: report)
-                    ModelShare(report: report).padding(.top, 4)
+                    WeekHeadline(report: report, measure: measure)
+                    WeekChart(report: report, measure: measure) { measure = measure.toggled }
+                    ModelShare(report: report, measure: measure).padding(.top, 4)
                 }
             }
             UpdatedStamp(report.updated, staleAfter: aiUsageStaleAfter, refresh: actions.refresh)
@@ -78,19 +80,23 @@ public struct RingsAIUsagePanel: View {
     }
 }
 
+// The measure of the chart leads, and the other one follows on the right.
 struct WeekHeadline: View {
     var report: AIUsageReport
+    var measure: UsageMeasure = .tokens
 
     var body: some View {
+        let tokens = (tokenText(report.weekTokens), "tokens"), cost = (dollarText(report.weekCost), "at API prices")
+        let (lead, follow) = measure == .tokens ? (tokens, cost) : (cost, tokens)
         VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(tokenText(report.weekTokens)).font(.system(size: 22, weight: .semibold, design: .rounded))
-                Text("tokens").font(.system(size: 12)).foregroundStyle(.secondary)
+                Text(lead.0).font(.system(size: 22, weight: .semibold, design: .rounded))
+                Text(lead.1).font(.system(size: 12)).foregroundStyle(.secondary)
                 Spacer()
-                Text(dollarText(report.weekCost)).font(.system(size: 15, weight: .semibold, design: .rounded))
-                Text("at API prices").font(.system(size: 11)).foregroundStyle(.secondary)
+                Text(follow.0).font(.system(size: 15, weight: .semibold, design: .rounded))
+                Text(follow.1).font(.system(size: 11)).foregroundStyle(.secondary)
             }
-            if let change = report.weekChange {
+            if let change = report.weekChange(measure) {
                 WeekChange(change: change)
             }
         }

@@ -51,4 +51,18 @@ import Testing
         let report = try #require(AIUsageReport(json: ["kind": "ai-usage", "providers": []], now: now))
         #expect(report.updated == now)
     }
+
+    @Test("the week counts tokens or cost by model, and an older cache charts its cost as Other")
+    func measures() throws {
+        let report = try #require(AIUsageReport(json: ["kind": "ai-usage", "providers": [], "days": [
+            ["date": "2026-10-01", "models": ["Opus 5.5": 300], "cost": 3.0,
+             "model_costs": ["Opus 5.5": 3.0], "prior_models": ["Opus 5.5": 100], "prior_costs": ["Opus 5.5": 2.0]],
+            ["date": "2026-10-02", "models": ["Opus 5.5": 100], "cost": 1.5],
+        ]]))
+        #expect(report.weekValue(.tokens) == 400)
+        #expect(report.weekValue(.cost) == 4.5)
+        #expect(report.days[1].values(.cost) == ["Other": 1.5])
+        #expect(report.weekChange(.cost) == 1.25)
+        #expect(UsageMeasure.cost.text(4.5) == "$4.50")
+    }
 }

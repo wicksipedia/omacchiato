@@ -294,19 +294,21 @@ def week_stats(entry, tokscale, clients):
         r = subprocess.run([tokscale, "graph", "--week", "-c", key, "--no-spinner"],
                            capture_output=True, text=True, timeout=STATS_TIMEOUT_S)
         graph = json.loads(r.stdout)
-        days, day_models, models, clients = {}, {}, {}, {}
+        days, day_models, day_costs, models, clients = {}, {}, {}, {}, {}
         for day in graph["contributions"]:
             days[day["date"]] = [day["totals"]["tokens"], day["totals"].get("cost", 0)]
             split = day_models.setdefault(day["date"], {})
+            spent = day_costs.setdefault(day["date"], {})
             for use in day.get("clients") or []:
                 n = sum(use["tokens"].values())
                 name = model_name(use["modelId"])
                 split[name] = split.get(name, 0) + n
+                spent[name] = spent.get(name, 0) + use.get("cost", 0)
                 tokens, cost = models.get(use["modelId"], [0, 0])
                 models[use["modelId"]] = [tokens + n, cost + use.get("cost", 0)]
                 clients[use["modelId"]] = use.get("client")
         metrics = graph.get("timeMetrics") or {}
-        stats = {"days": days, "day_models": day_models,
+        stats = {"days": days, "day_models": day_models, "day_costs": day_costs,
                  "models": sorted(([m] + v for m, v in models.items()), key=lambda m: -m[1]),
                  "clients": clients,
                  "sessions": metrics.get("sessionCount", 0),
@@ -315,7 +317,9 @@ def week_stats(entry, tokscale, clients):
     except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError, AttributeError):
         pass  # keep the last week on screen
     if stats is not None:
-        stats["prior"] = prior_week(tokscale, key) or stats.get("prior") or {}
+        tokens, costs = prior_week(tokscale, key) or (None, None)
+        stats["prior"] = tokens or stats.get("prior") or {}
+        stats["prior_costs"] = costs or stats.get("prior_costs") or {}
     # a failed read waits too, so a broken tokscale does not run on every refresh
     entry.update({"week": stats, "week_at": NOW, "week_key": key})
     write_cache(entry)
@@ -323,20 +327,22 @@ def week_stats(entry, tokscale, clients):
 
 
 def prior_week(tokscale, key):
-    """Tokens a day by model in the seven days before the last seven, for the faded bars."""
+    """Tokens and cost a day by model in the seven days before the last seven, for the faded bars."""
     today = datetime.now().date()
     try:
         r = subprocess.run([tokscale, "graph", "-c", key, "--no-spinner",
                             "--since", (today - timedelta(days=13)).isoformat(),
                             "--until", (today - timedelta(days=7)).isoformat()],
                            capture_output=True, text=True, timeout=STATS_TIMEOUT_S)
-        days = {}
+        days, costs = {}, {}
         for day in json.loads(r.stdout)["contributions"]:
             split = days.setdefault(day["date"], {})
+            spent = costs.setdefault(day["date"], {})
             for use in day.get("clients") or []:
                 name = model_name(use["modelId"])
                 split[name] = split.get(name, 0) + sum(use["tokens"].values())
-        return days
+                spent[name] = spent.get(name, 0) + use.get("cost", 0)
+        return days, costs
     except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
         return None
 
@@ -445,16 +451,22 @@ def panel(quotas, states, stats, updated):
         week = [(today - timedelta(days=n)).isoformat() for n in range(6, -1, -1)]
         split = stats.get("day_models") or {}
         prior = stats.get("prior") or {}
+        prior_costs = stats.get("prior_costs") or {}
+        costs = stats.get("day_costs") or {}
         out["days"] = []
         for day in week:
             tokens, cost = stats["days"].get(day, [0, 0])
             # a week cached before day_models existed has no split
             models = split.get(day) or ({"Other": tokens} if tokens else {})
-            before = prior.get((datetime.fromisoformat(day).date() - timedelta(days=7)).isoformat()) or {}
+            week_before = (datetime.fromisoformat(day).date() - timedelta(days=7)).isoformat()
+            before = prior.get(week_before) or {}
             # a week cached before the split held one total a day
             before = before if isinstance(before, dict) else {"Other": before}
+            # a week cached before the costs by model had only the day's cost
+            model_costs = costs.get(day) or ({"Other": cost} if cost else {})
             out["days"].append({"date": day, "models": models, "cost": cost,
-                                "prior": sum(before.values()), "prior_models": before})
+                                "prior": sum(before.values()), "prior_models": before,
+                                "model_costs": model_costs, "prior_costs": prior_costs.get(week_before) or {}})
         out["models"] = model_colours(chart_order(stats["models"], stats.get("clients") or {}),
                                       stats.get("clients") or {})
         out["sessions"] = stats["sessions"]

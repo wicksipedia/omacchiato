@@ -85,6 +85,8 @@ class Panel(unittest.TestCase):
         self.assertEqual(days[-1]["prior_models"], {"Opus 5.5": 200, "Sonnet 5": 100})
         self.assertEqual((days[0]["prior"], days[0]["prior_models"]), (40, {"Other": 40}))
         self.assertEqual(sum(d["prior"] for d in days), 340)
+        self.assertEqual(days[-1]["model_costs"], {"Other": 1.0})
+        self.assertEqual(days[-1]["prior_costs"], {})
 
 
     def test_each_client_gets_a_chart_colour(self):
