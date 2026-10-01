@@ -143,7 +143,9 @@ struct ShellResult {
 }
 
 // Kills the whole process tree after `timeout` seconds, not just the top
-// pid: a child of sh -c can hold the pipe open on its own.
+// pid: a child of sh -c can hold the pipe open on its own. SIGKILL follows
+// SIGTERM after 2 s. If a pipe still does not close, for example because
+// an orphan holds it, the call returns anyway and leaves that reader behind.
 func execute(_ launch: String, _ args: [String], env: [String: String]? = nil,
              timeout: TimeInterval? = nil) -> ShellResult {
     let p = Process()
@@ -154,19 +156,33 @@ func execute(_ launch: String, _ args: [String], env: [String: String]? = nil,
     let errPipe = Pipe()
     p.standardOutput = pipe
     p.standardError = errPipe
-    let started = Date()
+    let exited = DispatchGroup()
+    exited.enter()
+    p.terminationHandler = { _ in exited.leave() }
     guard (try? p.run()) != nil else { return ShellResult(err: "cannot start \(launch)") }
-    // Read stderr at the same time, or a full stderr pipe blocks the command.
-    var errData = Data()
-    let errRead = DispatchGroup()
-    errRead.enter()
-    DispatchQueue.global().async {
-        errData = errPipe.fileHandleForReading.readDataToEndOfFile()
-        errRead.leave()
+    // Read both pipes at the same time, or a full stderr pipe blocks the command.
+    var outData = Data(), errData = Data()
+    let outRead = DispatchGroup(), errRead = DispatchGroup(), all = DispatchGroup()
+    for (group, handle, isOut) in [(outRead, pipe, true), (errRead, errPipe, false)] {
+        group.enter()
+        all.enter()
+        DispatchQueue.global().async {
+            let data = handle.fileHandleForReading.readDataToEndOfFile()
+            if isOut { outData = data } else { errData = data }
+            group.leave()
+            all.leave()
+        }
     }
-    let stop = DispatchWorkItem {
-        guard p.isRunning else { return }
+    all.enter()
+    DispatchQueue.global().async {
+        exited.wait()
+        all.leave()
+    }
+    let timedOut = all.wait(timeout: timeout.map { .now() + $0 } ?? .distantFuture) == .timedOut
+    if timedOut {
         tlog("shell timeout \(launch) \(args.prefix(2).joined(separator: " "))")
+        // Find the tree once: a child of a parent that SIGTERM ends moves to
+        // launchd, and pgrep -P no longer finds it.
         var tree = [p.processIdentifier]
         var next = 0
         while next < tree.count {
@@ -175,16 +191,16 @@ func execute(_ launch: String, _ args: [String], env: [String: String]? = nil,
             next += 1
         }
         for pid in tree { kill(pid, SIGTERM) }
+        // a child can close its pipes and ignore SIGTERM, so watch each pid
+        for _ in 0..<40 where tree.contains(where: { kill($0, 0) == 0 }) { usleep(50_000) }
+        for pid in tree where kill(pid, 0) == 0 { kill(pid, SIGKILL) }
+        _ = all.wait(timeout: .now() + 1)
     }
-    if let timeout { DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: stop) }
-    let out = pipe.fileHandleForReading.readDataToEndOfFile()
-    stop.cancel()
-    p.waitUntilExit()
-    errRead.wait()
-    let stopped = p.terminationReason == .uncaughtSignal && Date().timeIntervalSince(started) >= (timeout ?? .infinity)
-    return ShellResult(out: String(data: out, encoding: .utf8) ?? "",
-                       err: String(data: errData, encoding: .utf8) ?? "",
-                       status: p.terminationStatus, timedOut: stopped)
+    // a reader that has not finished still owns its buffer
+    let done = { (g: DispatchGroup) in g.wait(timeout: .now()) == .success }
+    return ShellResult(out: done(outRead) ? String(data: outData, encoding: .utf8) ?? "" : "",
+                       err: done(errRead) ? String(data: errData, encoding: .utf8) ?? "" : "",
+                       status: done(exited) ? p.terminationStatus : -1, timedOut: timedOut)
 }
 
 // Read palette only on the main thread. A theme switch can rewrite it there

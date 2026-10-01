@@ -229,4 +229,45 @@ struct BarTests {
         #expect(menuBadge("System Settings…") == ("System Settings…", ""))
         #expect(menuBadge("Log Out Matt Wicks…") == ("Log Out Matt Wicks…", ""))
     }
+
+    @Test("a command that closes its pipes and hangs still times out")
+    func executeTimesOut() {
+        let started = Date()
+        let result = execute("/bin/sh", ["-c", "echo hi; exec >&- 2>&-; sleep 30"], timeout: 1)
+        #expect(result.timedOut)
+        #expect(result.out == "hi\n")
+        #expect(Date().timeIntervalSince(started) < 5)
+    }
+
+    @Test("a child that ignores SIGTERM still dies when its shell does")
+    func executeKillsChild() {
+        let started = Date()
+        let result = execute("/bin/sh", ["-c", "(trap '' TERM; sleep 31.25) & wait"], timeout: 1)
+        #expect(result.timedOut)
+        #expect(Date().timeIntervalSince(started) < 6)
+        // launchd reaps the killed orphan a moment later
+        var left = "x"
+        for _ in 0..<20 where !left.isEmpty {
+            left = shell("/usr/bin/pgrep", ["-xf", "sleep 31.25"])
+            if !left.isEmpty { usleep(50_000) }
+        }
+        #expect(left.isEmpty)
+    }
+
+    @Test("a child that ignores SIGTERM and closes its pipes still dies")
+    func executeKillsQuietChild() {
+        _ = execute("/bin/sh", ["-c", "(trap '' TERM; exec >/dev/null 2>&1; sleep 31.75) & wait"], timeout: 1)
+        var left = "x"
+        for _ in 0..<20 where !left.isEmpty {
+            left = shell("/usr/bin/pgrep", ["-xf", "sleep 31.75"])
+            if !left.isEmpty { usleep(50_000) }
+        }
+        #expect(left.isEmpty)
+    }
+
+    @Test("a quick command returns its output and status")
+    func executeReturns() {
+        let result = execute("/bin/sh", ["-c", "echo out; echo err >&2; exit 3"], timeout: 5)
+        #expect((result.out, result.err, result.status, result.timedOut) == ("out\n", "err\n", 3, false))
+    }
 }
