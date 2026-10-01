@@ -39,6 +39,9 @@ public struct KeepAwakeActions {
     public var openSettings: () -> Void = {}
     // Runs omacchiato-keep-awake with "toggle", "on", "off" or "for <minutes>".
     public var set: (String) -> Void = { _ in }
+    public var lidClosed: Bool?                      // nil draws no switch
+    public var lidRuleMissing = false                // pmset needs the sudoers rule of omacchiato-lid-rule
+    public var setLidClosed: (Bool) -> Void = { _ in }
 
     public init() {}
 }

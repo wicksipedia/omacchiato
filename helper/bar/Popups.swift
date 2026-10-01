@@ -182,6 +182,9 @@ func panelContent(_ name: String) -> AnyView? {
         if let report = KeepAwakeReport(json: json) {
             var actions = KeepAwakeActions()
             actions.openSettings = openBatterySettings
+            actions.lidClosed = pillModes["keep_awake_lid"] != "off"
+            actions.lidRuleMissing = !FileManager.default.fileExists(atPath: "/etc/sudoers.d/omacchiato-keep-awake")
+            actions.setLidClosed = { settingsActions.set("keep_awake_lid", $0 ? nil : "off") }
             if let program = barPlugins.first(where: { $0.name == name })?.command.split(separator: " ").first {
                 actions.set = { runPluginCommand(name, "\(program) \($0)") }
             }

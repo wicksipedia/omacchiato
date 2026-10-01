@@ -40,6 +40,11 @@ extension KeepAwakeReport {
     Desk { KeepAwakePanel(report: KeepAwakeReport(on: true, until: Date().addingTimeInterval(3600), last: "for 60",
                                                 holders: KeepAwakeReport.few.holders)) }
 }
+#Preview("Lid switch") {
+    var actions = KeepAwakeActions()
+    actions.lidClosed = true
+    return Desk { KeepAwakePanel(report: KeepAwakeReport(on: true, holders: KeepAwakeReport.one.holders), actions: actions) }
+}
 #Preview("Light") { Desk(colors: [.mint, .cyan, .teal]) { KeepAwakePanel(report: .few) }.preferredColorScheme(.light) }
 #Preview("Keep awake HUD") {
     Desk {

@@ -43,6 +43,10 @@ public struct KeepAwakePanel: View {
                 }
                 .padding(.horizontal, 6)
                 .padding(.bottom, 4)
+                if let lid = actions.lidClosed {
+                    ControlTile(title: "Stay Awake with Lid Closed", subtitle: lidSubtitle(lid),
+                                symbol: "laptopcomputer", on: lid) { actions.setLidClosed(!lid) }
+                }
             }
             PanelCard(title: "Also Keeping Awake", symbol: "cup.and.saucer.fill") {
                 if report.holders.isEmpty {
@@ -69,6 +73,11 @@ public struct KeepAwakePanel: View {
     }
 
     var shownCustom: Int { customPick ?? custom ?? 45 }
+
+    func lidSubtitle(_ on: Bool) -> String {
+        guard on else { return "Off" }
+        return actions.lidRuleMissing ? "Run omacchiato-lid-rule install" : "On"
+    }
 
     var subtitle: String {
         guard report.on else { return "Off" }
