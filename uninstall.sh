@@ -157,6 +157,13 @@ if [ ! -e "$HOME/.zshrc" ] && [ -f "$HOME/Documents/config/.dotfiles/zshrc" ]; t
   ln -s "$HOME/Documents/config/.dotfiles/zshrc" "$HOME/.zshrc"
 fi
 
+# the herdr keys that install.sh added, while they are as it wrote them
+if [ -f "$HOME/.config/herdr/config.toml" ] \
+  && [ -n "$("$REPO_DIR/bin/omacchiato-herdr-keys" remove "$HOME/.config/herdr/config.toml" "$REPO_DIR/config/herdr/keys.toml")" ]; then
+  log "Removed the omacchiato keys from the herdr config"
+  herdr server reload-config >/dev/null 2>&1 || true
+fi
+
 # the keep-awake lid rule, and the Mac's normal sleep with the lid closed
 "$REPO_DIR/bin/omacchiato-lid-rule" remove || true
 

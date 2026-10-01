@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+"""Add or remove the omacchiato keys in a herdr config.
+
+    omacchiato-herdr-keys <add|remove> <config.toml> <keys.toml>
+
+add appends keys.toml between two marker lines, and only to a config with
+no keys table, so keys that the user set stay. remove takes out that block
+while it is the same as keys.toml, and an older install's block, which had
+no markers, also with the comment of an omacosy install. A block that the
+user changed stays, with a warning.
+"""
+import re
+import sys
+
+START = "# >>> omacchiato keys\n"
+END = "# <<< omacchiato keys\n"
+
+
+def add(text, keys):
+    if re.search(r"^\s*\[\[?keys[].]", text, re.M):
+        return text
+    return text + ("\n" if text else "") + START + keys + END
+
+
+def remove(text, keys):
+    """The config without the block, or None if it holds no block to remove."""
+    if START in text and END in text:
+        a = text.index(START)
+        b = text.index(END, a) + len(END)
+        if text[a + len(START):b - len(END)] != keys:
+            return None
+    else:
+        # migrate-omacosy.sh renames the commands but not the comment
+        old = next((k for k in (keys, keys.replace("# omacchiato:", "# omacosy:", 1)) if k in text), None)
+        if old is None:
+            return None
+        a = text.index(old)
+        b = a + len(old)
+    # a line that the user added after the block belongs to its last table
+    nxt = next((l for l in text[b:].splitlines() if l.strip() and not l.lstrip().startswith("#")), None)
+    if nxt is not None and not nxt.lstrip().startswith("["):
+        return None
+    # add() put a blank line before the block
+    if text[:a].endswith("\n\n"):
+        a -= 1
+    return text[:a] + text[b:]
+
+
+def main():
+    action, config, keys_file = sys.argv[1:4]
+    keys = open(keys_file).read()
+    try:
+        text = open(config).read()
+    except FileNotFoundError:
+        text = ""
+    if action == "add":
+        new = add(text, keys)
+    else:
+        new = remove(text, keys)
+        if new is None:
+            if START in text:
+                print("omacchiato-herdr-keys: the keys block in %s has changes, so it stays" % config,
+                      file=sys.stderr)
+            return
+    if new != text:
+        with open(config, "w") as f:
+            f.write(new)
+        print("changed")
+
+
+if __name__ == "__main__":
+    main()

@@ -213,10 +213,9 @@ mkdir -p "$HOME/.config/omniwm"
 if command -v herdr >/dev/null 2>&1; then
   HERDR_CFG="$HOME/.config/herdr/config.toml"
   mkdir -p "$(dirname "$HERDR_CFG")"
-  touch "$HERDR_CFG"
-  if ! grep -qE '^[[:space:]]*\[\[?keys[].]' "$HERDR_CFG"; then
-    printf '\n' >> "$HERDR_CFG"
-    cat "$REPO_DIR/config/herdr/keys.toml" >> "$HERDR_CFG"
+  # an assignment, so a failure stops the install
+  HERDR_CHANGED="$("$REPO_DIR/bin/omacchiato-herdr-keys" add "$HERDR_CFG" "$REPO_DIR/config/herdr/keys.toml")"
+  if [ -n "$HERDR_CHANGED" ]; then
     herdr server reload-config >/dev/null 2>&1 || true
   fi
 fi
