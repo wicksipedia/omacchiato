@@ -157,7 +157,8 @@ def render(on, until, awake, now, script, last="on"):
     rows += [{"text": name, "detail": duration(age)} for name, _, age in awake]
     panel = {"kind": "keep-awake", "on": on, "until": until, "last": last,
              "holders": [panel_holder(*h) for h in awake]}
-    return {"label": time_left(until, now) if on and until else "", "icon": AWAKE_ICON,
+    label = (time_left(until, now) if until else "∞") if on else ""
+    return {"label": label, "icon": AWAKE_ICON,
             "color": "accent" if on or awake else "muted", "right_click": script + " toggle",
             "rows": rows, "panel": panel}
 

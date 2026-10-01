@@ -68,9 +68,9 @@ class Pill(unittest.TestCase):
         self.assertEqual(p["right_click"], "/bin/ka toggle")
         self.assertEqual((p["panel"]["on"], p["panel"]["until"], p["panel"]["last"]), (False, None, "on"))
 
-    def test_on_shows_the_accent_cup(self):
+    def test_on_with_no_timer_shows_the_accent_cup_and_infinity(self):
         p = ka.render(True, None, [], 100, "/bin/ka")
-        self.assertEqual((p["color"], p["label"]), ("accent", ""))
+        self.assertEqual((p["color"], p["label"]), ("accent", "∞"))
         self.assertTrue(p["panel"]["on"])
 
     def test_the_panel_carries_the_last_chosen_time(self):

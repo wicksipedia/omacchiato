@@ -337,7 +337,8 @@ popup rows, and the bar draws the result. The format is under
   until GitHub updates it again, and its notification is marked read.
 - **Keep awake** (`omacchiato-keep-awake`): a cup, dimmed while the Mac
   may sleep, in the accent colour while Omacchiato or another app keeps
-  it awake. A right-click or `Super+Esc` turns keep awake on or off,
+  it awake. While Omacchiato keeps it awake, the pill shows the time
+  left, or ∞ with no timer. A right-click or `Super+Esc` turns keep awake on or off,
   for the time chosen last. The popup has the switch, buttons for 30
   minutes, 1 hour, 2 hours and until turned off, a custom time in
   15-minute steps, and the other apps that hold the Mac awake, read
