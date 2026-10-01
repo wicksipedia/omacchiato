@@ -107,7 +107,7 @@ fi
 
 COUNT="$(git -C "$REPO" rev-list --count "$LOCAL..$REMOTE")"
 say "$COUNT new commit(s):"
-git -C "$REPO" log --no-merges --format='    %h %s' "$LOCAL..$REMOTE" | head -20
+git -C "$REPO" log --no-merges -20 --format='    %h %s' "$LOCAL..$REMOTE"
 [ "$COUNT" -gt 20 ] && say "    ... and $((COUNT - 20)) more"
 
 if [ -n "$CHECK" ]; then
