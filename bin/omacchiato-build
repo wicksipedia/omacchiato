@@ -23,11 +23,14 @@ sign() {
   local id=$1 path=$2
   shift 2
   if [ -n "$IDENTITY" ]; then
-    codesign -f -s "$IDENTITY" --identifier "$id" ${1+"$@"} "$path" 2>/dev/null ||
-      echo "omacchiato-build: could not sign $path" >&2
+    # an unsigned binary loses its TCC grants, so stop here
+    codesign -f -s "$IDENTITY" --identifier "$id" ${1+"$@"} "$path" || {
+      echo "omacchiato-build: could not sign $path with $IDENTITY" >&2
+      exit 1
+    }
   elif [ $# -gt 0 ]; then
     # the entitlements need a signature, so an ad-hoc one carries them
-    codesign -f --sign - "$@" "$path" 2>/dev/null || echo "omacchiato-build: could not sign $path" >&2
+    codesign -f --sign - "$@" "$path" || { echo "omacchiato-build: could not sign $path" >&2; exit 1; }
   fi
 }
 
