@@ -165,7 +165,7 @@ public struct ScreenTimeAIUsagePanel: View {
                                 Text("\(tokenText(model.tokens)) · \(dollarText(model.cost))")
                                     .font(.system(size: 11)).foregroundStyle(.secondary)
                             }
-                            Capsule().fill(modelPalette[i])
+                            Capsule().fill(report.modelColors[i])
                                 .frame(width: max(4, 290 * CGFloat(model.tokens) / CGFloat(max(1, top))), height: 5)
                         }
                     }

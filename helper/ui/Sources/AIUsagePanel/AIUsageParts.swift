@@ -231,7 +231,7 @@ struct WeekChart: View {
                     .foregroundStyle(.clear)
                     .annotation(position: .top, spacing: 0,
                                 overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
-                        DayTooltip(day: day, top: report.topModels, today: report.now)
+                        DayTooltip(day: day, top: report.topModels, colors: report.modelColors, today: report.now)
                     }
             }
             if mean > 0 {
@@ -243,7 +243,7 @@ struct WeekChart: View {
                     }
             }
         }
-        .chartForegroundStyleScale(domain: report.topModels + ["Other"], range: modelPalette)
+        .chartForegroundStyleScale(domain: report.topModels + ["Other"], range: report.modelColors)
         .chartLegend(.hidden)
         .chartXAxis {
             AxisMarks(values: .stride(by: .day)) { value in
@@ -281,6 +281,7 @@ struct WeekChart: View {
 struct DayTooltip: View {
     var day: AIUsageReport.Day
     var top: [String]
+    var colors: [Color]
     var today: Date
 
     // The chart's own groups: the top models, then the rest as Other.
@@ -308,7 +309,7 @@ struct DayTooltip: View {
             ForEach(names, id: \.self) { name in
                 GridRow {
                     HStack(spacing: 5) {
-                        Circle().fill(modelPalette[top.firstIndex(of: name) ?? 3]).frame(width: 7, height: 7)
+                        Circle().fill(colors[top.firstIndex(of: name) ?? top.count]).frame(width: 7, height: 7)
                         Text(name)
                     }
                     Text(now[name].map(tokenText) ?? "–").foregroundStyle(tint(now[name] ?? 0, before[name] ?? 0))
@@ -339,8 +340,9 @@ struct ModelShare: View {
         let total = max(1, report.weekTokens)
         let shown = Array(report.models.prefix(3))
         let other = report.weekTokens - shown.reduce(0) { $0 + $1.tokens }
-        let parts: [(String, Int, Color)] = shown.enumerated().map { ($1.name, $1.tokens, modelPalette[$0]) }
-            + (other > 0 ? [("Other", other, modelPalette[3])] : [])
+        let colors = report.modelColors
+        let parts: [(String, Int, Color)] = shown.enumerated().map { ($1.name, $1.tokens, colors[$0]) }
+            + (other > 0 ? [("Other", other, colors[shown.count])] : [])
         VStack(alignment: .leading, spacing: 8) {
             GeometryReader { geo in
                 HStack(spacing: 2) {

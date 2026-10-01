@@ -117,12 +117,15 @@ public struct AIUsageReport {
         public var name: String
         public var tokens: Int
         public var cost: Double
+        // A shade of the provider's colour. Nil takes the next colour of modelPalette.
+        public var color: Color?
         public var id: String { name }
 
-        public init(name: String, tokens: Int, cost: Double) {
+        public init(name: String, tokens: Int, cost: Double, color: Color? = nil) {
             self.name = name
             self.tokens = tokens
             self.cost = cost
+            self.color = color
         }
     }
 
@@ -157,6 +160,10 @@ public struct AIUsageReport {
 
     // The models that get a colour of their own. The rest chart as "Other".
     public var topModels: [String] { Array(models.prefix(3).map(\.name)) }
+    // The colours of topModels, then of Other.
+    public var modelColors: [Color] {
+        models.prefix(3).enumerated().map { $1.color ?? modelPalette[$0] } + [modelPalette[3]]
+    }
 }
 
 public struct AIUsageActions {
@@ -241,7 +248,8 @@ extension AIUsageReport {
                            ?? ((d["prior"] as? Int).map { ["Other": $0] } ?? [:]))
         }
         let models = list(json["models"]).map {
-            Model(name: $0["name"] as? String ?? "", tokens: $0["tokens"] as? Int ?? 0, cost: number($0["cost"]) ?? 0)
+            Model(name: $0["name"] as? String ?? "", tokens: $0["tokens"] as? Int ?? 0, cost: number($0["cost"]) ?? 0,
+                  color: ($0["color"] as? String).map(aiColor))
         }
         self.init(now: now, updated: number(json["updated"]).map { Date(timeIntervalSince1970: $0) },
                   providers: providers, days: days, models: models,

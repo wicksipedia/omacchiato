@@ -36,13 +36,17 @@ MONTH = 30 * 24 * 3600
 # span: the window length of a metric label that SPANS does not name.
 # colour: a bar colour name or #RRGGBB. The OpenAI and Copilot logos are
 # black or white, so they take the theme's label colour.
+# shades: the chart colours of the provider's models, busiest first.
 PROVIDERS = {
     "claude": {"page": "https://status.claude.com", "component": "Claude Code",
-               "span": WEEK, "glyph": "\uec82", "colour": "#D97757"},
+               "span": WEEK, "glyph": "\uec82", "colour": "#D97757",
+               "shades": ["#D97757", "#F2B08F", "#A8502F"]},
     "codex": {"page": "https://status.openai.com", "component": "Codex",
-              "span": WEEK, "glyph": "\uec81", "colour": "label"},
+              "span": WEEK, "glyph": "\uec81", "colour": "label",
+              "shades": ["#10A37F", "#6FD1B0", "#0B6B54"]},
     "copilot": {"page": "https://www.githubstatus.com", "component": "Copilot",
-                "span": MONTH, "glyph": "\uec1e", "colour": "label"},
+                "span": MONTH, "glyph": "\uec1e", "colour": "label",
+                "shades": ["#8B7CF6", "#BDB3FA", "#5B4BC4"]},
 }
 SPANS = {"session": FIVE_HOURS, "5h": FIVE_HOURS, "weekly": WEEK, "30d": MONTH}
 # Statuspage indicators, best first. A page's overall rating also drops for
@@ -84,9 +88,12 @@ IDLE_ICON = "\U0001f916"  # every provider at 0%: one glyph, no numbers
 
 
 def whole(left):
-    """The time to a reset for the pill: 4:46 or 0:42, or 3d from one day up."""
+    """The time to a reset for the pill: 4:46 or 0:42, or 6d23h to the nearest hour from one day up."""
     m = max(1, int(left) // 60)
-    return "%dd" % (m // 1440) if m >= 1440 else "%d:%02d" % divmod(m, 60)
+    if m < 1440:
+        return "%d:%02d" % divmod(m, 60)
+    d, h = divmod(round(left / 3600), 24)
+    return "%dd%dh" % (d, h) if h else "%dd" % d
 
 
 def countdown(left):
@@ -287,7 +294,7 @@ def week_stats(entry, tokscale, clients):
         r = subprocess.run([tokscale, "graph", "--week", "-c", key, "--no-spinner"],
                            capture_output=True, text=True, timeout=STATS_TIMEOUT_S)
         graph = json.loads(r.stdout)
-        days, day_models, models = {}, {}, {}
+        days, day_models, models, clients = {}, {}, {}, {}
         for day in graph["contributions"]:
             days[day["date"]] = [day["totals"]["tokens"], day["totals"].get("cost", 0)]
             split = day_models.setdefault(day["date"], {})
@@ -297,9 +304,11 @@ def week_stats(entry, tokscale, clients):
                 split[name] = split.get(name, 0) + n
                 tokens, cost = models.get(use["modelId"], [0, 0])
                 models[use["modelId"]] = [tokens + n, cost + use.get("cost", 0)]
+                clients[use["modelId"]] = use.get("client")
         metrics = graph.get("timeMetrics") or {}
         stats = {"days": days, "day_models": day_models,
                  "models": sorted(([m] + v for m, v in models.items()), key=lambda m: -m[1]),
+                 "clients": clients,
                  "sessions": metrics.get("sessionCount", 0),
                  "active_ms": metrics.get("totalActiveTimeMs", 0),
                  "active_days": (graph.get("summary") or {}).get("activeDays", 0)}
@@ -344,10 +353,10 @@ def dollars(amount):
 
 
 def model_name(model_id):
-    """claude-haiku-4-5-20251001 reads as Haiku 4.5."""
+    """claude-haiku-4-5-20251001 reads as Haiku 4.5, and gpt-6.1-sol as GPT 6.1 Sol."""
     parts = re.sub(r"-\d{8}$", "", model_id.removeprefix("claude-")).split("-")
     version = ".".join(p for p in parts if p.isdigit())
-    return " ".join(p.title() for p in parts if not p.isdigit()) + (" " + version if version else "")
+    return " ".join(p.upper() if p == "gpt" else p.title() for p in parts if not p.isdigit()) + (" " + version if version else "")
 
 
 def stats_rows(stats):
@@ -373,6 +382,32 @@ def stats_rows(stats):
 
 
 # --- panel -----------------------------------------------------------------
+def model_colours(models, clients):
+    """The panel's models. Each of the three in the chart takes the next shade of its provider."""
+    out, used = [], {}
+    for n, (m, tokens, cost) in enumerate(models):
+        model = {"name": model_name(m), "tokens": tokens, "cost": cost}
+        shades = (PROVIDERS.get(clients.get(m)) or {}).get("shades")
+        if n < 3 and shades:
+            model["color"] = shades[used.get(clients[m], 0) % len(shades)]
+            used[clients[m]] = used.get(clients[m], 0) + 1
+        out.append(model)
+    return out
+
+
+def chart_order(models, clients):
+    """The chart colours the first three models and folds the rest into Other.
+    Each client's busiest model goes first, so a client with few tokens still
+    gets a colour of its own."""
+    firsts, seen = [], set()
+    for m in models:
+        if clients.get(m[0]) not in seen:
+            seen.add(clients.get(m[0]))
+            firsts.append(m)
+    head = sorted((firsts + [m for m in models if m not in firsts])[:3], key=lambda m: -m[1])
+    return head + [m for m in models if m not in head]
+
+
 def panel_metric(pid, metric):
     left = seconds_until(metric.get("resets_at"))
     return {"label": metric.get("label", ""), "used": (metric.get("used_percent") or 0) / 100.0,
@@ -420,7 +455,8 @@ def panel(quotas, states, stats, updated):
             before = before if isinstance(before, dict) else {"Other": before}
             out["days"].append({"date": day, "models": models, "cost": cost,
                                 "prior": sum(before.values()), "prior_models": before})
-        out["models"] = [{"name": model_name(m), "tokens": n, "cost": c} for m, n, c in stats["models"]]
+        out["models"] = model_colours(chart_order(stats["models"], stats.get("clients") or {}),
+                                      stats.get("clients") or {})
         out["sessions"] = stats["sessions"]
         out["active_hours"] = stats["active_ms"] // 3_600_000
     return out
@@ -512,14 +548,17 @@ def label(quotas):
     if not shown:
         return "", "muted", []
     worst = colour_for(max(m.get("used_percent") or 0 for _, m, _ in shown))
-    # the first provider shown carries the time to its reset, quiet beside its percent
-    left = seconds_until(shown[0][1].get("resets_at"))
-    reset = [{"label": whole(left), "label_color": "muted", "under": STACK}] if left is not None and left > 0 else []
     if len(PILL) > 1:
         # one icon cannot name several providers, so each percent gets its logo
-        parts = [{"label": "%d%%" % pct, **logo(pid)} for pid, _, pct in shown]
-        return "", worst, parts[:1] + reset + parts[1:]
-    return "%d%%" % shown[0][2], worst, reset
+        return "", worst, [p for pid, m, pct in shown
+                           for p in [{"label": "%d%%" % pct, **logo(pid)}] + reset_part(m)]
+    return "%d%%" % shown[0][2], worst, reset_part(shown[0][1])
+
+
+def reset_part(metric):
+    """The time to the reset, quiet beside or under its percent."""
+    left = seconds_until(metric.get("resets_at"))
+    return [{"label": whole(left), "label_color": "muted", "under": STACK}] if left is not None and left > 0 else []
 
 
 def pill_icon(text, parts, mark, configured):

@@ -25,6 +25,6 @@ private let weeks: [AIUsageReport] = [.busy, .hot, .quiet]
 #Preview("Rings, dark") { Desk { RingsAIUsagePanel(report: .busy) }.preferredColorScheme(.dark) }
 #Preview("Rings: stale") { Desk { RingsAIUsagePanel(report: .cold) } }
 #Preview("Day tooltip") {
-    Desk { DayTooltip(day: AIUsageReport.busy.days[2], top: AIUsageReport.busy.topModels, today: AIUsageReport.morning) }
+    Desk { DayTooltip(day: AIUsageReport.busy.days[2], top: AIUsageReport.busy.topModels, colors: AIUsageReport.busy.modelColors, today: AIUsageReport.morning) }
 }
 #endif

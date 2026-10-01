@@ -21,20 +21,22 @@ class Label(unittest.TestCase):
         ai.PILL = [("claude", "5h"), ("codex", "5h")]
         self.assertEqual(ai.label({"claude": quota(0), "codex": quota(0.4)}), ("", "muted", []))
 
-    def test_the_first_provider_carries_its_reset_as_hours_and_minutes(self):
+    def test_each_provider_carries_its_reset(self):
         ai.PILL = [("claude", "5h"), ("codex", "5h")]
         soon = ai.datetime.now(ai.timezone.utc) + ai.timedelta(hours=2, minutes=5, seconds=30)
         q = quota(29)
         q[0]["metrics"][0]["resets_at"] = soon.isoformat()
-        _, _, parts = ai.label({"claude": q, "codex": quota(12)})
-        self.assertEqual([p["label"] for p in parts], ["29%", "2:05", "12%"])
+        week = quota(12)
+        week[0]["metrics"][0]["resets_at"] = (soon + ai.timedelta(days=6, hours=20, minutes=50)).isoformat()
+        _, _, parts = ai.label({"claude": q, "codex": week})
+        self.assertEqual([p["label"] for p in parts], ["29%", "2:05", "12%", "6d23h"])
         self.assertEqual(parts[1]["label_color"], "muted")
         self.assertTrue(parts[1]["under"])
         ai.STACK = False
         self.assertFalse(ai.label({"claude": q})[2][1]["under"])
         ai.STACK = True
-        self.assertEqual([ai.whole(s) for s in (30, 42 * 60, (4 * 60 + 46) * 60, 3 * 86400 + 5)],
-                         ["0:01", "0:42", "4:46", "3d"])
+        self.assertEqual([ai.whole(s) for s in (30, 42 * 60, (4 * 60 + 46) * 60, 3 * 86400 + 5, 6 * 86400 + 23.6 * 3600)],
+                         ["0:01", "0:42", "4:46", "3d", "7d"])
 
     def test_one_provider_reads_as_text(self):
         ai.PILL = [("claude", "5h")]
@@ -84,6 +86,17 @@ class Panel(unittest.TestCase):
         self.assertEqual((days[0]["prior"], days[0]["prior_models"]), (40, {"Other": 40}))
         self.assertEqual(sum(d["prior"] for d in days), 340)
 
+
+    def test_each_client_gets_a_chart_colour(self):
+        models = [["claude-opus-5-5", 700, 0], ["claude-sonnet-5", 80, 0], ["claude-sonnet-5-5", 6, 0],
+                  ["gpt-6.1-sol", 5, 0], ["gpt-5.6-terra", 1, 0]]
+        clients = {m[0]: "codex" if m[0].startswith("gpt") else "claude" for m in models}
+        self.assertEqual([m[0] for m in ai.chart_order(models, clients)],
+                         ["claude-opus-5-5", "claude-sonnet-5", "gpt-6.1-sol", "claude-sonnet-5-5", "gpt-5.6-terra"])
+        self.assertEqual(ai.chart_order(models, {}), models)
+        colours = [m.get("color") for m in ai.model_colours(ai.chart_order(models, clients), clients)]
+        claude, codex = ai.PROVIDERS["claude"]["shades"], ai.PROVIDERS["codex"]["shades"]
+        self.assertEqual(colours, [claude[0], claude[1], codex[0], None, None])
 
 
 class Refresh(unittest.TestCase):
