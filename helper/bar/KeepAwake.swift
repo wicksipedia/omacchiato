@@ -88,20 +88,22 @@ func lidAction(on: Bool, mode: String?, setByBar: Bool) -> Bool? {
     return nil
 }
 
+// One change at a time, in order. Each change reads the marker that the
+// change before it left, so a quick on then off ends with sleep on.
+let lidQueue = DispatchQueue(label: "omacchiato.keep-awake-lid", qos: .userInitiated)
+
 func applyLid(on: Bool) {
-    let setByBar = FileManager.default.fileExists(atPath: lidMarker)
-    guard let disable = lidAction(on: on, mode: pillModes["keep_awake_lid"], setByBar: setByBar) else { return }
-    if disable { FileManager.default.createFile(atPath: lidMarker, contents: nil) }
-    DispatchQueue.global(qos: .userInitiated).async {
+    let mode = pillModes["keep_awake_lid"]
+    lidQueue.async {
+        let setByBar = FileManager.default.fileExists(atPath: lidMarker)
+        guard let disable = lidAction(on: on, mode: mode, setByBar: setByBar) else { return }
+        // the marker comes first, so a crash during pmset still leaves it
+        if disable { FileManager.default.createFile(atPath: lidMarker, contents: nil) }
         let result = execute("/usr/bin/sudo", ["-n", "/usr/bin/pmset", "-a", "disablesleep", disable ? "1" : "0"], timeout: 10)
-        DispatchQueue.main.async {
-            if result.status != 0 {
-                tlog("keep awake: pmset disablesleep failed, so no lid rule? Run omacchiato-lid-rule install")
-                if disable { try? FileManager.default.removeItem(atPath: lidMarker) }
-            } else if !disable {
-                try? FileManager.default.removeItem(atPath: lidMarker)
-            }
+        if result.status != 0 {
+            DispatchQueue.main.async { tlog("keep awake: pmset disablesleep failed, so no lid rule? Run omacchiato-lid-rule install") }
         }
+        if disable == (result.status != 0) { try? FileManager.default.removeItem(atPath: lidMarker) }
     }
 }
 
