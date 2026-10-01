@@ -8,6 +8,10 @@ import StatusPanel
 
 let modelPalette: [Color] = [.orange, .purple, .teal, .gray]
 
+// The key of the chart's measure in the bar's defaults. Every panel design
+// reads it, so each one opens on the last choice.
+let aiUsageMeasureKey = "aiUsageMeasure"
+
 // The script reads tokscale at most every 5 minutes: 15 is three missed reads.
 let aiUsageStaleAfter: TimeInterval = 15 * 60
 

@@ -10,8 +10,7 @@ import StatusPanel
 public struct RingsAIUsagePanel: View {
     var report: AIUsageReport
     var actions: AIUsageActions
-    // the bar's defaults keep it, so the panel opens on the last choice
-    @AppStorage("aiUsageMeasure") private var measure = UsageMeasure.tokens
+    @AppStorage(aiUsageMeasureKey) private var measure = UsageMeasure.tokens
 
     public init(report: AIUsageReport, actions: AIUsageActions = .init()) {
         self.report = report
@@ -131,6 +130,7 @@ struct WeekChange: View {
 public struct ScreenTimeAIUsagePanel: View {
     var report: AIUsageReport
     var actions: AIUsageActions
+    @AppStorage(aiUsageMeasureKey) private var measure = UsageMeasure.tokens
 
     public init(report: AIUsageReport, actions: AIUsageActions = .init()) {
         self.report = report
@@ -143,12 +143,14 @@ public struct ScreenTimeAIUsagePanel: View {
             if !report.days.isEmpty {
                 PanelCard {
                     let days = max(1, report.days.count)
+                    let tokens = tokenText(report.weekTokens / days) + " tokens"
+                    let cost = dollarText(report.weekCost / Double(days))
                     Text("Daily Average").font(.system(size: 12, weight: .medium)).foregroundStyle(.secondary)
-                    Text(tokenText(report.weekTokens / days) + " tokens")
+                    Text(measure == .tokens ? tokens : cost)
                         .font(.system(size: 28, weight: .semibold, design: .rounded))
-                    Text("\(dollarText(report.weekCost / Double(days))) a day · \(report.sessions) sessions · \(report.activeHours)h active")
+                    Text("\(measure == .tokens ? cost : tokens) a day · \(report.sessions) sessions · \(report.activeHours)h active")
                         .font(.system(size: 11)).foregroundStyle(.secondary)
-                    WeekChart(report: report, height: 140).padding(.top, 4)
+                    WeekChart(report: report, height: 140, measure: measure) { measure = measure.toggled }.padding(.top, 4)
                 }
             }
             PanelCard(title: "Limits", symbol: "gauge.with.needle") {
@@ -162,17 +164,19 @@ public struct ScreenTimeAIUsagePanel: View {
             }
             if !report.models.isEmpty {
                 PanelCard(title: "Most Used", symbol: "cpu") {
-                    let top = report.models.first?.tokens ?? 1
-                    ForEach(Array(report.models.prefix(3).enumerated()), id: \.offset) { i, model in
+                    let shown = Array(report.models.prefix(3))
+                    let top = shown.map { $0.value(measure) }.max() ?? 0
+                    ForEach(Array(shown.enumerated()), id: \.offset) { i, model in
                         VStack(alignment: .leading, spacing: 3) {
                             HStack {
                                 Text(model.name).font(.system(size: 12, weight: .medium))
                                 Spacer()
-                                Text("\(tokenText(model.tokens)) · \(dollarText(model.cost))")
+                                let values = [tokenText(model.tokens), dollarText(model.cost)]
+                                Text((measure == .tokens ? values : values.reversed()).joined(separator: " · "))
                                     .font(.system(size: 11)).foregroundStyle(.secondary)
                             }
                             Capsule().fill(report.modelColors[i])
-                                .frame(width: max(4, 290 * CGFloat(model.tokens) / CGFloat(max(1, top))), height: 5)
+                                .frame(width: max(4, 290 * model.value(measure) / max(top, .leastNonzeroMagnitude)), height: 5)
                         }
                     }
                 }
@@ -204,6 +208,7 @@ public struct ScreenTimeAIUsagePanel: View {
 public struct ForecastAIUsagePanel: View {
     var report: AIUsageReport
     var actions: AIUsageActions
+    @AppStorage(aiUsageMeasureKey) private var measure = UsageMeasure.tokens
 
     public init(report: AIUsageReport, actions: AIUsageActions = .init()) {
         self.report = report
@@ -223,14 +228,19 @@ public struct ForecastAIUsagePanel: View {
                 }
             }
             if !report.days.isEmpty {
-                PanelCard(title: "Spend This Week", symbol: "dollarsign.circle") {
+                PanelCard(title: measure == .cost ? "Spend This Week" : "Tokens This Week",
+                          symbol: measure == .cost ? "dollarsign.circle" : "chart.line.uptrend.xyaxis") {
+                    let tokens = tokenText(report.weekTokens), cost = dollarText(report.weekCost)
                     HStack(alignment: .firstTextBaseline) {
-                        Text(dollarText(report.weekCost)).font(.system(size: 24, weight: .semibold, design: .rounded))
-                        Text("at API prices").font(.system(size: 11)).foregroundStyle(.secondary)
+                        Text(measure == .cost ? cost : tokens).font(.system(size: 24, weight: .semibold, design: .rounded))
+                        Text(measure == .cost ? "at API prices" : "tokens").font(.system(size: 11)).foregroundStyle(.secondary)
                         Spacer()
-                        Text(tokenText(report.weekTokens) + " tokens").font(.system(size: 11)).foregroundStyle(.secondary)
+                        Text(measure == .cost ? tokens + " tokens" : cost + " at API prices")
+                            .font(.system(size: 11)).foregroundStyle(.secondary)
                     }
-                    costChart
+                    weekChart
+                        .contentShape(.rect)
+                        .onTapGesture { measure = measure.toggled }
                 }
             }
             UpdatedStamp(report.updated, staleAfter: aiUsageStaleAfter, refresh: actions.refresh)
@@ -258,21 +268,22 @@ public struct ForecastAIUsagePanel: View {
         .padding(.vertical, 2)
     }
 
-    var costChart: some View {
+    // The week as a line, of cost or tokens. A click switches it.
+    var weekChart: some View {
         Chart(report.days) { day in
-            AreaMark(x: .value("Day", day.date, unit: .day), y: .value("Cost", day.cost))
+            AreaMark(x: .value("Day", day.date, unit: .day), y: .value("Value", day.total(measure)))
                 .interpolationMethod(.monotone)
                 .foregroundStyle(.linearGradient(colors: [PanelColors.green.opacity(0.35), PanelColors.green.opacity(0.02)],
                                                  startPoint: .top, endPoint: .bottom))
-            LineMark(x: .value("Day", day.date, unit: .day), y: .value("Cost", day.cost))
+            LineMark(x: .value("Day", day.date, unit: .day), y: .value("Value", day.total(measure)))
                 .interpolationMethod(.monotone)
                 .foregroundStyle(PanelColors.green)
                 .lineStyle(StrokeStyle(lineWidth: 2))
             if Calendar.current.isDate(day.date, inSameDayAs: report.now) {
-                PointMark(x: .value("Day", day.date, unit: .day), y: .value("Cost", day.cost))
+                PointMark(x: .value("Day", day.date, unit: .day), y: .value("Value", day.total(measure)))
                     .foregroundStyle(PanelColors.green)
                     .annotation(position: .top) {
-                        Text(dollarText(day.cost)).font(.system(size: 10, weight: .semibold))
+                        Text(measure.text(day.total(measure))).font(.system(size: 10, weight: .semibold))
                     }
             }
         }
@@ -284,7 +295,7 @@ public struct ForecastAIUsagePanel: View {
         .chartYAxis {
             AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { value in
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                AxisValueLabel { if let n = value.as(Double.self) { Text(dollarText(n)) } }
+                AxisValueLabel { if let n = value.as(Double.self) { Text(measure.text(n)) } }
             }
         }
         .frame(height: 100)
