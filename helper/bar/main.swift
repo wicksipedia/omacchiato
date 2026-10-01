@@ -107,8 +107,8 @@ func screenID(_ screen: NSScreen) -> CGDirectDisplayID {
 // NSScreen.localizedName (Monitor.current() in its source), so the name
 // join works; its ids stay opaque and meet only the query payloads they
 // came from.
-func monitorIDs() -> [String: String] { // display name -> OmniWM display id
-    guard omniwmActive() else { return [:] }
+func monitorIDs(active: Bool = omniwmActive()) -> [String: String] { // display name -> OmniWM display id
+    guard active else { return [:] }
     var map: [String: String] = [:]
     if let list = omniQuery("displays", ["--fields", "id,name"])?["displays"]
         as? [[String: Any]] {
@@ -119,8 +119,30 @@ func monitorIDs() -> [String: String] { // display name -> OmniWM display id
     return map
 }
 
+// The OmniWM query runs on rebuildQueue, because a hung OmniWM blocks it
+// for up to two timeouts. One query runs at a time: a call during a query
+// asks for one more after it. New surfaces need a snapshot of their own.
+var surfacesFetching = false
+var surfacesAgain = false
 func rebuildSurfaces() {
-    let ids = monitorIDs()
+    guard !surfacesFetching else { surfacesAgain = true; return }
+    surfacesFetching = true
+    let active = omniwmActive()
+    rebuildQueue.async {
+        let ids = monitorIDs(active: active)
+        DispatchQueue.main.async {
+            surfacesFetching = false
+            applySurfaces(ids)
+            kickRebuild()
+            if surfacesAgain {
+                surfacesAgain = false
+                rebuildSurfaces()
+            }
+        }
+    }
+}
+
+func applySurfaces(_ ids: [String: String]) {
     var kept: [BarSurface] = []
     for screen in NSScreen.screens {
         // With no window manager, draw on every screen anyway: the pills
@@ -895,7 +917,7 @@ model.focused = omniwmActive()
     ? ((omniQuery("workspaces", ["--focused", "--fields", "raw-name"])?["workspaces"]
         as? [[String: Any]])?.first?["rawName"] as? String ?? "")
     : ""
-rebuildSurfaces()
+applySurfaces(monitorIDs())
 guard !surfaces.isEmpty else {
     FileHandle.standardError.write("omacchiato-bar: no screen to draw on\n".data(using: .utf8)!)
     exit(1)
