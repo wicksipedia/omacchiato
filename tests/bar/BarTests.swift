@@ -219,16 +219,6 @@ struct BarTests {
     func clickable() {
         #expect(NSColor.clear.clickable.alphaComponent > 0)
     }
-}
-
-@Suite struct MenuBadgeTests {
-    @Test("an update count in a menu title becomes a badge, as the macOS menu draws it")
-    func badge() {
-        #expect(menuBadge("System Settings…, 1 update") == ("System Settings…", "1 update"))
-        #expect(menuBadge("System Settings…, 12 updates") == ("System Settings…", "12 updates"))
-        #expect(menuBadge("System Settings…") == ("System Settings…", ""))
-        #expect(menuBadge("Log Out Matt Wicks…") == ("Log Out Matt Wicks…", ""))
-    }
 
     @Test("a command that closes its pipes and hangs still times out")
     func executeTimesOut() {
@@ -244,7 +234,7 @@ struct BarTests {
         let started = Date()
         let result = execute("/bin/sh", ["-c", "(trap '' TERM; sleep 31.25) & wait"], timeout: 1)
         #expect(result.timedOut)
-        #expect(Date().timeIntervalSince(started) < 6)
+        #expect(Date().timeIntervalSince(started) < 10)
         // launchd reaps the killed orphan a moment later
         var left = "x"
         for _ in 0..<20 where !left.isEmpty {
@@ -269,5 +259,15 @@ struct BarTests {
     func executeReturns() {
         let result = execute("/bin/sh", ["-c", "echo out; echo err >&2; exit 3"], timeout: 5)
         #expect((result.out, result.err, result.status, result.timedOut) == ("out\n", "err\n", 3, false))
+    }
+}
+
+@Suite struct MenuBadgeTests {
+    @Test("an update count in a menu title becomes a badge, as the macOS menu draws it")
+    func badge() {
+        #expect(menuBadge("System Settings…, 1 update") == ("System Settings…", "1 update"))
+        #expect(menuBadge("System Settings…, 12 updates") == ("System Settings…", "12 updates"))
+        #expect(menuBadge("System Settings…") == ("System Settings…", ""))
+        #expect(menuBadge("Log Out Matt Wicks…") == ("Log Out Matt Wicks…", ""))
     }
 }

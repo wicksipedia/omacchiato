@@ -87,8 +87,10 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   `swiftc`. The tests `@testable import omacchiato_bar`, which holds
   `helper/bar/*.swift`. A test calls a function that takes plain
   values, so move the logic out of the AX, AppKit or subprocess code
-  first, as `layoutOrder` and `shortcutText` do. The suite runs serially,
-  because some tests set globals.
+  first, as `layoutOrder` and `shortcutText` do. `BarTests` runs serially,
+  because some tests set globals. Put a test that waits on a subprocess
+  there too. The CI runner has three test threads, and three such tests
+  in parallel froze the run until GitHub cancelled it.
 - The Python tests use `unittest`, in `tests/test_*.py`. `tests/loader.py`
   imports a script from `bin/`, so each script keeps its run code in
   `main()` behind `if __name__ == "__main__"`.
