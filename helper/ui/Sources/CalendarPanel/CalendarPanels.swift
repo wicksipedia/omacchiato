@@ -10,14 +10,25 @@ private func timeText(_ date: Date) -> String {
     date.formatted(date: .omitted, time: .shortened)
 }
 
-// The month grid. A click on a week opens that week in Calendar.
+// The month grid. A click on a week opens that week in Calendar. Under
+// each day, its events show as colored bars, as in the iPhone's month
+// view. With a step action, a row above the grid moves between months.
 struct MonthGrid: View {
     var now: Date
+    var month: Date
+    var marks: [Date: [Color]]
     var openWeek: (Date) -> Void
+    var step: ((Int) -> Void)?
     var compact = false
 
     var body: some View {
         VStack(spacing: compact ? 0 : 2) {
+            if let step {
+                MonthTitle(now: now, month: month, step: step)
+                    .font(.system(size: compact ? 12 : 15, weight: .semibold))
+                    .padding(.horizontal, 6)
+                    .padding(.bottom, 2)
+            }
             HStack(spacing: 0) {
                 ForEach(Array(["M", "T", "W", "T", "F", "S", "S"].enumerated()), id: \.offset) { _, day in
                     Text(day).frame(maxWidth: .infinity)
@@ -26,22 +37,91 @@ struct MonthGrid: View {
             .font(.system(size: 10, weight: .semibold))
             .foregroundStyle(.secondary)
             .padding(.horizontal, 6)
-            ForEach(Array(monthWeeks(now).enumerated()), id: \.offset) { _, week in
+            ForEach(Array(monthWeeks(month, today: now).enumerated()), id: \.offset) { _, week in
                 HoverRow(action: { openWeek(week.monday) }) {
                     HStack(spacing: 0) {
                         ForEach(Array(week.cells.enumerated()), id: \.offset) { index, cell in
-                            Text(cell.day.map(String.init) ?? "")
-                                .font(.system(size: compact ? 11 : 13, weight: cell.today ? .bold : .regular))
-                                .foregroundStyle(cell.today ? AnyShapeStyle(.white)
-                                                 : (index >= 5 ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary)))
-                                .frame(width: compact ? 20 : 26, height: compact ? 20 : 26)
-                                .background(cell.today ? AnyShapeStyle(Color.red) : AnyShapeStyle(.clear), in: .circle)
-                                .frame(maxWidth: .infinity)
+                            VStack(spacing: 2) {
+                                Text(cell.day.map(String.init) ?? "")
+                                    .font(.system(size: compact ? 11 : 13, weight: cell.today ? .bold : .regular))
+                                    .foregroundStyle(cell.today ? AnyShapeStyle(.white)
+                                                     : (index >= 5 ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary)))
+                                    .frame(width: compact ? 20 : 26, height: compact ? 20 : 26)
+                                    .background(cell.today ? AnyShapeStyle(Color.red) : AnyShapeStyle(.clear), in: .circle)
+                                if !marks.isEmpty {
+                                    DayMarks(colors: cell.date.flatMap { marks[$0] } ?? [])
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
                         }
                     }
                 }
             }
         }
+    }
+}
+
+// The month and year, with arrows to the months around it. A click on
+// the title of another month goes back to this month.
+struct MonthTitle: View {
+    var now: Date
+    var month: Date
+    var step: (Int) -> Void
+    var big = false
+
+    var body: some View {
+        let away = !Calendar(identifier: .gregorian).isDate(month, equalTo: now, toGranularity: .month)
+        HStack(alignment: .firstTextBaseline, spacing: big ? 6 : 4) {
+            Text(month.formatted(.dateTime.month(.wide)))
+                .foregroundStyle(big ? AnyShapeStyle(Color.red) : AnyShapeStyle(.primary))
+            Text(month.formatted(.dateTime.year()))
+            Spacer(minLength: 4)
+            if away {
+                Text("Today")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.red)
+                    .contentShape(.rect)
+                    .onTapGesture { step(0) }
+                    .accessibilityAddTraits(.isButton)
+            }
+            arrow("chevron.left", label: "Previous Month") { step(-1) }
+            arrow("chevron.right", label: "Next Month") { step(1) }
+        }
+    }
+
+    func arrow(_ symbol: String, label: String, action: @escaping () -> Void) -> some View {
+        Image(systemName: symbol)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .frame(width: 22, height: 20)
+            .hoverFill(radius: 5)
+            .contentShape(.rect)
+            .onTapGesture(perform: action)
+            .accessibilityLabel(label)
+            .accessibilityAddTraits(.isButton)
+    }
+}
+
+// A day's events: two bars, then the count of the rest. The space stays
+// the same on an empty day, so the rows line up.
+struct DayMarks: View {
+    var colors: [Color]
+
+    var body: some View {
+        VStack(spacing: 1.5) {
+            ForEach(0..<2, id: \.self) { i in
+                Capsule()
+                    .fill(i < colors.count ? AnyShapeStyle(colors[i].opacity(0.75)) : AnyShapeStyle(.clear))
+                    .frame(height: 3)
+            }
+            Text(colors.count > 2 ? "+\(colors.count - 2)" : " ")
+                .font(.system(size: 7, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(height: 8)
+        }
+        .padding(.horizontal, 3)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(colors.isEmpty ? "" : "\(colors.count) event\(colors.count == 1 ? "" : "s")")
     }
 }
 
@@ -111,10 +191,16 @@ struct EventsEmpty: View {
 public struct UpNextCalendarPanel: View {
     var report: CalendarReport
     var actions: CalendarActions
+    @State private var offset = 0
 
     public init(report: CalendarReport, actions: CalendarActions = .init()) {
         self.report = report
         self.actions = actions
+    }
+
+    func step(_ n: Int) {
+        offset = n == 0 ? 0 : offset + n
+        actions.showMonth(shiftMonth(report.now, by: offset))
     }
 
     public var body: some View {
@@ -147,7 +233,8 @@ public struct UpNextCalendarPanel: View {
                 }
             }
             PanelCard {
-                MonthGrid(now: report.now, openWeek: actions.openWeek, compact: true)
+                MonthGrid(now: report.now, month: shiftMonth(report.now, by: offset), marks: report.marks,
+                          openWeek: actions.openWeek, step: step, compact: true)
             }
         }
         .statusPanelBackground()
@@ -158,27 +245,25 @@ public struct UpNextCalendarPanel: View {
 public struct MonthCalendarPanel: View {
     var report: CalendarReport
     var actions: CalendarActions
+    @State private var offset = 0
 
     public init(report: CalendarReport, actions: CalendarActions = .init()) {
         self.report = report
         self.actions = actions
     }
 
+    func step(_ n: Int) {
+        offset = n == 0 ? 0 : offset + n
+        actions.showMonth(shiftMonth(report.now, by: offset))
+    }
+
     public var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(report.now.formatted(.dateTime.month(.wide)))
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundStyle(.red)
-                Text(report.now.formatted(.dateTime.year()))
-                    .font(.system(size: 24, weight: .bold))
-                Spacer()
-                Text("Week \(Calendar(identifier: .iso8601).component(.weekOfYear, from: report.now))")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 6)
-            MonthGrid(now: report.now, openWeek: actions.openWeek)
+            MonthTitle(now: report.now, month: shiftMonth(report.now, by: offset), step: step, big: true)
+                .font(.system(size: 24, weight: .bold))
+                .padding(.horizontal, 6)
+            MonthGrid(now: report.now, month: shiftMonth(report.now, by: offset), marks: report.marks,
+                      openWeek: actions.openWeek)
             Divider()
             VStack(alignment: .leading, spacing: 2) {
                 Text(report.now.formatted(.dateTime.weekday(.wide).day().month(.wide)))
@@ -197,10 +282,11 @@ public struct MonthCalendarPanel: View {
     }
 }
 
-// "Timeline": rest of day as blocks on an hour scale, like iOS Calendar's day view, month beside the date.
+// "Timeline": rest of day as blocks on an hour scale, like iOS Calendar's day view, under the month.
 public struct TimelineCalendarPanel: View {
     var report: CalendarReport
     var actions: CalendarActions
+    @State private var offset = 0
 
     public init(report: CalendarReport, actions: CalendarActions = .init()) {
         self.report = report
@@ -211,22 +297,20 @@ public struct TimelineCalendarPanel: View {
     let hour: CGFloat = 34
     let laneWidth: CGFloat = 340 - 24 - 8 - 44
 
+    func step(_ n: Int) {
+        offset = n == 0 ? 0 : offset + n
+        actions.showMonth(shiftMonth(report.now, by: offset))
+    }
+
     public var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(report.now.formatted(.dateTime.weekday(.wide)).uppercased())
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.red)
-                    Text(report.now.formatted(.dateTime.day()))
-                        .font(.system(size: 38, weight: .light))
-                    Text(report.now.formatted(.dateTime.month(.wide)))
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.secondary)
-                }
-                MonthGrid(now: report.now, openWeek: actions.openWeek, compact: true)
-            }
-            .padding(.horizontal, 4)
+            MonthGrid(now: report.now, month: shiftMonth(report.now, by: offset), marks: report.marks,
+                      openWeek: actions.openWeek, step: step)
+            // the events below are today's, whatever month the grid shows
+            Text(report.now.formatted(.dateTime.weekday(.wide).day().month(.wide)).uppercased())
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(.red)
+                .padding(.horizontal, 6)
             let allDay = report.events.filter(\.allDay)
             if !allDay.isEmpty {
                 VStack(alignment: .leading, spacing: 0) {

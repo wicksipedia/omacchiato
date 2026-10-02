@@ -95,6 +95,36 @@ struct BarTests {
         #expect(cal.component(.weekday, from: weeks[0].monday) == 2)
     }
 
+    @Test("another month's grid circles no day, and a step lands on the first of a month")
+    func otherMonth() throws {
+        let cal = Calendar(identifier: .gregorian)
+        let jan31 = try #require(cal.date(from: DateComponents(year: 2027, month: 1, day: 31, hour: 12)))
+        let feb = shiftMonth(jan31, by: 1)
+        #expect(cal.dateComponents([.year, .month, .day], from: feb) == DateComponents(year: 2027, month: 2, day: 1))
+        let cells = monthWeeks(feb, today: jan31).flatMap(\.cells)
+        #expect(cells.filter(\.today).isEmpty)
+        #expect(cells.compactMap(\.date).first == feb)
+    }
+
+    @Test("an event marks each day it touches, and its end is exclusive")
+    func marks() throws {
+        let cal = Calendar(identifier: .gregorian)
+        func day(_ d: Int, _ h: Int) -> Date {
+            cal.date(from: DateComponents(year: 2026, month: 10, day: d, hour: h)) ?? .distantPast
+        }
+        let marks = dayMarks([
+            (start: day(5, 0), end: day(8, 0), color: .green),   // all day, 5 to 7
+            (start: day(6, 9), end: day(6, 10), color: .red),
+            (start: day(9, 23), end: day(10, 1), color: .blue),  // crosses midnight
+        ])
+        #expect(marks[day(5, 0)] == [.green])
+        #expect(marks[day(6, 0)] == [.green, .red])
+        #expect(marks[day(7, 0)] == [.green])
+        #expect(marks[day(8, 0)] == nil)
+        #expect(marks[day(9, 0)] == [.blue])
+        #expect(marks[day(10, 0)] == [.blue])
+    }
+
     @Test("events that overlap share the width, and a free lane is reused")
     func lanes() {
         let t = { (h: Double) in Date(timeIntervalSinceReferenceDate: h * 3600) }

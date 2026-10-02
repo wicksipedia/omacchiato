@@ -83,23 +83,61 @@ func loadTodayEvents() {
     }
 }
 
+// The marks of each month that the grid has shown, keyed by the first of
+// the month. Like today's events, one answer serves for a minute.
+var monthMarks: [Date: (at: TimeInterval, marks: [Date: [Color]])] = [:]
+var monthsLoading: Set<Date> = []
+var shownMonth: Date?   // the month that the open grid shows, when not this month
+
+func loadMonth(_ date: Date) {
+    guard EKEventStore.authorizationStatus(for: .event) == .fullAccess else { return }
+    let start = shiftMonth(date, by: 0)
+    let end = shiftMonth(date, by: 1)
+    if let cached = monthMarks[start], Date.timeIntervalSinceReferenceDate - cached.at < 60 { return }
+    guard !monthsLoading.contains(start) else { return }
+    monthsLoading.insert(start)
+    let store = eventStore ?? EKEventStore()
+    eventStore = store
+    DispatchQueue.global(qos: .userInitiated).async {
+        let events = store.events(matching: store.predicateForEvents(withStart: start, end: end, calendars: nil))
+            .sorted { ($0.isAllDay ? 0 : 1, $0.startDate) < ($1.isAllDay ? 0 : 1, $1.startDate) }
+        // an event that starts before the month marks only the month's days
+        let marks = dayMarks(events.map { event in
+            (start: max(event.startDate, start), end: event.endDate,
+             color: event.calendar.cgColor.map { Color(cgColor: $0) } ?? .blue)
+        }).filter { $0.key >= start && $0.key < end }
+        DispatchQueue.main.async {
+            monthMarks[start] = (Date.timeIntervalSinceReferenceDate, marks)
+            monthsLoading.remove(start)
+            if openPopup == "clock" { refreshPopup() }
+        }
+    }
+}
+
 func calendarReport() -> CalendarReport {
     let now = Date()
     guard EKEventStore.authorizationStatus(for: .event) == .fullAccess else {
         return CalendarReport(now: now, access: false, events: [])
     }
     loadTodayEvents()
+    loadMonth(now)
+    if let shownMonth { loadMonth(shownMonth) }
+    let marks = monthMarks.values.reduce(into: [Date: [Color]]()) { all, month in all.merge(month.marks) { a, _ in a } }
     return CalendarReport(now: now, access: true, events: todayEvents.filter { $0.endDate > now }.map { event in
         CalendarReport.Event(id: event.calendarItemIdentifier, title: event.title ?? "Event",
                              start: event.startDate, end: event.endDate, allDay: event.isAllDay,
                              repeats: event.hasRecurrenceRules, location: event.location,
                              color: event.calendar.cgColor.map { Color(cgColor: $0) } ?? .blue)
-    })
+    }, marks: marks)
 }
 
 let calendarActions: CalendarActions = {
     var actions = CalendarActions()
     actions.openWeek = openCalendarWeek(of:)
+    actions.showMonth = { month in
+        shownMonth = month
+        loadMonth(month)
+    }
     actions.openEvent = { event in
         guard let link = calendarLink(id: event.id, start: event.start, repeats: event.repeats) else { return }
         closePopup()

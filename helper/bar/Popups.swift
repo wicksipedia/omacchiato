@@ -99,6 +99,7 @@ weak var popupOwner: BarSurface? // the bar that shows its pill lit
 func closePopup() {
     if openPopup == "wifi" || openPopup == "status" { stopHotspotBrowse() }
     if openPopup == "activity" { stopActivitySampling() }
+    if openPopup == "clock" { shownMonth = nil }
     setPopupKeys(false)
     popupWindow?.orderOut(nil)
     popupWindow = nil
