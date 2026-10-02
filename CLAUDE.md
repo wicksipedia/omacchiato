@@ -173,6 +173,14 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   Settings page, and `statusPanelBackground` then ends the panel with a
   muted "Customize Pill" row that opens that page. A panel with a
   background of its own, such as the weather panel, has no such row.
+  A section that a click folds keeps its fold with `@AppStorage`, keyed
+  by a stable ID, as `prStageOpen.<stage>` and `aiProviderOpen.<id>` do.
+  A fold in `@State` opens again each time the popup opens.
+  The popup window reaches from the bar to the bottom of the screen and
+  is clear under the panel, so a panel that changes size never resizes
+  the window. A window resize under a SwiftUI animation tore the top of
+  the panel. `PopupWindow.panelSize` holds the panel's size, and the
+  hover area and the close check use it.
   `panelRow` converts a `PopupRow`. The popup window never becomes key,
   so an event tap (`setPopupKeys`) gives a row popup its arrow keys,
   Return and Esc, and system controls there draw grey: draw them by hand.
