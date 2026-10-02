@@ -712,7 +712,7 @@ func pointerLeftTheHull() -> Bool {
     guard let popup = popupWindow else { return false }
     let p = NSEvent.mouseLocation
     let slack: CGFloat = 6 // the gap between a bar and its popup
-    if popup.frame.insetBy(dx: -slack, dy: -slack).contains(p) { return false }
+    if popup.panelFrame.insetBy(dx: -slack, dy: -slack).contains(p) { return false }
     for surface in surfaces where surface.window.frame.insetBy(dx: 0, dy: -slack).contains(p) {
         return false
     }

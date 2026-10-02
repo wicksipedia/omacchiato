@@ -62,6 +62,34 @@ struct PopupRow {
 
 final class PopupWindow: NSWindow {
     override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect { frameRect }
+
+    // The size of the panel at the top of the window. The window reaches
+    // down to the bottom of the screen and is clear under the panel, so a
+    // panel that changes size never resizes it. A resize in one step under
+    // an animation of many steps tore the top of the panel.
+    var panelSize = NSSize.zero
+    var panelFrame: NSRect {
+        NSRect(x: frame.minX, y: frame.maxY - panelSize.height, width: panelSize.width, height: panelSize.height)
+    }
+
+    func place() {
+        let screen = popupScreen
+        let w = panelSize.width
+        let x = min(max(screen.minX + 6, popupAlignLeft ? popupAnchorX : popupAnchorX - w), screen.maxX - w - 6)
+        setFrame(NSRect(x: x, y: screen.minY, width: w, height: popupTopY - screen.minY), display: true)
+    }
+
+    // The window shadow follows the alpha of the content, but macOS
+    // computes it again only on request. Ask on each frame of an animation.
+    private var shadowTimer: Timer?
+    func trackShadow() {
+        shadowTimer?.invalidate()
+        let end = Date().addingTimeInterval(0.5)
+        shadowTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60, repeats: true) { [weak self] t in
+            self?.invalidateShadow()
+            if Date() > end { t.invalidate() }
+        }
+    }
 }
 
 var popupWindow: PopupWindow?
@@ -97,8 +125,7 @@ func refreshPopup() {
     guard let name = openPopup, let window = popupWindow, let host = window.contentView as? PanelHost else { return }
     // A plugin that failed has no panel and no rows: close it.
     guard let view = panelView(name) else { closePopup(); return }
-    host.rootView = view
-    host.placeWindow()
+    host.setPanel(view)
 }
 
 func showPopup(_ name: String, under anchor: NSRect, on surface: BarSurface, alignLeft: Bool = false) {
@@ -269,20 +296,28 @@ final class PanelHost: NSHostingView<AnyView> {
     // The popup window never becomes key, so the first click must count.
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
-    // A panel can change its own size, as when a section opens.
-    override func layout() {
-        super.layout()
-        if let window, window.frame.size != fittingSize { placeWindow() }
+    // Clicks under the panel pass through, because AppKit hit-tests a
+    // clear window by alpha.
+    convenience init(panel: AnyView) {
+        self.init(rootView: AnyView(EmptyView()))
+        sizingOptions = []
+        setPanel(panel)
     }
 
-    // Fits the window to the panel: top edge under the bar, side at the pill.
-    func placeWindow() {
-        guard let window else { return }
-        let size = fittingSize
-        let screen = popupScreen
-        let x = min(max(screen.minX + 6, popupAlignLeft ? popupAnchorX : popupAnchorX - size.width),
-                    screen.maxX - size.width - 6)
-        window.setFrame(NSRect(x: x, y: popupTopY - size.height, width: size.width, height: size.height), display: true)
+    func setPanel(_ panel: AnyView) {
+        rootView = AnyView(panel
+            .fixedSize(horizontal: false, vertical: true)
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { [weak self] in self?.panelResized($0) }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top))
+    }
+
+    private func panelResized(_ size: CGSize) {
+        guard let window = window as? PopupWindow, window.panelSize != size else { return }
+        let moved = window.panelSize.width != size.width
+        window.panelSize = size
+        if moved { window.place() }
+        updateTrackingAreas()
+        window.trackShadow()
     }
 
     // A global monitor stops once this app is active, and a bar click makes
@@ -292,7 +327,9 @@ final class PanelHost: NSHostingView<AnyView> {
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         hullArea.map(removeTrackingArea)
-        let area = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+        let h = (window as? PopupWindow)?.panelSize.height ?? bounds.height
+        let rect = NSRect(x: 0, y: isFlipped ? 0 : bounds.height - h, width: bounds.width, height: h)
+        let area = NSTrackingArea(rect: rect, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
                                   owner: self)
         addTrackingArea(area)
         hullArea = area
@@ -305,20 +342,24 @@ final class PanelHost: NSHostingView<AnyView> {
 }
 
 func showPanel(_ name: String, _ view: AnyView, under anchor: NSRect, on surface: BarSurface, alignLeft: Bool = false) {
-    let host = PanelHost(rootView: view)
+    let host = PanelHost(panel: view)
     popupTopY = surface.window.frame.minY - 4
     popupScreen = surface.screen.frame
     popupAnchorX = alignLeft ? anchor.minX : anchor.maxX
     popupAlignLeft = alignLeft
-    let window = PopupWindow(contentRect: NSRect(origin: .zero, size: host.fittingSize),
+    // With no sizing options, the host reports a size of zero.
+    let fit = NSHostingView(rootView: view).fittingSize
+    let window = PopupWindow(contentRect: NSRect(x: 0, y: 0, width: fit.width, height: popupTopY - popupScreen.minY),
                              styleMask: .borderless, backing: .buffered, defer: false)
     window.isOpaque = false
     window.backgroundColor = .clear
     window.hasShadow = true
     window.level = .popUpMenu
     window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+    window.panelSize = fit
+    host.frame = NSRect(origin: .zero, size: window.frame.size)
     window.contentView = host
-    host.placeWindow()
+    window.place()
     window.alphaValue = 0
     window.orderFrontRegardless()
     NSAnimationContext.runAnimationGroup { ctx in
