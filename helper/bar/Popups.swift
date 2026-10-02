@@ -327,9 +327,10 @@ final class PanelHost: NSHostingView<AnyView> {
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         hullArea.map(removeTrackingArea)
+        // the panel only, not the clear space under it, so .inVisibleRect must stay off
         let h = (window as? PopupWindow)?.panelSize.height ?? bounds.height
         let rect = NSRect(x: 0, y: isFlipped ? 0 : bounds.height - h, width: bounds.width, height: h)
-        let area = NSTrackingArea(rect: rect, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+        let area = NSTrackingArea(rect: rect, options: [.mouseEnteredAndExited, .activeAlways],
                                   owner: self)
         addTrackingArea(area)
         hullArea = area
