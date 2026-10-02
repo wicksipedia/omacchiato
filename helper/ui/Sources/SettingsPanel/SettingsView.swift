@@ -261,14 +261,22 @@ struct SettingsThumbnail: View {
     var body: some View {
         GeometryReader { box in
             let room = CGSize(width: box.size.width - 16, height: box.size.height - 16)
-            let scale = size.width > 0 ? min(room.width / size.width, room.height / size.height, 1) : 0
+            let scale = thumbnailScale(room: room, panel: size)
             view.fixedSize()
                 .allowsHitTesting(false)
                 .onGeometryChange(for: CGSize.self) { $0.size } action: { size = $0 }
                 .scaleEffect(scale)
+                .opacity(size.width > 0 ? 1 : 0)
                 .frame(width: box.size.width, height: box.size.height)
         }
     }
+}
+
+// Never 0: a scroll view under a zero scale stops the bar with an AppKit
+// assertion. Before the panel is measured, draw it at full size and hide it.
+func thumbnailScale(room: CGSize, panel: CGSize) -> CGFloat {
+    guard panel.width > 0, panel.height > 0 else { return 1 }
+    return max(min(room.width / panel.width, room.height / panel.height, 1), 0.01)
 }
 
 let settingsDesktop = LinearGradient(colors: [.teal, .blue, .indigo], startPoint: .topLeading, endPoint: .bottomTrailing)

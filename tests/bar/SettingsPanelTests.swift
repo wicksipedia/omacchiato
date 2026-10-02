@@ -197,5 +197,13 @@ import Testing
         #expect(insertGlyph("*", into: text, at: TextSelection(range: word)) == "* = \nx")
         #expect(insertGlyph("*", into: text, at: nil) == "icon = \nx*")
     }
-}
 
+    @Test("a thumbnail never scales to 0, which crashes a scroll view inside it")
+    func thumbnailScaleIsNeverZero() {
+        let room = CGSize(width: 154, height: 214)
+        #expect(thumbnailScale(room: room, panel: .zero) == 1)
+        #expect(thumbnailScale(room: room, panel: CGSize(width: 380, height: 100_000)) > 0)
+        #expect(thumbnailScale(room: room, panel: CGSize(width: 77, height: 50)) == 1)
+        #expect(thumbnailScale(room: room, panel: CGSize(width: 308, height: 214)) == 0.5)
+    }
+}
