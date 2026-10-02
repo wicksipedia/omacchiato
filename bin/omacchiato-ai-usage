@@ -169,12 +169,14 @@ def usage_read_at(entry, pids):
     return min(ats) if ats else NOW
 
 
-def pick(metrics, want):
+def pick(metrics, want, fallback=True):
     """The metric that --pill names, else the most used one."""
     names = ("5h", "session") if want == "5h" else (want,)
     for m in metrics:
         if m.get("label", "").lower() in names:
             return m
+    if not fallback:
+        return None
     return max(metrics, key=lambda m: m.get("used_percent") or 0, default=None)
 
 
@@ -550,7 +552,10 @@ def label(quotas):
     picked = []
     for pid, want in PILL:
         outputs = quotas.get(pid)
-        picked.append(pick(active(outputs).get("metrics") or [], want) if outputs else None)
+        # A provider with no such window says nothing. Another window's
+        # percent under the same logo reads as the one the user picked.
+        strict = want in ("5h", "weekly")
+        picked.append(pick(active(outputs).get("metrics") or [], want, not strict) if outputs else None)
     found = [m for m in picked if m]
     if not found:
         return "--", "muted", []

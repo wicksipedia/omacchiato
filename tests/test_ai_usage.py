@@ -38,6 +38,23 @@ class Label(unittest.TestCase):
         self.assertEqual([ai.whole(s) for s in (30, 42 * 60, (4 * 60 + 46) * 60, 3 * 86400 + 5, 6 * 86400 + 23.6 * 3600)],
                          ["0:01", "0:42", "4:46", "3d", "7d"])
 
+    def test_a_provider_without_the_window_leaves_the_pill(self):
+        # Codex can report only a weekly window. Under "5h" its weekly
+        # percent must not stand in for a session.
+        ai.PILL = [("claude", "5h"), ("codex", "5h")]
+        week = [{"account": {"is_active": True}, "metrics": [{"label": "Weekly", "used_percent": 16}]}]
+        _, _, parts = ai.label({"claude": quota(30), "codex": week})
+        self.assertEqual([p["label"] for p in parts], ["30%"])
+        ai.PILL = [("claude", "5h"), ("codex", "weekly")]
+        _, _, parts = ai.label({"claude": quota(30), "codex": week})
+        self.assertEqual([p["label"] for p in parts], ["30%", "16%"])
+
+    def test_a_30_day_window_reads_the_most_used_metric(self):
+        ai.PILL = [("copilot", "30d")]
+        q = [{"account": {"is_active": True}, "metrics": [{"label": "Chat", "used_percent": 0},
+                                                          {"label": "Premium", "used_percent": 34}]}]
+        self.assertEqual(ai.label({"copilot": q})[0], "34%")
+
     def test_one_provider_reads_as_text(self):
         ai.PILL = [("claude", "5h")]
         self.assertEqual(ai.label({"claude": quota(12)}), ("12%", "green", []))
