@@ -35,15 +35,17 @@ public struct RemindersPRPanel: View {
                         .frame(maxWidth: .infinity).padding(.vertical, 8)
                 }
             } else {
-                PanelCard {
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(shown, id: \.0) { name, prs in
-                            VStack(alignment: .leading, spacing: 0) {
-                                RepoHeader(name: name, count: prs.count)
-                                ForEach(prs) { PRRow(pr: $0, now: report.now, actions: actions) }
+                PRScroll {
+                    PanelCard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(shown, id: \.0) { name, prs in
+                                VStack(alignment: .leading, spacing: 0) {
+                                    RepoHeader(name: name, count: prs.count)
+                                    ForEach(prs) { PRRow(pr: $0, now: report.now, actions: actions) }
+                                }
                             }
                         }
-                    }
+                }
                 }
             }
             if let updated = report.updatedStamp {
@@ -96,12 +98,14 @@ public struct InboxPRPanel: View {
             StaleNote(report: report, refresh: actions.refresh)
             StageBar(report: report)
             if report.prs.isEmpty { PanelCard { EmptyPRs() } }
-            ForEach(PRReport.Stage.allCases, id: \.self) { stage in
-                let prs = report.prs.filter { $0.stage == stage }
-                if !prs.isEmpty {
-                    PanelCard(title: stage.title, symbol: stage.symbol) {
-                        VStack(alignment: .leading, spacing: 0) {
-                            ForEach(prs) { PRRow(pr: $0, now: report.now, actions: actions, showRepo: true) }
+            PRScroll {
+                ForEach(PRReport.Stage.allCases, id: \.self) { stage in
+                    let prs = report.prs.filter { $0.stage == stage }
+                    if !prs.isEmpty {
+                        FoldCard(stage: stage, count: prs.count) {
+                            VStack(alignment: .leading, spacing: 0) {
+                                ForEach(prs) { PRRow(pr: $0, now: report.now, actions: actions, showRepo: true) }
+                            }
                         }
                     }
                 }
@@ -166,35 +170,37 @@ public struct TrackerPRPanel: View {
         VStack(spacing: 10) {
             StaleNote(report: report, refresh: actions.refresh)
             if report.prs.isEmpty { PanelCard { EmptyPRs() } }
-            ForEach(report.repos, id: \.name) { repo in
-                PanelCard {
-                    RepoHeader(name: repo.name, count: repo.prs.count)
-                    ForEach(repo.prs) { pr in
-                        HoverRow(action: pr.url.map { url in { actions.open(url) } }) {
-                            VStack(alignment: .leading, spacing: 6) {
-                                HStack(alignment: .firstTextBaseline) {
-                                    Text("#\(pr.number)").foregroundStyle(.secondary).monospacedDigit()
-                                    Text(pr.title).fontWeight(pr.unread ? .semibold : .regular).lineLimit(2)
-                                    Spacer(minLength: 4)
-                                    if pr.unread { UnreadDot(pr: pr, actions: actions) }
+            PRScroll {
+                ForEach(report.repos, id: \.name) { repo in
+                    PanelCard {
+                        RepoHeader(name: repo.name, count: repo.prs.count)
+                        ForEach(repo.prs) { pr in
+                            HoverRow(action: pr.url.map { url in { actions.open(url) } }) {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    HStack(alignment: .firstTextBaseline) {
+                                        Text("#\(pr.number)").foregroundStyle(.secondary).monospacedDigit()
+                                        Text(pr.title).fontWeight(pr.unread ? .semibold : .regular).lineLimit(2)
+                                        Spacer(minLength: 4)
+                                        if pr.unread { UnreadDot(pr: pr, actions: actions) }
+                                    }
+                                    .font(.system(size: 13))
+                                    Steps(pr: pr)
+                                    HStack {
+                                        Text(pr.note ?? pr.stage.title)
+                                            .foregroundStyle(pr.stage == .needsYou ? AnyShapeStyle(PanelColors.red)
+                                                                                    : AnyShapeStyle(.secondary))
+                                        Spacer()
+                                        if pr.state == .open { DiffSize(pr: pr) }
+                                        Text(ageText(pr.updated, now: report.now)).foregroundStyle(.secondary)
+                                    }
+                                    .font(.system(size: 11))
                                 }
-                                .font(.system(size: 13))
-                                Steps(pr: pr)
-                                HStack {
-                                    Text(pr.note ?? pr.stage.title)
-                                        .foregroundStyle(pr.stage == .needsYou ? AnyShapeStyle(PanelColors.red)
-                                                                                : AnyShapeStyle(.secondary))
-                                    Spacer()
-                                    if pr.state == .open { DiffSize(pr: pr) }
-                                    Text(ageText(pr.updated, now: report.now)).foregroundStyle(.secondary)
-                                }
-                                .font(.system(size: 11))
+                                .padding(.leading, CGFloat(pr.depth) * 14)
                             }
-                            .padding(.leading, CGFloat(pr.depth) * 14)
+                            .swipeToMarkRead(pr, actions)
                         }
-                        .swipeToMarkRead(pr, actions)
                     }
-                }
+            }
             }
             if let updated = report.updatedStamp {
                 UpdatedStamp(updated, staleAfter: PRReport.staleAfter, refresh: actions.refresh)

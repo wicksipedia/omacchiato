@@ -221,6 +221,12 @@ struct SwipeToMarkRead: ViewModifier {
 
     static let reveal: CGFloat = 72
 
+    // A row with no width yet has its whole content past the edge. That is
+    // not a swipe, and once it marked every PR read.
+    static func pastButton(offset: CGFloat, content: CGFloat, container: CGFloat) -> Bool {
+        container > 0 && offset > content - container + reveal
+    }
+
     func body(content: Content) -> some View {
         if let markRead = actions.markRead, pr.markRead != nil {
             ScrollView(.horizontal) {
@@ -256,7 +262,8 @@ struct SwipeToMarkRead: ViewModifier {
             .defaultScrollAnchor(revealed || marking ? .trailing : .leading)
             // the rubber band past the button is the long swipe
             .onScrollGeometryChange(for: Bool.self) { geo in
-                geo.contentOffset.x > geo.contentSize.width - geo.containerSize.width + Self.reveal
+                Self.pastButton(offset: geo.contentOffset.x, content: geo.contentSize.width,
+                                container: geo.containerSize.width)
             } action: { _, past in
                 if past { mark(markRead) }
             }
@@ -299,5 +306,70 @@ struct Spinner: View {
 extension View {
     func swipeToMarkRead(_ pr: PRReport.PR, _ actions: PRActions) -> some View {
         modifier(SwipeToMarkRead(pr: pr, actions: actions))
+    }
+}
+
+// The PR list scrolls past a height, so the stamp and links under it stay
+// in view. A ScrollView has no height of its own, so this layout gives it
+// the height of its content, up to the cap.
+struct ScrollCap: Layout {
+    var maxHeight: CGFloat = 520
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let child = subviews.first else { return .zero }
+        let size = child.sizeThatFits(ProposedViewSize(width: proposal.width, height: nil))
+        return CGSize(width: proposal.width ?? size.width, height: Swift.min(size.height, maxHeight))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews.first?.place(at: bounds.origin, proposal: ProposedViewSize(bounds.size))
+    }
+}
+
+struct PRScroll<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        ScrollCap {
+            ScrollView {
+                VStack(spacing: 10) { content }
+            }
+            .scrollBounceBehavior(.basedOnSize)
+        }
+    }
+}
+
+// A stage card that a click on its title folds away. A folded card shows
+// its count. The fold lasts until the popup closes.
+struct FoldCard<Content: View>: View {
+    var stage: PRReport.Stage
+    var count: Int
+    @ViewBuilder var content: Content
+    @State private var open = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        PanelCard {
+            HStack(spacing: 6) {
+                Label(stage.title.uppercased(), systemImage: stage.symbol)
+                Spacer(minLength: 4)
+                if !open { Text("\(count)").font(.system(size: 11, weight: .semibold, design: .rounded)) }
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+                    .rotationEffect(.degrees(open ? 90 : 0))
+            }
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .hoverFill(inset: 5)
+            .contentShape(.rect)
+            .onTapGesture {
+                withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) { open.toggle() }
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityValue(open ? "Expanded" : "Collapsed")
+            if open { content }
+        }
     }
 }

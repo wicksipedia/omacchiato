@@ -44,3 +44,9 @@ import Testing
         #expect(PRReport(now: now, prs: []).updatedStamp == nil)
     }
 }
+
+@Test func longSwipeNeedsALaidOutRow() {
+    #expect(SwipeToMarkRead.pastButton(offset: 200, content: 456, container: 380))
+    #expect(!SwipeToMarkRead.pastButton(offset: 76, content: 456, container: 380))
+    #expect(!SwipeToMarkRead.pastButton(offset: 0, content: 456, container: 0))
+}
