@@ -52,12 +52,14 @@ struct ProviderHeader: View {
 
 // A click folds a provider's windows away. A folded provider shows its
 // fullest window in the header. A service problem stays on screen either way.
+// The bar keeps each fold across popups and restarts. Until the first
+// click, the script's --open flag decides.
 struct ProviderSection<Content: View>: View {
     var provider: AIUsageReport.Provider
     var actions: AIUsageActions
     var health = true
     @ViewBuilder var content: Content
-    @State private var open: Bool
+    @AppStorage private var open: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(provider: AIUsageReport.Provider, actions: AIUsageActions, health: Bool = true,
@@ -66,7 +68,7 @@ struct ProviderSection<Content: View>: View {
         self.actions = actions
         self.health = health
         self.content = content()
-        _open = State(initialValue: provider.open)
+        _open = AppStorage(wrappedValue: provider.open, "aiProviderOpen.\(provider.id)")
     }
 
     var body: some View {
