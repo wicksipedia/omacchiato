@@ -1,11 +1,11 @@
-# Omacchiato: notes for Claude
+# Omacchiato: notes for Codex
 
 Omacchiato is an omarchy-style tiling desktop for macOS 26: a status bar,
 a gesture daemon, a workspace overview, themes and install scripts
 around the OmniWM window manager. README.md describes the features and
 CONTRIBUTING.md holds the design rules. This file holds what the code does not show.
 AGENTS.md holds the same notes for Codex: change both files together.
-Notes about one Mac go in CLAUDE.local.md, which git ignores.
+Notes about one Mac go in AGENTS.local.md, which git ignores.
 
 ## Repository
 
@@ -43,7 +43,7 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
 - There is no interactive `git add -p`. To stage part of a file, filter
   `git diff -U0 <file>` to the hunks you want and pipe the result to
   `git apply --cached --unidiff-zero -`.
-- End each message with the `Co-Authored-By: Claude` line. Do not add
+- End each message with a `Co-Authored-By` line for the agent. Do not add
   session links.
 - Apply the stop-slop rules to commit messages, PR text, README text and
   comments.
@@ -107,7 +107,7 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
 
 - Ask before a test that opens menus, posts clicks or moves the pointer.
   The user can be in a meeting or sharing the screen.
-- Never post an Escape key event. It can reach the Claude Code terminal.
+- Never post an Escape key event. It can reach the agent's terminal.
 - If the macOS menu bar stays on screen over the bar, quit the app whose
   menu bar icon was last pressed through Accessibility. A restart of
   SystemUIServer, the Dock or the bar does not release it.

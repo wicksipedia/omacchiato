@@ -8,5 +8,6 @@ __pycache__/
 config/aerospace/aerospace.toml
 .claude/worktrees/
 CLAUDE.local.md
+AGENTS.local.md
 .build/
 .swiftpm/
