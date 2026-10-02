@@ -340,12 +340,19 @@ struct PRScroll<Content: View>: View {
 }
 
 // A stage card that a click on its title folds away. A folded card shows
-// its count. The fold lasts until the popup closes.
+// its count. The bar keeps each fold across popups and restarts.
 struct FoldCard<Content: View>: View {
     var stage: PRReport.Stage
     var count: Int
     @ViewBuilder var content: Content
-    @State private var open = true
+    @AppStorage private var open: Bool
+
+    init(stage: PRReport.Stage, count: Int, @ViewBuilder content: () -> Content) {
+        self.stage = stage
+        self.count = count
+        self.content = content()
+        _open = AppStorage(wrappedValue: true, "prStageOpen.\(stage)")
+    }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
