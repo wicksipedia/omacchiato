@@ -503,7 +503,10 @@ for event in [NSWorkspace.didLaunchApplicationNotification,
 // The retries above stop at 15 s, and OmniWM's socket can take longer to
 // answer after a settings migration. So while a surface has no monitor,
 // look for OmniWM again every 5 s.
+// NSWorkspace posts no launch notification for an LSUIElement app such as
+// OmniWM. So the timer also restarts the stream after OmniWM relaunches.
 Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
+    startOmniWatch()
     guard surfaces.contains(where: { $0.monitorID.isEmpty }) else { return }
     rebuildSurfaces()
     kickRebuild()
