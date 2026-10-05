@@ -438,7 +438,7 @@ AXEnhancedUserInterface (Electron) tax, but excludes the closing lane.
 
 ## 7. IPC / CLI surface (cross-cutting)
 
-Unix socket (`$OMNIWM_SOCKET` or `~/Library/Caches/com.barut.OmniWM/ipc.sock`), newline-delimited
+Unix socket (`$OMNIWM_SOCKET` or `~/Library/Application Support/com.barut.OmniWM/ipc.sock`), newline-delimited
 JSON, protocol v11; peer-uid check + per-launch bearer token in a 0600 `.secret` file; **off by
 default** (`Sources/OmniWMIPC/IPCSocketPath.swift`, `IPC/IPCServer.swift`). `omniwmctl` is fully
 manifest-driven (`IPCAutomationManifest.swift` generates usage + shell completions).

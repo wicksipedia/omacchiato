@@ -11,7 +11,7 @@ before you assume that a strange layout is Omacchiato's fault.
   other manager quits.
 - **IPC socket** had to be enabled once from OmniWM's status-bar menu
   before omniwmctl worked (socket:
-  ~/Library/Caches/com.barut.OmniWM/ipc.sock).
+  ~/Library/Application Support/com.barut.OmniWM/ipc.sock).
 - **Dwindle ignores outer gaps** — DwindleSettings carries only
   innerGap; [gaps.outer] is Niri-only. Verified empirically (top=42
   and bottom=60 both no-ops after forced relayout; innerGap

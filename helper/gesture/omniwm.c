@@ -31,7 +31,7 @@ static void socket_path(char* out, size_t n)
 	if (env && *env) { snprintf(out, n, "%s", env); return; }
 	const char* home = getenv("HOME");
 	if (!home || !*home) { struct passwd* pw = getpwuid(getuid()); home = pw ? pw->pw_dir : "/"; }
-	snprintf(out, n, "%s/Library/Caches/com.barut.OmniWM/ipc.sock", home);
+	snprintf(out, n, "%s/Library/Application Support/com.barut.OmniWM/ipc.sock", home);
 }
 
 bool omniwm_available(void)

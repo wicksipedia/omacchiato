@@ -330,7 +330,7 @@ code, message, exitCode}` envelope (no version/id).
 
 ### Security model (all verified in `IPCServer.swift`)
 
-- Socket `~/Library/Caches/com.barut.OmniWM/ipc.sock` (override:
+- Socket `~/Library/Application Support/com.barut.OmniWM/ipc.sock` (override:
   `OMNIWM_SOCKET`; secret always `<socket>.secret`). IPC is **off by default**;
   menu toggle creates/removes socket + secret.
 - Socket chmod `0600` after bind (line 279); new socket dirs `0700`; secret
