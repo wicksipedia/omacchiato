@@ -19,6 +19,17 @@ import Testing
         #expect(Metric(label: "5h", used: 0.1, resetsIn: 4.9 * 3600, span: 5 * 3600).forecastText == nil)
     }
 
+    @Test("the reset time names the day")
+    func resetAt() {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC")!
+        let us = Locale(identifier: "en_US")
+        let now = cal.date(from: DateComponents(year: 2026, month: 10, day: 6, hour: 12))!  // a Tuesday
+        #expect(resetAtText(now + 2 * 3600 - 10, now: now, calendar: cal, locale: us) == "Today 2:00\u{202F}PM")
+        #expect(resetAtText(now + 4 * 86400 + 2 * 3600, now: now, calendar: cal, locale: us) == "Sat 2:00\u{202F}PM")
+        #expect(resetAtText(now + 30 * 86400, now: now, calendar: cal, locale: us) == "Nov 5")
+    }
+
     @Test("the panel reads the script's JSON")
     func decode() throws {
         let text = """

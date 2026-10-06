@@ -227,6 +227,20 @@ public func resetText(_ left: TimeInterval) -> String {
     return h > 0 ? "\(h)h \(m)m" : "\(m)m"
 }
 
+// The moment of the reset: "Today 2:00 PM" on the same day, "Sat 2:00 PM"
+// within the week, and "Oct 9" past that.
+public func resetAtText(_ at: Date, now: Date, calendar: Calendar = .current, locale: Locale = .current) -> String {
+    let at = Date(timeIntervalSinceReferenceDate: (at.timeIntervalSinceReferenceDate / 60).rounded() * 60)
+    let time = at.formatted(Date.FormatStyle(locale: locale, calendar: calendar, timeZone: calendar.timeZone).hour().minute())
+    if calendar.isDate(at, inSameDayAs: now) { return "Today \(time)" }
+    let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: at)).day ?? 0
+    if days < 7 {
+        let day = at.formatted(Date.FormatStyle(locale: locale, calendar: calendar, timeZone: calendar.timeZone).weekday(.abbreviated))
+        return "\(day) \(time)"
+    }
+    return at.formatted(Date.FormatStyle(locale: locale, calendar: calendar, timeZone: calendar.timeZone).month(.abbreviated).day())
+}
+
 extension AIUsageReport.Metric {
     // One line on where the window is heading at the current rate.
     public var forecastText: String? {

@@ -48,6 +48,17 @@ public struct RingsAIUsagePanel: View {
         .statusPanelBackground(width: 340)
     }
 
+    // A window shorter than a day needs no day. A window that resets with
+    // an earlier one names that one, as Fable does with Weekly.
+    func resetCaption(_ metrics: [AIUsageReport.Metric], _ i: Int) -> String? {
+        let m = metrics[i]
+        guard let left = m.resetsIn, (m.span ?? .infinity) >= 86400 else { return nil }
+        if let twin = metrics[..<i].first(where: { abs(($0.resetsIn ?? -.infinity) - left) < 60 }) {
+            return "With \(twin.label)"
+        }
+        return resetAtText(report.now + left, now: report.now)
+    }
+
     // One row per window. "Resets in" shows once, above the time column.
     func legend(_ metrics: [AIUsageReport.Metric]) -> some View {
         Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 7) {
@@ -69,10 +80,21 @@ public struct RingsAIUsagePanel: View {
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle(m.tint == PanelColors.green ? AnyShapeStyle(.primary) : AnyShapeStyle(m.tint))
                         .gridColumnAlignment(.trailing)
-                    Text(m.resetsIn.flatMap { $0 > 0 ? resetText($0) : nil } ?? "")
-                        .font(.system(size: 12, design: .rounded))
-                        .foregroundStyle(.secondary)
+                    if let left = m.resetsIn, left > 0 {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(resetText(left))
+                                .font(.system(size: 12, design: .rounded))
+                                .foregroundStyle(.secondary)
+                            if let caption = resetCaption(metrics, i) {
+                                Text(caption)
+                                    .font(.system(size: 10, design: .rounded))
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
                         .monospacedDigit()
+                        .lineLimit(1)
+                        .fixedSize()
+                    }
                 }
             }
         }
