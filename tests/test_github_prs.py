@@ -119,6 +119,18 @@ class Marks(unittest.TestCase):
                          gh.icon(pr(0, ci="FAILURE"), "me"))
 
 
+class Pill(unittest.TestCase):
+    def test_no_open_prs_shows_a_green_check(self):
+        p = gh.render([], [], {}, "me")
+        self.assertEqual(p["label"], "")
+        self.assertEqual(p["parts"], [{"icon": "\U000F0791", "icon_color": "green"}])
+
+    def test_open_prs_show_the_count(self):
+        p = gh.render([pr(1)], [], {}, "me")
+        self.assertEqual(p["label"], "1")
+        self.assertNotIn("parts", p)
+
+
 class Panel(unittest.TestCase):
     def test_panel_lists_each_pr_in_stack_order(self):
         failing = pr(2, ci="FAILURE", base="branch-1")
