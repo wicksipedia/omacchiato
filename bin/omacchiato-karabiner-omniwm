@@ -71,7 +71,7 @@ rules = slot_rules + [
     # omacchiato-spawn preselects the omarchy insertion side and serializes
     # bursts — a bare `open -na` gives OmniWM's above-not-below spiral
     rule("terminal", "return_or_enter", SUPER, cmd=f"{home}/.local/bin/omacchiato-spawn '{apps['TERMINAL']}'"),
-    rule("browser", "return_or_enter", SHIFT, cmd=f"open -a '{apps['BROWSER']}'"),
+    rule("browser", "return_or_enter", SHIFT, cmd=f"{home}/.local/bin/omacchiato-spawn '{apps['BROWSER']}'"),
     # OmniWM's command palette on the launcher chord; Raycast keeps its
     # own Cmd+Space hotkey
     rule("launcher", "spacebar", SUPER, cmd=f"{ctl} command open-command-palette >/dev/null 2>&1"),

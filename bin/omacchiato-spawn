@@ -38,5 +38,10 @@ before="$("$OMNI" window-count 2>/dev/null || echo 0)"
 # never shows a window cannot wedge the terminal key.
 "$OMNI" wait-window "$before" 2000 >/dev/null 2>&1 &
 waiter=$!
-open -na "$APP"
+# A second Safari process does not open a window, so ask the running one.
+if [ "$APP" = Safari ] && pgrep -xq Safari; then
+  osascript -e 'tell application "Safari"' -e 'make new document' -e 'activate' -e 'end tell' >/dev/null 2>&1
+else
+  open -na "$APP"
+fi
 wait "$waiter" 2>/dev/null || true
