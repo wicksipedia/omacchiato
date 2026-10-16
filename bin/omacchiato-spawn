@@ -27,6 +27,18 @@ done
 trap 'rmdir "$LOCK" 2>/dev/null' EXIT
 
 OMNI="$HOME/.local/bin/omacchiato-omni"
+
+# Open on the workspace that the display under the pointer shows.
+# OmniWM frames are y-up from the main display's bottom, the cursor is y-down.
+IFS=, read -r cx cy <<<"$("$HOME/.local/bin/omacchiato-helper" cursor 2>/dev/null)"
+if [ -n "$cy" ]; then
+  ws="$("$OMNI" query displays 2>/dev/null | /usr/bin/jq -r --argjson x "$cx" --argjson y "$cy" '
+    .result.payload.displays as $d | ($d[] | select(.isMain) | .frame.height) as $mh
+    | [$d[] | select(.frame as $f | $x >= $f.x and $x < $f.x + $f.width
+        and $mh - $y >= $f.y and $mh - $y < $f.y + $f.height)
+      | .activeWorkspace.rawName][0] // empty' 2>/dev/null)"
+  [ -n "$ws" ] && [ "$ws" != "$("$OMNI" active 2>/dev/null)" ] && "$OMNI" focus "$ws" >/dev/null 2>&1
+fi
 mult="$(sed -n 's/^splitWidthMultiplier = //p' "$HOME/.config/omniwm/settings.toml" 2>/dev/null | head -1)"
 "$OMNI" preselect-for-focused "${mult:-1.4}" >/dev/null 2>&1 || true
 before="$("$OMNI" window-count 2>/dev/null || echo 0)"
