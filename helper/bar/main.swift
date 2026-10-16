@@ -500,6 +500,27 @@ for event in [NSWorkspace.didLaunchApplicationNotification,
     }
 }
 
+// A new app window opens on OmniWM's focused display, which can be the
+// other screen while focus follows clicks only. So when an app with a
+// Dock icon launches, focus the workspace under the pointer first.
+// "Will launch" beats the first window, but macOS sends it for some
+// launches only, so "did launch" covers the rest.
+for event in [NSWorkspace.willLaunchApplicationNotification,
+              NSWorkspace.didLaunchApplicationNotification] {
+    NSWorkspace.shared.notificationCenter.addObserver(forName: event, object: nil, queue: .main) { note in
+        guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+              !isOmniWM(app.bundleIdentifier), hasDockIcon(app) else { return }
+        let pointer = NSEvent.mouseLocation
+        guard let ws = surfaces.first(where: { $0.screen.frame.contains(pointer) })?.visible,
+              !ws.isEmpty, ws != model.focused else { return }
+        tlog("launch: \(app.localizedName ?? "?") -> workspace \(ws)")
+        model.focused = ws
+        DispatchQueue.global().async {
+            _ = shell(NSHomeDirectory() + "/.local/bin/omacchiato-omni", ["focus", ws], timeout: omniTimeout)
+        }
+    }
+}
+
 // The retries above stop at 15 s, and OmniWM's socket can take longer to
 // answer after a settings migration. So while a surface has no monitor,
 // look for OmniWM again every 5 s.

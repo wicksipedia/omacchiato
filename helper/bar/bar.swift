@@ -123,6 +123,16 @@ func omniQuery(_ name: String, _ args: [String] = []) -> [String: Any]? {
     return result["payload"] as? [String: Any]
 }
 
+// At "will launch" the activation policy is not known yet, so read the
+// bundle's Info.plist.
+func hasDockIcon(_ app: NSRunningApplication) -> Bool {
+    if app.activationPolicy == .regular { return true }
+    guard app.activationPolicy == .prohibited, let url = app.bundleURL,
+          let info = Bundle(url: url)?.infoDictionary else { return false }
+    let on = { (key: String) in (info[key] as? Bool) == true || (info[key] as? String) == "1" }
+    return url.pathExtension == "app" && !on("LSUIElement") && !on("LSBackgroundOnly")
+}
+
 // Click to jump. OmniWM's focus-name call resolves a raw workspace ID
 // across all monitors, which matches a chip on either display.
 func focusWorkspace(_ ws: String) {
