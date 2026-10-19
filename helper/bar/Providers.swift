@@ -26,17 +26,49 @@ import ThemePanel
 import WeatherPanel
 #endif
 
-// --- clock (no publisher, so poll every minute)
+// --- clock (no publisher, so poll every minute, or every second for a pattern with seconds)
+var clockFormatter = makeClockFormatter("")
+var clockTimer: DispatchSourceTimer?
+var displaysAsleep = false
+
+// The clock ticks on the boundary rather than every 60 s from launch, so
+// it never shows a stale minute. A config reload calls this again, so a
+// pattern that gains or loses seconds changes the rate.
+func scheduleClock() {
+    guard !displaysAsleep else { return }
+    updateClock()
+    let seconds = clockShowsSeconds(clockFormatter.dateFormat)
+    let now = Date()
+    if !seconds || Calendar.current.component(.second, from: now) == 0 { refreshPowerMode() }
+    let next = seconds ? now.timeIntervalSinceReferenceDate.rounded(.down) + 1
+        : (Calendar.current.nextDate(after: now, matching: DateComponents(second: 0), matchingPolicy: .nextTime)
+           ?? now.addingTimeInterval(60)).timeIntervalSinceReferenceDate
+    if clockTimer == nil {
+        let timer = DispatchSource.makeTimerSource(queue: .main)
+        timer.setEventHandler { scheduleClock() }
+        timer.resume()
+        clockTimer = timer
+    }
+    clockTimer?.schedule(deadline: .now() + max(0.05, next - now.timeIntervalSinceReferenceDate),
+                         leeway: .milliseconds(100))
+}
+
+func stopClock() {
+    clockTimer?.cancel()
+    clockTimer = nil
+}
+
 func updateClock() {
-    let f = DateFormatter()
-    f.dateFormat = "EEE dd MMM  HH:mm"
+    let pattern = clockPattern(format: pillModes["clock_format"], hours: pillModes["clock_hours"],
+                               systemIs24: systemUses24Hour())
+    if clockFormatter.dateFormat != pattern { clockFormatter = makeClockFormatter(pattern) }
     loadTodayEvents()
     let now = Date()
     let next = todayEvents.first { soonLabel(start: $0.startDate, allDay: $0.isAllDay, now: now) != nil }
     soonMeetingLink = next.flatMap { meetingLink(url: $0.url, location: $0.location, notes: $0.notes) }
     set("clock") {
         $0.icon = "󰃰"
-        $0.label = f.string(from: now)
+        $0.label = clockLabel(clockFormatter.string(from: now))
         $0.tickerText = demoMode ? "" : next.map { $0.title ?? "event" } ?? ""
         $0.tickerTail = next.flatMap { soonLabel(start: $0.startDate, allDay: $0.isAllDay, now: now) } ?? ""
     }

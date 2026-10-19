@@ -49,6 +49,7 @@ func reloadConfig() {
     startProviders()
     // The volume pill has no timer, so a new `volume` mode applies here.
     updateVolume()
+    scheduleClock()
     // The jiggle interval and display sleep apply to a running keep awake.
     applyKeepAwake()
 

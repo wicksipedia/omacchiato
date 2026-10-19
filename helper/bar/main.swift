@@ -901,18 +901,18 @@ for event in [NSWorkspace.didLaunchApplicationNotification,
     }
 }
 
-// clock and weather have no publisher to listen to. The clock ticks on
-// the minute boundary rather than every 60 s from launch, so it never
-// shows a stale minute.
-func scheduleClock() {
-    updateClock()
-    refreshPowerMode()
-    let now = Date()
-    let nextMinute = Calendar.current.nextDate(after: now, matching: DateComponents(second: 0),
-                                               matchingPolicy: .nextTime) ?? now.addingTimeInterval(60)
-    DispatchQueue.main.asyncAfter(deadline: .now() + max(1, nextMinute.timeIntervalSinceNow)) { scheduleClock() }
-}
 scheduleClock()
+// A display that sleeps shows no clock, so the clock stops until it wakes.
+NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.screensDidSleepNotification,
+                                                  object: nil, queue: .main) { _ in
+    displaysAsleep = true
+    stopClock()
+}
+NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.screensDidWakeNotification,
+                                                  object: nil, queue: .main) { _ in
+    displaysAsleep = false
+    scheduleClock()
+}
 
 // Some providers run only while their pill is on the bar. A reload starts
 // the provider of a pill that comes back. A provider is never stopped:
