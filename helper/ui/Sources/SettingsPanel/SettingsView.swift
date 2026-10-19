@@ -4,6 +4,7 @@ import StatusPanel
 import ThemePanel
 import SoundPanel
 import KeepAwakePanel
+import BarPills
 #endif
 
 // The Omacchiato Settings window, laid out as System Settings: a sidebar
@@ -176,6 +177,7 @@ struct SettingsPillPage: View {
                     }
                 }
             }
+            if let clock = pill.clock { SettingsClockSection(clock: clock, actions: actions) }
             if pill.shown {
                 if let options = pill.aiUsage {
                     SettingsAIUsagePill(options: options) { actions.setPlugin(pill.key, "command", $0.command) }
@@ -469,6 +471,58 @@ struct SettingsGlyph: View {
         } else {
             Text(glyph).font(.custom("JetBrainsMono Nerd Font", size: size))
         }
+    }
+}
+
+struct SettingsClockSection: View {
+    var clock: SettingsReport.Clock
+    var actions: SettingsActions
+    static let titles = ["full": "Full", "short": "Short", "date": "Date", "iso": "ISO"]
+
+    var body: some View {
+        Section {
+            // Each title carries an example, so it reads the time again each minute.
+            TimelineView(.everyMinute) { context in
+                Picker("Format", selection: Binding(get: { clock.custom ? "custom" : clock.format ?? "full" }, set: { value in
+                    // Custom starts from the pattern on show, so the pill does not change until it is edited.
+                    if value == "custom" { actions.set("clock_format", clock.pattern(clock.format)) }
+                    else { actions.set("clock_format", value == "full" ? nil : value) }
+                })) {
+                    ForEach(clockPresets, id: \.key) { preset in
+                        Text("\(Self.titles[preset.key] ?? preset.key)  \(text(clock.pattern(preset.key), context.date))")
+                            .tag(preset.key)
+                    }
+                    Text("Custom").tag("custom")
+                }
+                .pickerStyle(.menu)
+            }
+            Picker("Hours", selection: Binding(get: { clock.hours ?? "auto" },
+                                               set: { actions.set("clock_hours", $0 == "auto" ? nil : $0) })) {
+                Text("Auto").tag("auto")
+                Text("12").tag("12")
+                Text("24").tag("24")
+            }
+            .pickerStyle(.segmented)
+            .disabled(clock.custom)
+            if clock.custom, let format = clock.format {
+                SettingsTextRow(title: "Pattern", value: format, font: .system(.body, design: .monospaced)) {
+                    actions.set("clock_format", $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0)
+                }
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    LabeledContent("Preview", value: text(format, context.date))
+                }
+            }
+        } header: {
+            Text("Format")
+        } footer: {
+            if clock.custom {
+                Text("HH hours, h 12-hour hours, mm minutes, ss seconds, a AM or PM, EEE day, dd date, MMM month, yyyy year. Put other text in single quotes.")
+            }
+        }
+    }
+
+    func text(_ pattern: String, _ date: Date) -> String {
+        clockLabel(makeClockFormatter(pattern).string(from: date))
     }
 }
 

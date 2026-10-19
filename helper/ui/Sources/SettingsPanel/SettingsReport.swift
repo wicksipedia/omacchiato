@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 #if canImport(ThemePanel)
 import ThemePanel
+import BarPills
 #endif
 
 // What the settings window shows. The bar builds it from bar-pills.conf,
@@ -42,6 +43,7 @@ public struct SettingsReport {
         public var aiUsage: AIUsageOptions?
         public var plugin: PluginFields?
         public var panelKind: String?    // which panel the designs belong to, for their previews
+        public var clock: Clock?         // the clock pill's format, nil on every other pill
 
         public init(key: String, title: String, symbol: String, tint: String = "gray", summary: String = "",
                     group: Group = .bar, optIn: Bool = false, value: String? = nil, styles: [Choice] = [],
@@ -100,6 +102,27 @@ public struct SettingsReport {
         public var shownPanelDesigns: [Choice] {
             panelDesigns.contains { $0.value == panelValue } || panelDesigns.isEmpty
                 ? panelDesigns : panelDesigns + [Choice(panelValue, panelValue ?? "Default")]
+        }
+    }
+
+    // The raw `clock_format` and `clock_hours` values.
+    public struct Clock {
+        public var format: String?
+        public var hours: String?
+
+        public init(format: String?, hours: String?) {
+            self.format = format
+            self.hours = hours
+        }
+
+        // A format that is not a preset name is a custom pattern.
+        public var custom: Bool {
+            guard let format, !format.isEmpty else { return false }
+            return !clockPresets.contains { $0.key == format }
+        }
+
+        public func pattern(_ format: String?, systemIs24: Bool = systemUses24Hour()) -> String {
+            clockPattern(format: format, hours: hours, systemIs24: systemIs24)
         }
     }
 

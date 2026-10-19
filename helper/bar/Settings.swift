@@ -9,9 +9,9 @@ import ThemePanel
 // --- the Omacchiato Settings window -----------------------------------------
 
 // What each pill's page offers. Keep in sync with the code that reads each
-// key: pillOrder and iconOnly (Plugins.swift), updateVolume and
-// updateBattery (Providers.swift), panelView (Popups.swift), leftGap,
-// rightGap and mediaMaxWidth (BarView.swift).
+// key: pillOrder and iconOnly (Plugins.swift), updateVolume,
+// updateBattery and updateClock (Providers.swift), panelView
+// (Popups.swift), leftGap, rightGap and mediaMaxWidth (BarView.swift).
 struct PillInfo {
     var title: String
     var symbol: String
@@ -84,7 +84,9 @@ func settingsReport() -> SettingsReport {
     var pills = ["menubar"].compactMap { key in builtinPills[key].map { pill(key, $0, group: .bar, designs: key) } }
     for key in rightOrderAll {
         guard let info = builtinPills[key] else { continue }
-        pills.append(pill(key, info, group: .bar, designs: key))
+        var page = pill(key, info, group: .bar, designs: key)
+        if key == "clock" { page.clock = .init(format: pillModes["clock_format"], hours: pillModes["clock_hours"]) }
+        pills.append(page)
     }
     for plugin in barPlugins {
         let program = (plugin.command.split(separator: " ").first.map(String.init) ?? "") as NSString

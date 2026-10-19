@@ -50,7 +50,7 @@ let package = Package(
         .target(name: "PanelDesigns", dependencies: ["StatusPanel", "MenuBarPanel", "ActivityPanel", "CalendarPanel",
                                                      "PRPanel", "AIUsagePanel"]),
         .target(name: "SettingsPanel", dependencies: ["StatusPanel", "ThemePanel", "PanelDesigns", "SoundPanel",
-                                                     "KeepAwakePanel"]),
+                                                     "KeepAwakePanel", "BarPills"]),
     ],
     swiftLanguageModes: [.v5]
 )

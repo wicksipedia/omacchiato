@@ -6,6 +6,14 @@ import Testing
 @Suite struct SettingsPanelTests {
     let file = "# pills\nvolume = muted\n\n# the title\nmedia = 49\n"
 
+    @Test("a clock format is custom only when it is not empty and not a preset name")
+    func clockCustom() {
+        #expect(!SettingsReport.Clock(format: nil, hours: nil).custom)
+        #expect(!SettingsReport.Clock(format: "", hours: nil).custom)
+        #expect(!SettingsReport.Clock(format: "iso", hours: nil).custom)
+        #expect(SettingsReport.Clock(format: "HH:mm", hours: nil).custom)
+    }
+
     @Test("setting a key changes its line and keeps the comments, blank lines and order")
     func replace() {
         #expect(confSet(file, key: "media", value: "30") == "# pills\nvolume = muted\n\n# the title\nmedia = 30\n")
