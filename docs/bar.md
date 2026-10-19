@@ -26,6 +26,16 @@ zero, as a red icon, the same way the microphone pill works.
 `battery = time` shows only the battery icon on AC power; on battery
 it adds the time left, in whole hours or in minutes under an hour.
 
+`clock_format` sets the clock's text. It takes `full` (the default,
+`Mon 19 Oct  16:21`), `short` (`16:21`), `date` (`Mon 19 Oct`), `iso`
+(`2026-10-19 16:21`), or a pattern of your own in `DateFormatter`
+symbols, such as `EEE d MMM HH:mm:ss`. `clock_hours` takes `12`, `24`
+or `auto` (the default), and `auto` follows the 24-hour time switch in
+System Settings. A pattern of your own sets its own hours, so
+`clock_hours` does not change it. The clock ticks each second only
+while the pattern shows seconds, and each minute otherwise. The text is
+cut at 32 characters.
+
 The status pill is one gauge for the battery and the wi-fi, and it
 replaces the `wifi` and `battery` pills. The ring is the Mac battery,
 and the four dots that close the ring at the bottom are the wi-fi
