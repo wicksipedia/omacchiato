@@ -35,6 +35,22 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   `~/Documents`, `~/Desktop` or `~/Downloads` gets copies instead,
   because TCC blocks launchd agents from those folders.
 
+## Feature workflow
+
+- Build a new feature or a change of behaviour through the skills of
+  the `agent-skills` plugin, in this order:
+  1. `agent-skills:idea-refine` writes `docs/ideas/<name>.md`.
+  2. `agent-skills:spec` writes `docs/plans/<date>-<name>-spec.md`.
+  3. `agent-skills:plan` writes `tasks/plan.md` and `tasks/todo.md`.
+  4. `agent-skills:build` does the tasks, one at a time.
+- Get the user's approval at the end of each step before the next one
+  starts.
+- Use the `agent-skills:` name in full. Do not use a skill of another
+  plugin for one of these steps, such as `brainstorming`,
+  `product-management:write-spec` or `engineering:architecture`.
+- To skip a step, ask the user first. A bug fix or a small change with
+  clear requirements needs no idea or spec.
+
 ## Commits and pushes
 
 - Write the message to a file and use `git commit -F <file>`. In zsh, a
