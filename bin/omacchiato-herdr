@@ -1,0 +1,21 @@
+#!/bin/bash
+# omacchiato-herdr: focus the herdr window that this script opened, or
+# open one.
+OMNI="$HOME/.local/bin/omacchiato-omni"
+STATE="$HOME/.local/state/omacchiato/herdr-window"
+
+id="$(cat "$STATE" 2>/dev/null)"
+if [ -n "$id" ] && "$OMNI" focus-window "$id" >/dev/null 2>&1; then
+  exit 0
+fi
+# open passes our environment to Ghostty, and herdr refuses to nest.
+unset "${!HERDR_@}"
+# Karabiner gives launchd's PATH, which has no Homebrew.
+PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+herdr="$(command -v herdr)" || exit 1
+"$HOME/.local/bin/omacchiato-spawn" Ghostty --command="$herdr"
+mkdir -p "$(dirname "$STATE")"
+"$OMNI" query focused-window 2>/dev/null \
+  | /usr/bin/jq -r '.result.payload.window | select(.app.bundleId == "com.mitchellh.ghostty") | .id // empty' \
+  >"$STATE.tmp" && [ -s "$STATE.tmp" ] && mv "$STATE.tmp" "$STATE"
+rm -f "$STATE.tmp"

@@ -574,6 +574,7 @@ from the live config, and you can type to filter it.
 |---|---|
 | `Super+Enter` | terminal, spawned on the omarchy side of the focused tile (*Karabiner*) |
 | `Super+Shift+Enter` | browser (*Karabiner*) |
+| `Super+A` | the herdr window: focus it, or open one if none is open (*Karabiner*) |
 | `Super+Space` | OmniWM's command palette (*Karabiner*) |
 | `Alt+`` ` `` | OmniWM's quake terminal, which reads the Ghostty config |
 | `Ctrl+Alt+M` | the front app's menu bar as a menu at the pointer |

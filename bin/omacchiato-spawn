@@ -1,6 +1,7 @@
 #!/bin/bash
-# omacchiato-spawn <App> — open a new window of App on the omarchy side of
-# the focused tile, one spawn at a time.
+# omacchiato-spawn <App> [args...] — open a new window of App on the
+# omarchy side of the focused tile, one spawn at a time. The args go to
+# the app through `open --args`.
 #
 # OmniWM's dwindle insertion side is not omarchy's: with smartSplit off a
 # new window goes RIGHT in horizontal splits and ABOVE in vertical ones
@@ -15,6 +16,7 @@
 # and over.
 APP="$1"
 [ -n "$APP" ] || exit 1
+shift
 
 # macOS ships no flock; mkdir is the portable atomic lock. A holder that
 # died is stolen after ~5s so the terminal key can never go dead.
@@ -54,6 +56,6 @@ waiter=$!
 if [ "$APP" = Safari ] && pgrep -xq Safari; then
   osascript -e 'tell application "Safari"' -e 'make new document' -e 'activate' -e 'end tell' >/dev/null 2>&1
 else
-  open -na "$APP"
+  open -na "$APP" ${1:+--args} "$@"
 fi
 wait "$waiter" 2>/dev/null || true
