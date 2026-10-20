@@ -5,6 +5,10 @@
 
 export PATH="$HOME/.local/bin:$PATH"
 
+# Claude Code draws pictures only when TERM_PROGRAM names Ghostty or kitty.
+# Inside herdr it names herdr, which passes the kitty graphics through.
+[ "$TERM_PROGRAM" = herdr ] && export CLAUDE_CODE_FORCE_TERMINAL_IMAGES=1
+
 # omacchiato repo location, derived from the installed theme-set symlink
 if [ -L "$HOME/.local/bin/theme-set" ]; then
   export OMACCHIATO="$(dirname "$(dirname "$(readlink -f "$HOME/.local/bin/theme-set")")")"
