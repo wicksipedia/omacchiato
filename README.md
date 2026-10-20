@@ -80,9 +80,9 @@ Accounts, keeps the permission grants across rebuilds; see
 up anything it would replace), copies OmniWM's settings template once,
 adds Karabiner rules for your app choices, hides the native menu bar,
 applies the default theme (tokyo-night) and starts the services. It
-also checks app versions against `config/requirements.conf`, starting
-with OmniWM 0.7.0, and prints the `brew` command that fixes an app
-that is too old.
+also checks app versions against `config/requirements.conf`: OmniWM,
+and herdr if it is installed. It prints the `brew` command that fixes
+one that is too old.
 
 [Permissions](#permissions) lists every grant it asks for, what each
 one is used for, and what breaks without it. Karabiner-Elements also

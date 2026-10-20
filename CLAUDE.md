@@ -28,7 +28,8 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   a binary only when its CDHash changed. `OMACCHIATO_BUILD=1` forces a
   build.
 - `config/requirements.conf` holds the minimum app versions that
-  `bin/omacchiato-requirements` checks. Raise one when Omacchiato starts to
+  `bin/omacchiato-requirements` checks. A `formula:<name>` line is an
+  optional command-line tool, such as herdr. Raise one when Omacchiato starts to
   write a setting that only a newer version of the app reads.
 - The clone lives at `~/.local/share/omacchiato`, and configs are symlinked
   into it, so an edit to a symlinked config is live. A clone in
