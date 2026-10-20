@@ -36,3 +36,28 @@ resize-overlay = never
 # Without this, closing the window leaves its windowless instance
 # running forever: ten stale ghostty processes after a day's work.
 quit-after-last-window-closed = true
+
+# herdr runs in every window and binds these keys itself.
+keybind = super+t=unbind
+keybind = super+w=unbind
+keybind = super+n=unbind
+keybind = super+digit_1=unbind
+keybind = super+digit_2=unbind
+keybind = super+digit_3=unbind
+keybind = super+digit_4=unbind
+keybind = super+digit_5=unbind
+keybind = super+digit_6=unbind
+keybind = super+digit_7=unbind
+keybind = super+digit_8=unbind
+keybind = super+1=unbind
+keybind = super+2=unbind
+keybind = super+3=unbind
+keybind = super+4=unbind
+keybind = super+5=unbind
+keybind = super+6=unbind
+keybind = super+7=unbind
+keybind = super+8=unbind
+keybind = super+9=unbind
+# If unbound, ctrl+tab reaches herdr as a plain Tab, so send the CSI-u form.
+keybind = ctrl+tab=text:\x1b[9;5u
+keybind = ctrl+shift+tab=text:\x1b[9;6u

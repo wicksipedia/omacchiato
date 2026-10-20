@@ -38,5 +38,29 @@ class HerdrKeys(unittest.TestCase):
         self.assertIsNone(hk.remove("[keys]\nzoom = \"z\"\n", KEYS))
 
 
+OLD = "# omacchiato: old\n[keys]\nzoom = \"ctrl+alt+z\"\n"
+NEW = "# omacchiato: new\n[keys]\nnew_tab = \"cmd+t\"\n"
+
+
+class HerdrKeysUpgrade(unittest.TestCase):
+    def test_add_replaces_an_unchanged_old_block(self):
+        before = "[ui]\ntheme = \"dark\"\n"
+        self.assertEqual(hk.add(hk.add(before, OLD), NEW, [OLD]), hk.add(before, NEW))
+
+    def test_add_replaces_an_old_omacosy_block_with_no_markers(self):
+        before = "[ui]\n\n" + OLD.replace("# omacchiato:", "# omacosy:")
+        self.assertEqual(hk.add(before, NEW, [OLD]), hk.add("[ui]\n", NEW))
+
+    def test_add_keeps_a_changed_old_block(self):
+        changed = hk.add("", OLD).replace("ctrl+alt+z", "ctrl+z")
+        self.assertEqual(hk.add(changed, NEW, [OLD]), changed)
+
+    def test_remove_takes_an_old_block(self):
+        self.assertEqual(hk.remove(hk.add("[ui]\n", OLD), NEW, [OLD]), "[ui]\n")
+
+    def test_remove_takes_the_current_block_before_an_old_one(self):
+        self.assertEqual(hk.remove(hk.add("[ui]\n", NEW), NEW, [OLD]), "[ui]\n")
+
+
 if __name__ == "__main__":
     unittest.main()

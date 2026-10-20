@@ -514,10 +514,6 @@ binding = "Control+Option+Command+Right Arrow"
 id = "focus.right"
 
 [[hotkeys]]
-binding = "Option+Tab"
-id = "focusPrevious"
-
-[[hotkeys]]
 binding = "Unassigned"
 id = "focusDownOrLeft"
 

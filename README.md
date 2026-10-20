@@ -481,7 +481,7 @@ the code this repo absorbed, with what Omacchiato uses each for.
 | Homebrew | Installed if missing, then `brew bundle` | [Homebrew/brew](https://github.com/Homebrew/brew) |
 | airpods-control | The AirPods pill's noise control modes. It ships source only, so `install.sh` builds the tagged release with the Command Line Tools, pinned by version and checksum. It uses a private Apple API; see [The AirPods pill](docs/bar.md#the-airpods-pill) | [raulgg/airpods-control](https://github.com/raulgg/airpods-control) |
 | tokscale | The AI usage pill: plan usage for each provider, and the last seven days of tokens, sessions and cost. Homebrew has no formula, so `install.sh` takes the macOS binary from the npm package, pinned by version and checksum | [junhoyeo/tokscale](https://github.com/junhoyeo/tokscale) |
-| herdr | Optional. If herdr is installed, `install.sh` adds the keys in `config/herdr/keys.toml`, `theme-set` sets its theme, and `Ctrl+Alt+G` opens a worktree off a branch you pick | [herdrdev/herdr](https://github.com/herdrdev/herdr) |
+| herdr | Optional, 0.9.5 or newer. If herdr is installed, `install.sh` adds the keys in `config/herdr/keys.toml`, `theme-set` sets its theme, and `Ctrl+Alt+G` opens a worktree off a branch you pick | [herdrdev/herdr](https://github.com/herdrdev/herdr) |
 
 ### Plugins and scripts in this repo
 
@@ -536,7 +536,6 @@ from the live config, and you can type to filter it.
 | Chord | Action |
 |---|---|
 | `Super+Arrows` | focus the window in that direction |
-| `Alt+Tab` | focus the previously focused window |
 | `Ctrl+Alt+1..9` | focus column N |
 | `Alt+Home` / `Alt+End` | focus the first / last column |
 
@@ -615,18 +614,23 @@ windows, which macOS's own switcher does not.
 
 If herdr is installed and `~/.config/herdr/config.toml` has no
 `[keys]` table, `install.sh` adds these. They need no `ctrl+b` prefix,
-and the prefix keys still work.
+and the prefix keys still work. If the config holds the `Ctrl+Alt` keys
+of an older install, unchanged, `install.sh` replaces them.
+
+Ghostty gives these keys to herdr, so Ghostty's own tabs have no keys.
 
 | Chord | Action |
 |---|---|
-| `Ctrl+Alt+H/J/K/L` | focus the pane in that direction |
-| `Ctrl+Alt+D` / `Ctrl+Alt+Shift+D` | split right / split down |
-| `Ctrl+Alt+Z` | zoom the pane |
-| `Ctrl+Alt+[` / `Ctrl+Alt+]` | previous / next tab |
-| `Ctrl+Alt+T` / `Ctrl+Alt+W` | new tab / close tab |
-| `Ctrl+Alt+Shift+T` | rename the tab |
-| `Ctrl+Alt+Up` / `Ctrl+Alt+Down` | previous / next herdr workspace |
+| `Cmd+T` / `Cmd+W` | new tab / close tab |
+| `Cmd+N` | new workspace |
+| `Cmd+1..9` | go to tab 1–9 |
+| `Ctrl+Tab` / `Ctrl+Shift+Tab` | next / previous tab |
+| `Alt+Tab` / `Alt+Shift+Tab` | next / previous workspace |
 | `Ctrl+Alt+G` | new worktree off a branch you pick; herdr's own dialog branches off HEAD |
+
+`Alt+Tab` reaches herdr only if OmniWM does not take it. An install from
+before this change has an `Option+Tab` hotkey in
+`~/.config/omniwm/settings.toml`. Delete that `[[hotkeys]]` table.
 
 ### On the modifier space
 

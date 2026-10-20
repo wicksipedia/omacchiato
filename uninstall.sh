@@ -159,7 +159,7 @@ fi
 
 # the herdr keys that install.sh added, while they are as it wrote them
 if [ -f "$HOME/.config/herdr/config.toml" ] \
-  && [ -n "$("$REPO_DIR/bin/omacchiato-herdr-keys" remove "$HOME/.config/herdr/config.toml" "$REPO_DIR/config/herdr/keys.toml")" ]; then
+  && [ -n "$("$REPO_DIR/bin/omacchiato-herdr-keys" remove "$HOME/.config/herdr/config.toml" "$REPO_DIR/config/herdr/keys.toml" "$REPO_DIR/config/herdr/keys-omacosy.toml")" ]; then
   log "Removed the omacchiato keys from the herdr config"
   herdr server reload-config >/dev/null 2>&1 || true
 fi

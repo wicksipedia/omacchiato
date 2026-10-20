@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Add or remove the omacchiato keys in a herdr config.
 
-    omacchiato-herdr-keys <add|remove> <config.toml> <keys.toml>
+    omacchiato-herdr-keys <add|remove> <config.toml> <keys.toml> [<old-keys.toml>...]
 
 add appends keys.toml between two marker lines, and only to a config with
 no keys table, so keys that the user set stay. remove takes out that block
 while it is the same as keys.toml, and an older install's block, which had
 no markers, also with the comment of an omacosy install. A block that the
-user changed stays, with a warning.
+user changed stays, with a warning. Both also take out a block that is the
+same as an old keys file, so add replaces the keys of an older release.
 """
 import re
 import sys
@@ -16,14 +17,27 @@ START = "# >>> omacchiato keys\n"
 END = "# <<< omacchiato keys\n"
 
 
-def add(text, keys):
+def add(text, keys, old=()):
+    for k in old:
+        new = remove_one(text, k)
+        if new is not None:
+            text = new
+            break
     if re.search(r"^\s*\[\[?keys[].]", text, re.M):
         return text
     return text + ("\n" if text else "") + START + keys + END
 
 
-def remove(text, keys):
-    """The config without the block, or None if it holds no block to remove."""
+def remove(text, keys, old=()):
+    """The config without the first block that matches, or None if none does."""
+    for k in (keys, *old):
+        new = remove_one(text, k)
+        if new is not None:
+            return new
+    return None
+
+
+def remove_one(text, keys):
     if START in text and END in text:
         a = text.index(START)
         b = text.index(END, a) + len(END)
@@ -49,14 +63,15 @@ def remove(text, keys):
 def main():
     action, config, keys_file = sys.argv[1:4]
     keys = open(keys_file).read()
+    old = [open(f).read() for f in sys.argv[4:]]
     try:
         text = open(config).read()
     except FileNotFoundError:
         text = ""
     if action == "add":
-        new = add(text, keys)
+        new = add(text, keys, old)
     else:
-        new = remove(text, keys)
+        new = remove(text, keys, old)
         if new is None:
             if START in text:
                 print("omacchiato-herdr-keys: the keys block in %s has changes, so it stays" % config,

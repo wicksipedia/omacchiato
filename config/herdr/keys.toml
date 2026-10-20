@@ -1,20 +1,14 @@
-# omacchiato: OmniWM and Karabiner take ctrl+option with 1-9, F, R, Tab,
-# Home and End, so herdr never sees those chords.
+# omacchiato: Mac shortcuts. Ghostty unbinds its own tab keys, so herdr
+# gets cmd+t, cmd+w, cmd+n, cmd+1..9 and ctrl+tab.
 [keys]
-focus_pane_left = ["prefix+h", "ctrl+alt+h"]
-focus_pane_down = ["prefix+j", "ctrl+alt+j"]
-focus_pane_up = ["prefix+k", "ctrl+alt+k"]
-focus_pane_right = ["prefix+l", "ctrl+alt+l"]
-split_vertical = ["prefix+v", "ctrl+alt+d"]
-split_horizontal = ["prefix+minus", "ctrl+alt+shift+d"]
-zoom = ["prefix+z", "ctrl+alt+z"]
-previous_tab = ["prefix+p", "ctrl+alt+["]
-next_tab = ["prefix+n", "ctrl+alt+]"]
-new_tab = ["prefix+c", "ctrl+alt+t"]
-rename_tab = ["prefix+shift+t", "ctrl+alt+shift+t"]
-close_tab = ["prefix+shift+x", "ctrl+alt+w"]
-previous_workspace = "ctrl+alt+up"
-next_workspace = "ctrl+alt+down"
+new_tab = ["prefix+c", "cmd+t"]
+close_tab = ["prefix+shift+x", "cmd+w"]
+new_workspace = ["prefix+shift+n", "cmd+n"]
+switch_tab = ["prefix+1..9", "cmd+1..9"]
+next_tab = ["prefix+n", "ctrl+tab"]
+previous_tab = ["prefix+p", "ctrl+shift+tab"]
+next_workspace = "alt+tab"
+previous_workspace = "alt+shift+tab"
 
 [[keys.command]]
 key = "ctrl+alt+g"

@@ -209,12 +209,13 @@ mkdir -p "$HOME/.config/omniwm"
 [ -e "$HOME/.config/omniwm/settings.toml" ] || cp "$REPO_DIR/config/omniwm/settings.toml" "$HOME/.config/omniwm/settings.toml"
 
 # Add the omacchiato keys only to a herdr config with no keys table, so keys
-# that the user set stay.
+# that the user set stay. An unchanged block of older keys is replaced.
 if command -v herdr >/dev/null 2>&1; then
   HERDR_CFG="$HOME/.config/herdr/config.toml"
   mkdir -p "$(dirname "$HERDR_CFG")"
   # an assignment, so a failure stops the install
-  HERDR_CHANGED="$("$REPO_DIR/bin/omacchiato-herdr-keys" add "$HERDR_CFG" "$REPO_DIR/config/herdr/keys.toml")"
+  HERDR_CHANGED="$("$REPO_DIR/bin/omacchiato-herdr-keys" add "$HERDR_CFG" "$REPO_DIR/config/herdr/keys.toml" \
+    "$REPO_DIR/config/herdr/keys-omacosy.toml")"
   if [ -n "$HERDR_CHANGED" ]; then
     herdr server reload-config >/dev/null 2>&1 || true
   fi
