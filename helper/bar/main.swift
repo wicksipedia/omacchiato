@@ -902,7 +902,6 @@ for event in [NSWorkspace.didLaunchApplicationNotification,
 }
 
 scheduleClock()
-// A display that sleeps shows no clock, so the clock stops until it wakes.
 NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.screensDidSleepNotification,
                                                   object: nil, queue: .main) { _ in
     displaysAsleep = true

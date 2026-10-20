@@ -31,9 +31,8 @@ var clockFormatter = makeClockFormatter("")
 var clockTimer: DispatchSourceTimer?
 var displaysAsleep = false
 
-// The clock ticks on the boundary rather than every 60 s from launch, so
-// it never shows a stale minute. A config reload calls this again, so a
-// pattern that gains or loses seconds changes the rate.
+// Tick on the boundary, not every 60 s from launch, or the pill shows a
+// stale minute. reloadConfig() calls this again to change the rate.
 func scheduleClock() {
     guard !displaysAsleep else { return }
     updateClock()

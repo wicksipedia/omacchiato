@@ -43,7 +43,7 @@ public struct SettingsReport {
         public var aiUsage: AIUsageOptions?
         public var plugin: PluginFields?
         public var panelKind: String?    // which panel the designs belong to, for their previews
-        public var clock: Clock?         // the clock pill's format, nil on every other pill
+        public var clock: Clock?         // nil on every pill but the clock
 
         public init(key: String, title: String, symbol: String, tint: String = "gray", summary: String = "",
                     group: Group = .bar, optIn: Bool = false, value: String? = nil, styles: [Choice] = [],
@@ -105,7 +105,6 @@ public struct SettingsReport {
         }
     }
 
-    // The raw `clock_format` and `clock_hours` values.
     public struct Clock {
         public var format: String?
         public var hours: String?
@@ -115,7 +114,6 @@ public struct SettingsReport {
             self.hours = hours
         }
 
-        // A format that is not a preset name is a custom pattern.
         public var custom: Bool {
             guard let format, !format.isEmpty else { return false }
             return !clockPresets.contains { $0.key == format }

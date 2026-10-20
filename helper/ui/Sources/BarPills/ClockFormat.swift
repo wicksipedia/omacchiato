@@ -1,8 +1,7 @@
 import Foundation
 
-// The clock pill's `clock_format` presets. Each preset has fixed patterns:
-// a `dateFormat(fromTemplate:)` template puts the fields in the locale's
-// order, which turned `iso` into `dd/MM/yyyy`.
+// Fixed patterns: `dateFormat(fromTemplate:)` puts the fields in the
+// locale's order, which turned `iso` into `dd/MM/yyyy`.
 public let clockPresets: [(key: String, h24: String, h12: String)] = [
     ("full", "EEE dd MMM  HH:mm", "EEE dd MMM  h:mm a"),
     ("short", "HH:mm", "h:mm a"),
@@ -24,7 +23,7 @@ public func systemUses24Hour(_ locale: Locale = .autoupdatingCurrent) -> Bool {
     !(DateFormatter.dateFormat(fromTemplate: "j", options: 0, locale: locale) ?? "").contains("a")
 }
 
-// A quote starts or ends a literal, and `''` toggles twice, so it needs no case of its own.
+// `''` toggles twice, so it needs no case of its own.
 public func clockShowsSeconds(_ pattern: String) -> Bool {
     var quoted = false
     for c in pattern {
