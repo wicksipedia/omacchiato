@@ -216,6 +216,12 @@ if command -v herdr >/dev/null 2>&1; then
   # an assignment, so a failure stops the install
   HERDR_CHANGED="$("$REPO_DIR/bin/omacchiato-herdr-keys" add "$HERDR_CFG" "$REPO_DIR/config/herdr/keys.toml" \
     "$REPO_DIR/config/herdr/keys-omacosy.toml")"
+  # Pass kitty graphics through, so pictures show inside herdr. A terminal
+  # table that the user wrote stays. The running server reads this only
+  # when it restarts.
+  if ! grep -q '^\[terminal\]' "$HERDR_CFG" 2>/dev/null; then
+    printf '\n[terminal]\nkitty_graphics = true\n' >>"$HERDR_CFG"
+  fi
   if [ -n "$HERDR_CHANGED" ]; then
     herdr server reload-config >/dev/null 2>&1 || true
   fi
