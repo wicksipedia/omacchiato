@@ -61,6 +61,14 @@ for n in range(1, 10):
 
 ctl = f"{home}/.local/bin/omacchiato-omniwmctl"
 
+def close_window_rule():
+    r = rule("close window", "w", SUPER, to_key="w", to_mods=["command"])
+    m = r["manipulators"][0]
+    r["manipulators"].insert(0, {**m,
+        "to": [{"key_code": "w", "modifiers": ["command", "shift"]}],
+        "conditions": [{"type": "frontmost_application_if", "bundle_identifiers": ["^com\\.mitchellh\\.ghostty$"]}]})
+    return r
+
 # One set of resize chords for both layouts: niri changes the column
 # width or the window's height in its column, dwindle resizes the split.
 # A command exits non-zero outside its own layout, so the fallback runs.
@@ -100,8 +108,10 @@ rules = slot_rules + [
     rule("keep awake", "escape", SUPER, cmd=f"{home}/.local/bin/omacchiato-keep-awake toggle"),
     rule("cheatsheet", "k", SUPER, cmd="/usr/bin/touch /tmp/omacchiato-bar-cheatsheet"),
     # OmniWM has no close-window command (HotkeyCommand.swift) — send
-    # the app-level Cmd+W instead, which closes the focused window
-    rule("close window", "w", SUPER, to_key="w", to_mods=["command"]),
+    # the app-level Cmd+W instead, which closes the focused window.
+    # In Ghostty, herdr takes Cmd+W to close a tab, so send Ghostty's
+    # own close_window key.
+    close_window_rule(),
     # OmniWM cannot focus a display that has no workspace. With more
     # displays than workspace sets, one direction can land on such a
     # display, so try the other direction when the first does nothing.

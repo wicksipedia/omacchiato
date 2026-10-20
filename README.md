@@ -551,7 +551,7 @@ from the live config, and you can type to filter it.
 
 | Chord | Action |
 |---|---|
-| `Super+W` | close the window (*Karabiner* sends `Cmd+W`) |
+| `Super+W` | close the window (*Karabiner* sends `Cmd+W`, or `Cmd+Shift+W` in Ghostty, where herdr takes `Cmd+W`) |
 | `Super+T` | toggle floating |
 | `Super+S` | raise every floating window |
 | `Super+F` | fullscreen inside the workspace; the bar strip stays |
