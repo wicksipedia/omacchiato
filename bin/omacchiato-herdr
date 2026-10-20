@@ -10,10 +10,9 @@ if [ -n "$id" ] && "$OMNI" focus-window "$id" >/dev/null 2>&1; then
 fi
 # open passes our environment to Ghostty, and herdr refuses to nest.
 unset "${!HERDR_@}"
-# Karabiner gives launchd's PATH, which has no Homebrew.
-PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
-herdr="$(command -v herdr)" || exit 1
-"$HOME/.local/bin/omacchiato-spawn" Ghostty --command="$herdr"
+# Karabiner gives launchd's PATH. herdr and its plugins need the PATH of
+# an interactive shell, for Homebrew and version managers such as fnm.
+"$HOME/.local/bin/omacchiato-spawn" Ghostty --command="${SHELL:-/bin/zsh} -lic 'exec herdr'"
 mkdir -p "$(dirname "$STATE")"
 "$OMNI" query focused-window 2>/dev/null \
   | /usr/bin/jq -r '.result.payload.window | select(.app.bundleId == "com.mitchellh.ghostty") | .id // empty' \
