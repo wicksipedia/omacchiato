@@ -753,7 +753,7 @@ func weatherEmoji(_ code: Int, night: Bool) -> String {
     case 113: return night ? "🌙" : "☀️"
     case 116: return night ? "☁️" : "⛅"
     case 119, 122: return "☁️"
-    case 143, 248, 260: return "🌫️"
+    case 143, 248, 260: return "🌁"
     case 176, 263, 266, 293, 296, 353: return "🌦️"
     case 299, 302, 305, 308, 356, 359: return "🌧️"
     case 200, 386, 389, 392, 395: return "⛈️"
