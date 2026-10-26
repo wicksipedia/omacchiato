@@ -26,8 +26,9 @@ import WeatherPanel
 #endif
 
 // --- menu bar apps -------------------------------------------------------
-// Third-party menu bar icons, read from each app's AXExtrasMenuBar. OmniWM's
-// MenuBarExtrasScanner reads the same attribute on macOS 27.
+// Third-party menu bar icons. Before macOS 27.2, each app's AXExtrasMenuBar
+// holds its icons. From 27.2, MenuBarAgent hosts every icon in one window,
+// and AXUIElementGetPid on an icon gives the app that owns it.
 struct MenuBarItem {
     let app: NSRunningApplication
     let element: AXUIElement
@@ -42,6 +43,26 @@ let axTimeout: Float = 0.25
 func menuBarItems() -> [MenuBarItem] {
     let own = ProcessInfo.processInfo.processIdentifier
     var items: [MenuBarItem] = []
+    if let agent = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.MenuBarAgent").first {
+        let ax = AXUIElementCreateApplication(agent.processIdentifier)
+        AXUIElementSetMessagingTimeout(ax, axTimeout)
+        for window in axElements(ax, "AXWindows") {
+            AXUIElementSetMessagingTimeout(window, axTimeout)
+            for group in axChildren(window) {
+                for element in axChildren(group) {
+                    var pid: pid_t = 0
+                    guard AXUIElementGetPid(element, &pid) == .success, pid != own,
+                          let app = NSRunningApplication(processIdentifier: pid),
+                          let id = app.bundleIdentifier, !id.hasPrefix("com.apple.") else { continue }
+                    let label = [axString(element, "AXTitle"), axString(element, "AXDescription"),
+                                 axString(element, "AXHelp")].first { !$0.isEmpty } ?? ""
+                    items.append(MenuBarItem(app: app, element: element, label: label,
+                                             parked: (axFrame(element)?.minX ?? -1) < 0))
+                }
+            }
+        }
+        return items
+    }
     for app in NSWorkspace.shared.runningApplications {
         guard app.processIdentifier != own,
               let id = app.bundleIdentifier, !id.hasPrefix("com.apple.") else { continue }
@@ -472,6 +493,12 @@ private func axChildren(_ element: AXUIElement) -> [AXUIElement] {
     // A timeout holds for one element only, so each child needs its own.
     for child in children { AXUIElementSetMessagingTimeout(child, axTimeout) }
     return children
+}
+
+private func axElements(_ element: AXUIElement, _ attr: String) -> [AXUIElement] {
+    var ref: CFTypeRef?
+    guard AXUIElementCopyAttributeValue(element, attr as CFString, &ref) == .success else { return [] }
+    return ref as? [AXUIElement] ?? []
 }
 
 private func axString(_ element: AXUIElement, _ attr: String) -> String {
