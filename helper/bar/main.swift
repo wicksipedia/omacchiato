@@ -242,15 +242,32 @@ func fullscreenDisplays() -> Set<CGDirectDisplayID> {
 let barBaseLevel = NSWindow.Level(rawValue: -20)
 // above .screenSaver (1000), so an overlay at that level cannot cover it
 let barRevealLevel = NSWindow.Level(rawValue: 1002)
+// macOS 27 keeps a clear MenuBarAgent window at layer 25 over the whole
+// strip, and a click on it slides the native menu bar in. While the
+// pointer is on the bar, the bar sits above that window.
+let barHoverLevel = NSWindow.Level(rawValue: 26)
 let revealEdge: CGFloat = 2 // how close to the top edge counts as asking
 var revealed = false
+var hovering = false
+// Set at the top edge, cleared when the pointer leaves the strip. While it
+// is set, the native menu bar is in, so the bar must not climb over it.
+var edgeTouched = false
+
+func applyBarLevel() {
+    let level = revealed ? barRevealLevel : hovering ? barHoverLevel : barBaseLevel
+    for surface in surfaces { surface.window.level = level }
+}
+
+func setHovering(_ on: Bool) {
+    guard on != hovering else { return }
+    hovering = on
+    applyBarLevel()
+}
 
 func setRevealed(_ show: Bool) {
     guard show != revealed else { return }
     revealed = show
-    for surface in surfaces {
-        surface.window.level = show ? barRevealLevel : barBaseLevel
-    }
+    applyBarLevel()
     updateBarVisibility()
 }
 
@@ -266,6 +283,8 @@ func pointerAtScreenTop() {
     else { return }
     let fromTop = screen.frame.maxY - p.y
     if fromTop <= revealEdge {
+        edgeTouched = true
+        setHovering(false)
         // Climb only when fullscreen actually hides the bar. Otherwise
         // stay at the -20 resting level, so the auto-hidden native menu
         // bar can slide in above the bar and stay clickable. Without
@@ -273,7 +292,11 @@ func pointerAtScreenTop() {
         if fullscreenDisplays().contains(screenID(screen)) {
             setRevealed(true)
         }
-    } else if revealed, openPopup == nil, fromTop > barHeight + 12 {
+        return
+    }
+    if fromTop > barHeight + 12 { edgeTouched = false }
+    setHovering(!edgeTouched && fromTop <= barHeight + 12)
+    if revealed, openPopup == nil, fromTop > barHeight + 12 {
         // a popup keeps it up: its anchor must not vanish under the pointer
         setRevealed(false)
     }
