@@ -1,20 +1,15 @@
-# Omacchiato: notes for Claude
+# Omacchiato: notes for coding agents
 
 Omacchiato is an omarchy-style tiling desktop for macOS 26: a status bar,
 a gesture daemon, a workspace overview, themes and install scripts
 around the OmniWM window manager. README.md describes the features and
 CONTRIBUTING.md holds the design rules. This file holds what the code does not show.
-AGENTS.md holds the same notes for Codex: change both files together.
-Notes about one Mac go in CLAUDE.local.md, which git ignores.
+Notes about one Mac go in AGENTS.local.md, which git ignores.
 
 ## Repository
 
 - Omacchiato is a fork of omacosy. `origin` is this fork,
-  github.com/wicksipedia/omacchiato. `upstream` is paulsp94/omacosy. To
-  take upstream work, run `git fetch upstream && git merge upstream/main`.
-- Upstream still uses the omacosy names. Git follows the renamed files,
-  but a new upstream file or line that says omacosy needs the rename by
-  hand.
+  github.com/wicksipedia/omacchiato.
 - `migrate-omacosy.sh` moves an omacosy install to the omacchiato names:
   agents, binaries, `~/.config` and `~/.local/state`, and the command
   names in `bar-plugins.conf` and the herdr config. `install.sh` and
@@ -60,7 +55,7 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
 - There is no interactive `git add -p`. To stage part of a file, filter
   `git diff -U0 <file>` to the hunks you want and pipe the result to
   `git apply --cached --unidiff-zero -`.
-- End each message with the `Co-Authored-By: Claude` line. Do not add
+- End each message with the `Co-Authored-By:` line of the agent. Do not add
   session links.
 - Apply the stop-slop rules to commit messages, PR text, README text and
   comments.
@@ -124,7 +119,7 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
 
 - Ask before a test that opens menus, posts clicks or moves the pointer.
   The user can be in a meeting or sharing the screen.
-- Never post an Escape key event. It can reach the Claude Code terminal.
+- Never post an Escape key event. It can reach the terminal of the agent.
 - If the macOS menu bar stays on screen over the bar, quit the app whose
   menu bar icon was last pressed through Accessibility. A restart of
   SystemUIServer, the Dock or the bar does not release it.
@@ -286,6 +281,10 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
   pair and `OMACCHIATO_APPEARANCE`.
 - The native menu bar auto-hides (`_HIHideMenuBar`,
   `AutoHideMenuBarOption`), and the bar sits in its place.
+- macOS 27.2 keeps a clear `MenuBarAgent` window at layer 25 over the
+  whole strip, and a click on it shows the native menu bar. So the bar
+  rests at level -20, climbs to 26 while the pointer is on it, and drops
+  back at the top edge, so that the native menu bar can slide in.
 - `demo = on` in `bar-pills.conf` makes `panelView` draw the popups
   that show private data (clock, weather, status, wi-fi, activity, menu
   bar apps, pull requests and AI usage) from the sample data, and hides the clock's
@@ -319,6 +318,11 @@ Notes about one Mac go in CLAUDE.local.md, which git ignores.
 
 The design and the test results are in
 `docs/plans/2026-09-14-menu-bar-apps-design.md`. The rules:
+
+- From macOS 27.2, `MenuBarAgent` (`com.apple.MenuBarAgent`) hosts every
+  status item in one window, and an app's `AXExtrasMenuBar` has no value.
+  `menuBarItems()` reads the items from that window, and
+  `AXUIElementGetPid` on an item gives the app that owns it.
 
 - Each app's status items come from its `AXExtrasMenuBar`. Skip
   `com.apple.*` apps and the bar itself. Set a short AX messaging
