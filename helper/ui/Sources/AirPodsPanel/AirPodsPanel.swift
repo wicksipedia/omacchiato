@@ -71,7 +71,7 @@ struct ProductPicture: View {
     var device: AirPodsReport.Device
 
     var body: some View {
-        let images = ProductArt.images(for: device.type)
+        let images = ProductArt.images(for: device.type, color: device.color)
         Group {
             if images.isEmpty {
                 Image(systemName: device.isMax ? "airpodsmax" : "airpods.pro")

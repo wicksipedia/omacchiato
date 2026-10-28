@@ -39,9 +39,10 @@ func BTGetPower() -> Int32
 @_silgen_name("IOBluetoothPreferenceSetControllerPowerState")
 func BTSetPower(_ state: Int32)
 
-// AirPods carry their battery only in these private IOBluetoothDevice
-// methods. system_profiler reports none at all for AirPods Max.
+// AirPods carry their battery and colour only in these private
+// IOBluetoothDevice methods. system_profiler reports no battery for AirPods Max.
 @objc private protocol BatteryInfo {
+    @objc optional func colorID() -> UInt8
     @objc optional func batteryPercentSingle() -> Int
     @objc optional func batteryPercentLeft() -> Int
     @objc optional func batteryPercentRight() -> Int
@@ -467,11 +468,11 @@ case "bt":
             print("\(d.isConnected() ? 1 : 0)\t\(addr)\t\(name)\t\(kind(d))")
         }
     case "battery":
-        // percent per part, 0 where the device reports none
+        // percent per part, 0 where the device reports none, then the colour ID
         for d in (IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice]) ?? [] where d.isConnected() {
             let b = unsafeBitCast(d, to: BatteryInfo.self)
             let parts = [b.batteryPercentSingle?(), b.batteryPercentLeft?(),
-                         b.batteryPercentRight?(), b.batteryPercentCase?()]
+                         b.batteryPercentRight?(), b.batteryPercentCase?(), (b.colorID?()).map(Int.init)]
             print(([d.addressString ?? "?"] + parts.map { String($0 ?? 0) }).joined(separator: "\t"))
         }
     case "connect", "disconnect":

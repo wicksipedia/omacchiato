@@ -46,8 +46,8 @@ def address(value):
 
 
 def helper_battery():
-    """{address: {part: percent}}. AirPods Max report no battery to
-    system_profiler, and omacchiato-helper reads it from IOBluetooth."""
+    """{address: ({part: percent}, colour ID)}. AirPods Max report no battery
+    to system_profiler, and omacchiato-helper reads it from IOBluetooth."""
     helper = shutil.which("omacchiato-helper")
     if not helper:
         return {}
@@ -58,9 +58,11 @@ def helper_battery():
     found = {}
     for line in r.stdout.splitlines():
         device, *parts = line.split("\t")
-        if len(parts) == len(HELPER_PARTS):
-            found[address(device)] = {name: int(pct) for name, pct in zip(HELPER_PARTS, parts)
-                                      if pct.isdigit() and int(pct)}
+        if len(parts) == len(HELPER_PARTS) + 1:
+            *parts, color = parts
+            found[address(device)] = ({name: int(pct) for name, pct in zip(HELPER_PARTS, parts)
+                                       if pct.isdigit() and int(pct)},
+                                      int(color) if color.isdigit() else 0)
     return found
 
 
@@ -114,8 +116,8 @@ def airpods_model(types, info):
 
 
 def connected():
-    """(name, model, icon, type identifier, {battery name: percent}, on a cable)
-    for each connected AirPods Pro or Max."""
+    """(name, model, icon, type identifier, {battery name: percent}, on a cable,
+    colour ID) for each connected AirPods Pro or Max."""
     found = []
     report = run_json(["/usr/sbin/system_profiler", "SPBluetoothDataType", "-json"]) or {}
     types, live, cables = None, None, plugged()
@@ -135,10 +137,11 @@ def connected():
                     if part != key and str(value).rstrip("%").isdigit():
                         battery[BATTERY_NAMES.get(part, part)] = int(str(value).rstrip("%"))
                 live = helper_battery() if live is None else live
-                for part, pct in live.get(address(info.get("device_address", "")), {}).items():
+                parts, color = live.get(address(info.get("device_address", "")), ({}, 0))
+                for part, pct in parts.items():
                     battery.setdefault(part, pct)
                 found.append((name, *model_icon, battery,
-                              str(info.get("device_serialNumber")) in cables))
+                              str(info.get("device_serialNumber")) in cables, color))
     return found
 
 
@@ -152,10 +155,11 @@ def listening(tool, name):
     return reply.get("listeningMode"), reply.get("supportedListeningModes") or []
 
 
-def panel_device(tool, name, model, kind, battery, cable, modes):
+def panel_device(tool, name, model, kind, battery, cable, modes, color=0):
     """One device in the panel object that the bar's AirPods panel reads.
     Keep in sync with AirPodsReport(json:) in helper/ui/Sources/AirPodsPanel."""
-    device = {"name": name, "model": model, "type": kind, "battery": battery, "cable": cable}
+    device = {"name": name, "model": model, "type": kind, "battery": battery, "cable": cable,
+              "color": color}
     if modes:
         current, supported = modes
         device["mode"] = current
@@ -200,9 +204,9 @@ def main():
         return
     tool = shutil.which("airpods-control")
     rows, panel = [], []
-    for n, (name, model, icon, kind, battery, cable) in enumerate(devices):
+    for n, (name, model, icon, kind, battery, cable, color) in enumerate(devices):
         modes = listening(tool, name)
-        panel.append(panel_device(tool, name, model, kind, battery, cable, modes))
+        panel.append(panel_device(tool, name, model, kind, battery, cable, modes, color))
         section = device_rows(tool, name, model, icon, battery, cable, modes)
         if len(devices) > 1:
             section[0]["section"] = "closed"
@@ -210,7 +214,7 @@ def main():
     rows += [{"separator": True, "section": "end"},
              {"text": "Sound settings…", "dim": True, "url": SOUND_SETTINGS}]
 
-    levels = [pct for *_, battery, _ in devices for part, pct in battery.items() if part != "Case"]
+    levels = [pct for *_, battery, _, _ in devices for part, pct in battery.items() if part != "Case"]
     lowest = min(levels, default=None)
     payload = {"label": "" if lowest is None else "%d%%" % lowest, "icon": devices[0][2], "rows": rows,
                "panel": {"kind": "airpods", "devices": panel, "settings": SOUND_SETTINGS}}

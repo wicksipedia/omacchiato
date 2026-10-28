@@ -1,4 +1,6 @@
+import subprocess
 import unittest
+from unittest import mock
 
 from loader import load
 
@@ -33,6 +35,16 @@ class PanelDevice(unittest.TestCase):
                                       {"Battery": 40}, True, None)
         self.assertNotIn("modes", device)
         self.assertTrue(device["cable"])
+
+
+class HelperBattery(unittest.TestCase):
+    def test_reads_the_parts_and_the_colour(self):
+        out = "f8-73-df-25-cc-d2\t82\t0\t0\t0\t18\n"
+        with mock.patch.object(airpods.shutil, "which", return_value="/bin/helper"), \
+             mock.patch.object(airpods.subprocess, "run",
+                               return_value=subprocess.CompletedProcess([], 0, out, "")):
+            self.assertEqual(airpods.helper_battery(),
+                             {airpods.address("f8-73-df-25-cc-d2"): ({"Battery": 82}, 18)})
 
 
 if __name__ == "__main__":

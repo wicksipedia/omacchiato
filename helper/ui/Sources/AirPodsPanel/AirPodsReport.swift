@@ -46,17 +46,19 @@ public struct AirPodsReport {
         public var type: String         // the Uniform Type Identifier from CoreTypes, such as com.apple.airpods-pro-gen2
         public var batteries: [Battery]
         public var cable: Bool
+        public var color: Int           // IOBluetooth's colorID, 0 if unknown
         public var mode: String?
         public var modes: [Mode]
         public var id: String { name }
 
         public init(name: String, model: String, type: String, batteries: [Battery], cable: Bool = false,
-                    mode: String? = nil, modes: [Mode] = []) {
+                    color: Int = 0, mode: String? = nil, modes: [Mode] = []) {
             self.name = name
             self.model = model
             self.type = type
             self.batteries = batteries
             self.cable = cable
+            self.color = color
             self.mode = mode
             self.modes = modes
         }
@@ -103,7 +105,7 @@ extension AirPodsReport {
             }
             return Device(name: d["name"] as? String ?? "", model: d["model"] as? String ?? "",
                           type: d["type"] as? String ?? "", batteries: batteries, cable: d["cable"] as? Bool ?? false,
-                          mode: d["mode"] as? String, modes: modes)
+                          color: d["color"] as? Int ?? 0, mode: d["mode"] as? String, modes: modes)
         }
         self.init(devices: devices, settings: (json["settings"] as? String).flatMap(URL.init(string:)))
     }
@@ -116,11 +118,14 @@ enum ProductArt {
     private static var cache: [String: [NSImage]] = [:]
 
     // The pictures of one product, left to right.
-    static func images(for type: String) -> [NSImage] {
-        if let hit = cache[type] { return hit }
+    static func images(for type: String, color: Int = 0) -> [NSImage] {
+        let key = "\(type)|\(color)"
+        if let hit = cache[key] { return hit }
         let found: [NSImage]
         if type.hasPrefix("com.apple.airpods-max") {
-            found = load("HeadphoneAssets", ["B515d-Default"])
+            // The default render is Starlight. Each colour has its own render.
+            found = [load("HeadphoneAssets", ["B515d-\(color)"]), load("HeadphoneAssets", ["B515d-Default"])]
+                .first { !$0.isEmpty } ?? []
         } else if type == "com.apple.airpods-pro-2025" {
             found = load("HeadphoneSettingsUI", ["B788_airpod_left", "B788_airpod_right"])
         } else if type.hasPrefix("com.apple.airpods-pro") {
@@ -128,7 +133,7 @@ enum ProductArt {
         } else {
             found = []
         }
-        cache[type] = found
+        cache[key] = found
         return found
     }
 
