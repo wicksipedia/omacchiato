@@ -49,7 +49,8 @@ func menuBarItems() -> [MenuBarItem] {
         for window in axElements(ax, "AXWindows") {
             AXUIElementSetMessagingTimeout(window, axTimeout)
             for group in axChildren(window) {
-                for element in axChildren(group) {
+                // A group can also hold the owning app's root element, which is no icon.
+                for element in axChildren(group) where axString(element, "AXRole") != "AXApplication" {
                     var pid: pid_t = 0
                     guard AXUIElementGetPid(element, &pid) == .success, pid != own,
                           let app = NSRunningApplication(processIdentifier: pid),
