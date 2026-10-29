@@ -17,6 +17,11 @@ def pr(n, ci="SUCCESS", state="OPEN", reviews=0, decision=None, threads=(), base
                 for who in threads]}}
 
 
+def run(name, conclusion, started="t1", workflow="ci", status="COMPLETED"):
+    return {"name": name, "status": status, "conclusion": None if status != "COMPLETED" else conclusion,
+            "startedAt": started, "checkSuite": {"workflowRun": {"workflow": {"name": workflow}}}}
+
+
 UNREAD = {"a/b#%d" % n: str(n) for n in range(1, 20)}
 
 
@@ -134,19 +139,26 @@ class Pill(unittest.TestCase):
 class Panel(unittest.TestCase):
     def test_panel_lists_each_pr_in_stack_order(self):
         failing = pr(2, ci="FAILURE", base="branch-1")
-        failing["commits"]["nodes"][0]["commit"]["statusCheckRollup"]["contexts"] = {
-            "checkRunCountsByState": [{"state": "FAILURE", "count": 2}, {"state": "SUCCESS", "count": 9}],
-            "statusContextCountsByState": [{"state": "SUCCESS", "count": 1}]}
+        failing["commits"]["nodes"][0]["commit"]["statusCheckRollup"]["contexts"] = {"nodes": [
+            run("lint", "FAILURE"), run("test", "FAILURE"), run("build", "SUCCESS"), {"state": "SUCCESS"}]}
         p = gh.render([pr(1, decision="APPROVED"), failing], [], {"a/b#2": "20"}, "me")["panel"]
         self.assertEqual(p["kind"], "github-prs")
         first, second = p["prs"]
         self.assertEqual((first["number"], first["depth"], first["review"]), (1, 0, "approved"))
         self.assertEqual((second["number"], second["depth"], second["checks"]), (2, 1, "failed"))
-        self.assertEqual(second["check_counts"], {"failed": 2, "passed": 10})
+        self.assertEqual(second["check_counts"], {"failed": 2, "passed": 2})
         self.assertTrue(second["unread"] and not first["unread"])
         self.assertTrue(second["mark_read"].endswith(" --mark-read 'a/b#2' '' 20"))
         self.assertTrue(first["mark_read"].endswith(" --mark-read 'a/b#1' ''"), "a PR with nothing unread")
 
+
+    def test_a_replaced_run_does_not_count(self):
+        green = pr(3, ci="FAILURE")
+        green["commits"]["nodes"][0]["commit"]["statusCheckRollup"]["contexts"] = {"nodes": [
+            run("build", "CANCELLED", "t1"), run("build", "SUCCESS", "t2"),
+            run("build", "SUCCESS", "t1", workflow="other"), run("test", "IN_PROGRESS", "t1", status="IN_PROGRESS")]}
+        p = gh.render([green], [], {}, "me")["panel"]["prs"][0]
+        self.assertEqual((p["checks"], p["check_counts"]), ("running", {"passed": 2, "running": 1}))
 
     def test_panel_updated_is_the_read_time(self):
         import time

@@ -43,8 +43,9 @@ fragment pr on PullRequest {
   repository { nameWithOwner }
   reviews { totalCount }
   latestOpinionatedReviews(first: 20) { nodes { state } }
-  commits(last: 1) { nodes { commit { statusCheckRollup { state contexts(first: 0) {
-    checkRunCountsByState { state count } statusContextCountsByState { state count } } } } } }
+  commits(last: 1) { nodes { commit { statusCheckRollup { state contexts(first: 100) { nodes {
+    ... on CheckRun { name status conclusion startedAt checkSuite { workflowRun { workflow { name } } } }
+    ... on StatusContext { state } } } } } } }
   reviewThreads(first: 30) { nodes { isResolved comments(first: 1) { nodes { author { login } } } } }
 }
 """
@@ -70,10 +71,34 @@ def key(pr):
     return "%s#%d" % (pr["repository"]["nameWithOwner"], pr["number"])
 
 
-def ci_state(pr):
+def rollup(pr):
     commits = pr["commits"]["nodes"]
-    rollup = commits[0]["commit"]["statusCheckRollup"] if commits else None
-    return (rollup or {}).get("state")
+    return (commits[0]["commit"]["statusCheckRollup"] if commits else None) or {}
+
+
+def check_states(pr):
+    """The state of each check, as the PR page shows it.
+
+    GitHub's rollup also counts a run that a newer run of the same check
+    replaced, so a cancelled duplicate reads as a failure there."""
+    latest, states = {}, []
+    for node in (rollup(pr).get("contexts") or {}).get("nodes") or []:
+        if "name" not in node:
+            states.append(node.get("state"))
+            continue
+        workflow = (((node.get("checkSuite") or {}).get("workflowRun") or {}).get("workflow") or {}).get("name")
+        run = latest.get((workflow, node["name"]))
+        if run is None or (node.get("startedAt") or "") > (run.get("startedAt") or ""):
+            latest[(workflow, node["name"])] = node
+    states += [run["conclusion"] if run["status"] == "COMPLETED" else run["status"] for run in latest.values()]
+    return [COUNTED.get(s) for s in states if COUNTED.get(s)]
+
+
+def ci_state(pr):
+    states = check_states(pr)
+    if not states:
+        return rollup(pr).get("state")
+    return "FAILURE" if "failed" in states else "PENDING" if "running" in states else "SUCCESS"
 
 
 def decision(pr):
@@ -140,14 +165,9 @@ def status(pr, me):
 
 
 def check_counts(pr):
-    commits = pr["commits"]["nodes"]
-    rollup = (commits[0]["commit"]["statusCheckRollup"] if commits else None) or {}
-    contexts = rollup.get("contexts") or {}
     counts = {}
-    for entry in (contexts.get("checkRunCountsByState") or []) + (contexts.get("statusContextCountsByState") or []):
-        name = COUNTED.get(entry["state"])
-        if name and entry["count"]:
-            counts[name] = counts.get(name, 0) + entry["count"]
+    for name in check_states(pr):
+        counts[name] = counts.get(name, 0) + 1
     return counts
 
 
