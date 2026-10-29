@@ -15,11 +15,13 @@ extension PRReport {
 
     // Computed, so the read time is minutes before now each time a preview draws.
     public static var busy: PRReport { PRReport(now: morning, prs: inbox([
+        PR(repo: "acme/web", number: 478, title: "Split the cart into its own module", checks: .passed,
+           checkCounts: [.passed: 13], additions: 940, deletions: 610, updated: ago(5)),
         PR(repo: "acme/web", number: 482, title: "Move checkout to the new payments API",
            checks: .failed, checkCounts: [.passed: 11, .failed: 2], threads: 3, unread: true,
-           additions: 612, deletions: 240, updated: ago(0.4), markRead: "true"),
+           depth: 1, additions: 612, deletions: 240, updated: ago(0.4), markRead: "true"),
         PR(repo: "acme/web", number: 490, title: "Add Apple Pay to checkout", checks: .running,
-           checkCounts: [.passed: 6, .running: 7], depth: 1, additions: 188, deletions: 12, updated: ago(1)),
+           checkCounts: [.passed: 6, .running: 7], depth: 2, additions: 188, deletions: 12, updated: ago(1)),
         PR(repo: "acme/web", number: 471, title: "Fix the date picker on Safari 26", checks: .passed,
            review: .approved, unread: true, additions: 14, deletions: 9, updated: ago(3), markRead: "true"),
         PR(repo: "acme/web", number: 455, title: "Spike: server components for the product page",

@@ -104,7 +104,13 @@ public struct InboxPRPanel: View {
                     if !prs.isEmpty {
                         FoldCard(stage: stage, count: prs.count) {
                             VStack(alignment: .leading, spacing: 0) {
-                                ForEach(prs) { PRRow(pr: $0, now: report.now, actions: actions, showRepo: true) }
+                                ForEach(report.rows(in: [stage])) { row in
+                                    if row.muted {
+                                        MutedPRRow(pr: row.pr, rail: row.rail, actions: actions)
+                                    } else {
+                                        PRRow(pr: row.pr, now: report.now, actions: actions, showRepo: true, rail: row.rail)
+                                    }
+                                }
                             }
                         }
                     }

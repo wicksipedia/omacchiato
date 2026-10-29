@@ -6,7 +6,8 @@ import StatusPanel
 // Pieces that every design of the pull request panel shares.
 
 extension PRReport.PR {
-    var tint: Color { state == .closed ? .secondary : stage.tint }
+    // The mark shows the PR's own state; the note names the PR it waits on.
+    var tint: Color { state == .closed ? .secondary : ownStage.tint }
 }
 
 // Mail's unread dot. With an action, it turns into a check under the
@@ -85,6 +86,7 @@ struct PRRow: View {
     var now: Date
     var actions: PRActions
     var showRepo = false
+    var rail: PRReport.Rail = .none
     var revealed = false        // the previews draw the row swiped open,
     var marking = false         // or waiting on GitHub
 
@@ -120,18 +122,64 @@ struct PRRow: View {
                     if pr.unread { UnreadDot(pr: pr, actions: actions) }
                 }
             }
-            .padding(.leading, CGFloat(pr.depth) * 14)
-            .overlay(alignment: .leading) {
-                if pr.depth > 0 {
-                    // the stack line from the PR this one sits on
-                    Image(systemName: "arrow.turn.down.right")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(.tertiary)
-                        .offset(x: CGFloat(pr.depth - 1) * 14, y: -1)
-                }
-            }
+            .stackRail(rail, dotY: 8)
         }
         .modifier(SwipeToMarkRead(pr: pr, actions: actions, revealed: revealed, marking: marking))
+    }
+}
+
+// A PR of another stage, to place the PRs of this one in their stack.
+struct MutedPRRow: View {
+    var pr: PRReport.PR
+    var rail: PRReport.Rail
+    var actions: PRActions
+
+    var body: some View {
+        HoverRow(action: pr.url.map { url in { actions.open(url) } }) {
+            HStack(spacing: 6) {
+                Text("#\(pr.number)").monospacedDigit()
+                Text(pr.title).lineLimit(1)
+            }
+            .font(.system(size: 11))
+            .foregroundStyle(.secondary)
+            .stackRail(rail, dotY: 6.5, hollow: true)
+        }
+    }
+}
+
+// A stack as GitHub draws it: a line through a dot per PR, base first.
+struct StackRail: View {
+    var rail: PRReport.Rail
+    var dotY: CGFloat           // the middle of the row's first line
+    var hollow: Bool
+
+    var body: some View {
+        // reach through HoverRow's vertical padding, so the rows' lines meet
+        let pad: CGFloat = 5
+        Canvas { context, size in
+            let x = size.width / 2, y = dotY + pad
+            var line = Path()
+            if rail != .first { line.move(to: CGPoint(x: x, y: 0)); line.addLine(to: CGPoint(x: x, y: y - 3.5)) }
+            if rail != .last { line.move(to: CGPoint(x: x, y: y + 3.5)); line.addLine(to: CGPoint(x: x, y: size.height)) }
+            context.stroke(line, with: .style(.tertiary), lineWidth: 1.5)
+            let dot = Path(ellipseIn: CGRect(x: x - 3.5, y: y - 3.5, width: 7, height: 7))
+            if hollow {
+                context.stroke(dot, with: .style(.secondary), lineWidth: 1.5)
+            } else {
+                context.fill(dot, with: .style(.secondary))
+            }
+        }
+        .frame(width: 10)
+        .padding(.vertical, -pad)
+    }
+}
+
+extension View {
+    func stackRail(_ rail: PRReport.Rail, dotY: CGFloat, hollow: Bool = false) -> some View {
+        padding(.leading, rail == .none ? 0 : 16)
+            .overlay(alignment: .leading) {
+                if rail != .none { StackRail(rail: rail, dotY: dotY, hollow: hollow) }
+            }
     }
 }
 
