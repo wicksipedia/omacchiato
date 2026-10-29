@@ -12,3 +12,5 @@ AGENTS.local.md
 .build/
 .swiftpm/
 tasks/
+docs/ideas/
+docs/plans/

@@ -41,6 +41,8 @@ Notes about one Mac go in AGENTS.local.md, which git ignores.
   4. `agent-skills:build` does the tasks, one at a time.
 - Get the user's approval at the end of each step before the next one
   starts.
+- Git ignores `docs/ideas/`, `docs/plans/` and `tasks/`. Do not commit
+  ideas, specs or plans.
 - Use the `agent-skills:` name in full. Do not use a skill of another
   plugin for one of these steps, such as `brainstorming`,
   `product-management:write-spec` or `engineering:architecture`.
@@ -83,8 +85,7 @@ Notes about one Mac go in AGENTS.local.md, which git ignores.
 - `bin/omacchiato-release` publishes `origin/main` as a GitHub release
   with a date version (`vYYYY.MM.DD`). It needs a clean tree, the Apple
   Development identity and `gh`. It reuses the gesture app of the last
-  release while `helper/gesture/` is the same. The plan is in
-  `docs/plans/2026-09-28-versioned-releases-design.md`.
+  release while `helper/gesture/` is the same.
 - TCC keys a grant on the code signature. Sign with the same Apple
   Development identity and identifier every time, and the bar, overview
   and helper keep their grants across rebuilds.
@@ -315,9 +316,6 @@ Notes about one Mac go in AGENTS.local.md, which git ignores.
   apps to quit.
 
 ## Menu bar apps pill
-
-The design and the test results are in
-`docs/plans/2026-09-14-menu-bar-apps-design.md`. The rules:
 
 - From macOS 27.2, `MenuBarAgent` (`com.apple.MenuBarAgent`) hosts every
   status item in one window, and an app's `AXExtrasMenuBar` has no value.
