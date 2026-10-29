@@ -25,7 +25,8 @@ public struct RemindersPRPanel: View {
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible())], spacing: 8) {
                 ForEach(Self.tiles, id: \.self) { tile($0) }
             }
-            let shown = report.repos.map { ($0.name, $0.prs.filter { filter == nil || $0.stage == filter }) }
+            let rows = report.rows(in: filter.map { [$0] })
+            let shown = report.repos.map { repo in (repo.name, rows.filter { $0.pr.repo == repo.name }) }
                 .filter { !$0.1.isEmpty }
             if report.prs.isEmpty {
                 PanelCard { EmptyPRs() }
@@ -40,8 +41,14 @@ public struct RemindersPRPanel: View {
                         VStack(alignment: .leading, spacing: 8) {
                             ForEach(shown, id: \.0) { name, prs in
                                 VStack(alignment: .leading, spacing: 0) {
-                                    RepoHeader(name: name, count: prs.count)
-                                    ForEach(prs) { PRRow(pr: $0, now: report.now, actions: actions) }
+                                    RepoHeader(name: name, count: prs.filter { !$0.muted }.count)
+                                    ForEach(prs) { row in
+                                        if row.muted {
+                                            MutedPRRow(pr: row.pr, rail: row.rail, actions: actions)
+                                        } else {
+                                            PRRow(pr: row.pr, now: report.now, actions: actions, rail: row.rail)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -180,7 +187,8 @@ public struct TrackerPRPanel: View {
                 ForEach(report.repos, id: \.name) { repo in
                     PanelCard {
                         RepoHeader(name: repo.name, count: repo.prs.count)
-                        ForEach(repo.prs) { pr in
+                        ForEach(report.rows(in: nil).filter { $0.pr.repo == repo.name }) { row in
+                            let pr = row.pr
                             HoverRow(action: pr.url.map { url in { actions.open(url) } }) {
                                 VStack(alignment: .leading, spacing: 6) {
                                     HStack(alignment: .firstTextBaseline) {
@@ -201,7 +209,7 @@ public struct TrackerPRPanel: View {
                                     }
                                     .font(.system(size: 11))
                                 }
-                                .padding(.leading, CGFloat(pr.depth) * 14)
+                                .stackRail(row.rail, dotY: 8)
                             }
                             .swipeToMarkRead(pr, actions)
                         }
