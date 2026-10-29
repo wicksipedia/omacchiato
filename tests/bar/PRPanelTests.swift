@@ -17,6 +17,50 @@ import Testing
                 == "2 checks failed · 1 thread to resolve")
     }
 
+    // The spec's example: #3 of five has a failed check, the rest wait for review.
+    static let fiveStack = PRReport(now: Date(), prs: (1...5).map {
+        PR(repo: "a/b", number: $0, title: "", checks: $0 == 3 ? .failed : .passed,
+           checkCounts: $0 == 3 ? [.failed: 1] : [:], depth: $0 - 1)
+    })
+
+    @Test("a stacked PR takes the worst stage of the PRs below it")
+    func rollUp() {
+        let prs = Self.fiveStack.prs
+        #expect(prs.map(\.stage) == [.inReview, .inReview, .needsYou, .needsYou, .needsYou])
+        #expect(prs.map(\.blockedBy) == [nil, nil, nil, 3, 3])
+        #expect(prs[2].note == "1 check failed")
+        #expect(prs[3].note == "Waits on #3")
+    }
+
+    @Test("a ready PR waits on running checks below it, and a draft or merged PR blocks nothing")
+    func rollUpEdges() {
+        let running = PRReport(now: Date(), prs: [
+            PR(repo: "a/b", number: 1, title: "", checks: .running),
+            PR(repo: "a/b", number: 2, title: "", checks: .passed, review: .approved, depth: 1),
+        ]).prs
+        #expect(running[1].stage == .running)
+        let draft = PRReport(now: Date(), prs: [
+            PR(repo: "a/b", number: 1, title: "", draft: true),
+            PR(repo: "a/b", number: 2, title: "", checks: .passed, review: .approved, depth: 1),
+            PR(repo: "a/b", number: 3, title: "", draft: true, checks: .failed, depth: 2),
+        ]).prs
+        #expect(draft.map(\.stage) == [.draft, .ready, .draft])
+        #expect(draft.map(\.blockedBy) == [nil, nil, nil])
+    }
+
+    @Test("each branch of a stack rolls up on its own, and a PR with no parent starts a chain")
+    func rollUpBranches() {
+        let prs = PRReport(now: Date(), prs: [
+            PR(repo: "a/b", number: 1, title: "", checks: .passed),
+            PR(repo: "a/b", number: 2, title: "", checks: .failed, depth: 1),
+            PR(repo: "a/b", number: 3, title: "", checks: .passed, depth: 2),
+            PR(repo: "a/b", number: 4, title: "", checks: .passed, depth: 1),
+            PR(repo: "c/d", number: 5, title: "", checks: .passed, depth: 2),
+        ]).prs
+        #expect(prs.map(\.blockedBy) == [nil, nil, 2, nil, nil])
+        #expect(prs[4].stage == .inReview)
+    }
+
     @Test("the panel reads the script's JSON")
     func decode() throws {
         let text = """

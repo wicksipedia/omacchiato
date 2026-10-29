@@ -70,6 +70,8 @@ public struct PRReport {
         public var deletions: Int
         public var updated: Date?
         public var markRead: String?         // the command that hides it until its next update
+        public internal(set) var blockedBy: Int?   // the PR below it in its stack whose stage it takes
+        var blockedStage: Stage?
         public var id: String { "\(repo)#\(number)" }
 
         public init(repo: String, number: Int, title: String, url: URL? = nil, state: State = .open,
@@ -96,7 +98,10 @@ public struct PRReport {
             self.markRead = markRead
         }
 
-        public var stage: Stage {
+        // A PR cannot merge before the PRs below it, so it waits on the worst of them.
+        public var stage: Stage { blockedStage ?? ownStage }
+
+        public var ownStage: Stage {
             if state != .open { return .done }
             if draft { return .draft }
             if checks == .failed || conflicts || review == .changes || threads > 0 { return .needsYou }
@@ -119,6 +124,7 @@ public struct PRReport {
             }
             if review == .changes { parts.append("Changes requested") }
             if threads > 0 { parts.append("\(threads) thread\(threads == 1 ? "" : "s") to resolve") }
+            if let blockedBy { parts.append("Waits on #\(blockedBy)") }
             return parts.isEmpty ? nil : parts.joined(separator: " · ")
         }
 
@@ -144,7 +150,7 @@ public struct PRReport {
 
     public init(now: Date, prs: [PR], problem: String? = nil, updated: Date? = nil) {
         self.now = now
-        self.prs = prs
+        self.prs = Self.rolledUp(prs)
         self.problem = problem
         self.updated = updated
     }
@@ -156,6 +162,24 @@ public struct PRReport {
     // When to show "Updated …" at the panel's foot: StaleNote already gives
     // the age once the read failed, so this stamp shows only when it did not.
     public var updatedStamp: Date? { problem == nil ? updated : nil }
+
+    // A PR's parent is the nearest PR before it in its repository with one
+    // less depth. A draft, merged or closed PR passes no stage up.
+    static func rolledUp(_ prs: [PR]) -> [PR] {
+        var prs = prs
+        var chains: [String: [Int: Int]] = [:]   // repo -> depth -> index of the last PR at that depth
+        for i in prs.indices {
+            let depth = prs[i].depth
+            let parent = depth > 0 ? chains[prs[i].repo]?[depth - 1] : nil
+            chains[prs[i].repo, default: [:]] = (chains[prs[i].repo] ?? [:]).filter { $0.key < depth }
+            chains[prs[i].repo]?[depth] = i
+            guard let parent, prs[parent].ownStage < .draft, prs[i].ownStage < .draft,
+                  prs[parent].stage < prs[i].ownStage else { continue }
+            prs[i].blockedStage = prs[parent].stage
+            prs[i].blockedBy = prs[parent].blockedBy ?? prs[parent].number
+        }
+        return prs
+    }
 
     public func count(_ stage: Stage) -> Int { prs.filter { $0.stage == stage }.count }
 
