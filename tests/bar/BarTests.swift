@@ -159,6 +159,18 @@ struct BarTests {
         #expect(titles.map(\.text) == ["Bartender", "OneDrive · SSW", "OneDrive · TinaCMS", "Zed 1", "Zed 2"])
     }
 
+    @Test("the native menu bar counts as shown from the start of its slide, on its own display only")
+    func nativeMenuBar() {
+        let main = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let below = CGRect(x: 0, y: 982, width: 1512, height: 982)
+        let parkedBelow = CGRect(x: 0, y: 982 - 39, width: 1512, height: 39)
+        #expect(!nativeMenuBarShown([CGRect(x: 0, y: -39, width: 1512, height: 39), parkedBelow], on: main))
+        #expect(nativeMenuBarShown([CGRect(x: 0, y: -20, width: 1512, height: 39)], on: main))
+        #expect(nativeMenuBarShown([CGRect(x: 0, y: 0, width: 1512, height: 39)], on: main))
+        #expect(!nativeMenuBarShown([parkedBelow], on: below))
+        #expect(!nativeMenuBarShown([CGRect(x: 1512, y: 0, width: 1920, height: 39)], on: main))
+    }
+
     @Test("the OmniWM dev build counts as OmniWM")
     func omniWM() {
         #expect(isOmniWM("com.barut.OmniWM"))

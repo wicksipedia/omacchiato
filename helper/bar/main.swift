@@ -285,6 +285,7 @@ func pointerAtScreenTop() {
     if fromTop <= revealEdge {
         edgeTouched = true
         setHovering(false)
+        watchNativeMenuBar()
         // Climb only when fullscreen actually hides the bar. Otherwise
         // stay at the -20 resting level, so the auto-hidden native menu
         // bar can slide in above the bar and stay clickable. Without
@@ -299,6 +300,29 @@ func pointerAtScreenTop() {
     if revealed, openPopup == nil, fromTop > barHeight + 12 {
         // a popup keeps it up: its anchor must not vanish under the pointer
         setRevealed(false)
+    }
+}
+
+// The native menu bar has no background on macOS 26, so the bar shows
+// through it. While it is on a screen, hide the bar there. Poll, because
+// no event reports the slide.
+var menuBarWatch: Timer?
+func watchNativeMenuBar() {
+    guard menuBarWatch == nil, stackOffset == 0 else { return }
+    menuBarWatch = Timer.scheduledTimer(withTimeInterval: 1.0 / 30, repeats: true) { timer in
+        let bars = (CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? [])
+            .filter { ($0[kCGWindowLayer as String] as? Int) == Int(CGWindowLevelForKey(.mainMenuWindow)) }
+            .compactMap { ($0[kCGWindowBounds as String] as? NSDictionary).flatMap { CGRect(dictionaryRepresentation: $0) } }
+        var anyShown = false
+        for surface in surfaces {
+            let shown = nativeMenuBarShown(bars, on: CGDisplayBounds(screenID(surface.screen)))
+            anyShown = anyShown || shown
+            surface.window.alphaValue = shown && !revealed ? 0 : 1
+        }
+        if !anyShown, !edgeTouched {
+            timer.invalidate()
+            menuBarWatch = nil
+        }
     }
 }
 

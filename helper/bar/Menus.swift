@@ -127,6 +127,16 @@ func menuBarIsShown(overX x: CGFloat) -> Bool {
     return false
 }
 
+// True while one of the menu bar frames is partly or fully slid in at the
+// top of the display. A hidden one waits above its display, which can be
+// inside the bottom of a display stacked above.
+func nativeMenuBarShown(_ frames: [CGRect], on display: CGRect) -> Bool {
+    frames.contains {
+        display.minX <= $0.midX && $0.midX < display.maxX
+            && $0.minY < display.minY + 1 && $0.maxY > display.minY + 1
+    }
+}
+
 // Clicks the icon the way OmniWM's HiddenBarClickForwarder does. Returns
 // false without clicking if the icon has no clickable position. Call off
 // the main thread: it waits for the menu bar to appear.
