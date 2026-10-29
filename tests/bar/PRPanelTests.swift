@@ -61,6 +61,30 @@ import Testing
         #expect(prs[4].stage == .inReview)
     }
 
+    @Test("a stage list shows the whole stack, and mutes the PRs of other stages")
+    func rows() {
+        let stack = Self.fiveStack
+        let needsYou = stack.rows(in: [.needsYou])
+        #expect(needsYou.map(\.pr.number) == [1, 2, 3, 4, 5])
+        #expect(needsYou.map(\.muted) == [true, true, false, false, false])
+        #expect(needsYou.map(\.rail) == [.first, .middle, .middle, .middle, .last])
+        #expect(stack.rows(in: [.inReview]).map(\.muted) == [false, false, true, true, true])
+        #expect(stack.rows(in: nil).allSatisfy { !$0.muted })
+        #expect(stack.rows(in: [.ready]).isEmpty)
+    }
+
+    @Test("a PR outside a stack has no rail, and two stacks keep their own rails")
+    func rails() {
+        let report = PRReport(now: Date(), prs: [
+            PR(repo: "a/b", number: 1, title: ""),
+            PR(repo: "a/b", number: 2, title: ""),
+            PR(repo: "a/b", number: 3, title: "", depth: 1),
+            PR(repo: "a/b", number: 4, title: "", checks: .failed),
+        ])
+        #expect(report.rows(in: nil).map(\.rail) == [.none, .first, .last, .none])
+        #expect(report.rows(in: [.inReview]).map(\.pr.number) == [1, 2, 3])
+    }
+
     @Test("the panel reads the script's JSON")
     func decode() throws {
         let text = """

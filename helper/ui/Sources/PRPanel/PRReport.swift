@@ -72,6 +72,7 @@ public struct PRReport {
         public var markRead: String?         // the command that hides it until its next update
         public internal(set) var blockedBy: Int?   // the PR below it in its stack whose stage it takes
         var blockedStage: Stage?
+        var parent: Int?                     // the PR it sits on, when that PR is in the list
         public var id: String { "\(repo)#\(number)" }
 
         public init(repo: String, number: Int, title: String, url: URL? = nil, state: State = .open,
@@ -173,12 +174,38 @@ public struct PRReport {
             let parent = depth > 0 ? chains[prs[i].repo]?[depth - 1] : nil
             chains[prs[i].repo, default: [:]] = (chains[prs[i].repo] ?? [:]).filter { $0.key < depth }
             chains[prs[i].repo]?[depth] = i
+            prs[i].parent = parent.map { prs[$0].number }
             guard let parent, prs[parent].ownStage < .draft, prs[i].ownStage < .draft,
                   prs[parent].stage < prs[i].ownStage else { continue }
             prs[i].blockedStage = prs[parent].stage
             prs[i].blockedBy = prs[parent].blockedBy ?? prs[parent].number
         }
         return prs
+    }
+
+    public enum Rail { case none, first, middle, last }
+
+    public struct Row: Identifiable {
+        public var pr: PR
+        public var muted: Bool               // a PR of another stage, shown to place the others in their stack
+        public var rail: Rail
+        public var id: String { pr.id }
+    }
+
+    // The rows of a list that shows the given stages, or every stage for nil.
+    // A stack with a PR in the list shows whole, base first.
+    public func rows(in stages: Set<Stage>?) -> [Row] {
+        var stacks: [[PR]] = []
+        for pr in prs {
+            if pr.parent == nil { stacks.append([pr]) } else { stacks[stacks.count - 1].append(pr) }
+        }
+        let shown = { (pr: PR) in stages?.contains(pr.stage) ?? true }
+        return stacks.filter { $0.contains(where: shown) }.flatMap { stack in
+            stack.indices.map { i in
+                Row(pr: stack[i], muted: !shown(stack[i]),
+                    rail: stack.count == 1 ? .none : i == 0 ? .first : i == stack.count - 1 ? .last : .middle)
+            }
+        }
     }
 
     public func count(_ stage: Stage) -> Int { prs.filter { $0.stage == stage }.count }
