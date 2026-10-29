@@ -10,7 +10,11 @@ import StatusPanel
 public struct RemindersPRPanel: View {
     var report: PRReport
     var actions: PRActions
-    @State private var filter: PRReport.Stage?
+    @AppStorage("prReminderFilter") private var filterValue = -1   // a Stage raw value, or -1 for none
+    private var filter: PRReport.Stage? {
+        get { PRReport.Stage(rawValue: filterValue) }
+        nonmutating set { filterValue = newValue?.rawValue ?? -1 }
+    }
 
     public init(report: PRReport, actions: PRActions = .init()) {
         self.report = report
@@ -40,8 +44,7 @@ public struct RemindersPRPanel: View {
                     PanelCard {
                         VStack(alignment: .leading, spacing: 8) {
                             ForEach(shown, id: \.0) { name, prs in
-                                VStack(alignment: .leading, spacing: 0) {
-                                    RepoHeader(name: name, count: prs.filter { !$0.muted }.count)
+                                FoldRepo(name: name, count: prs.filter { !$0.muted }.count) {
                                     ForEach(prs) { row in
                                         if row.muted {
                                             MutedPRRow(pr: row.pr, rail: row.rail, actions: actions)

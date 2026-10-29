@@ -186,6 +186,8 @@ extension View {
 struct RepoHeader: View {
     var name: String
     var count: Int
+    var open: Bool?             // nil draws no chevron
+    var hovered = false
 
     var body: some View {
         HStack(spacing: 5) {
@@ -193,9 +195,48 @@ struct RepoHeader: View {
             Text(name).font(.system(size: 11, weight: .semibold)).lineLimit(1).truncationMode(.head)
             Spacer()
             Text("\(count)").font(.system(size: 11, weight: .semibold, design: .rounded))
+            if let open {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(hovered ? .secondary : .tertiary)
+                    .rotationEffect(.degrees(open ? 90 : 0))
+            }
         }
         .foregroundStyle(.secondary)
         .padding(.horizontal, 6)
+    }
+}
+
+// A repository's PRs under a header that a click folds away.
+struct FoldRepo<Content: View>: View {
+    var name: String
+    var count: Int
+    @ViewBuilder var content: Content
+    @AppStorage private var open: Bool
+    @State private var hovered = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    init(name: String, count: Int, @ViewBuilder content: () -> Content) {
+        self.name = name
+        self.count = count
+        self.content = content()
+        _open = AppStorage(wrappedValue: true, "prRepoOpen.\(name)")
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // A sidebar section header: no hover fill, only the chevron answers.
+            RepoHeader(name: name, count: count, open: open, hovered: hovered)
+                .contentShape(.rect)
+                .onHover { hovered = $0 }
+                .onTapGesture {
+                    withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) { open.toggle() }
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityValue(open ? "Expanded" : "Collapsed")
+            if open { content }
+        }
     }
 }
 
