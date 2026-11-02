@@ -288,7 +288,7 @@ fetch_release() {
     log "The download or its checksum failed."
     return 1
   fi
-  for name in omacchiato-helper omacchiato-overview omacchiato-omni omacchiato-bar.app omacchiato-gesture.app; do
+  for name in omacchiato-helper omacchiato-overview omacchiato-bar.app omacchiato-gesture.app; do
     codesign --verify --strict -R="anchor apple generic and certificate leaf[subject.OU] = \"$RELEASE_TEAM\"" \
       "$RELEASE_TMP/x/$name" 2>/dev/null && continue
     log "$name in $tag does not carry the signature of team $RELEASE_TEAM."
@@ -597,11 +597,9 @@ fi
 # --- 4. Trackpad gestures (omacchiato-gesture) ---------------------------------
 # The gesture engine — absorbed from aerospace-swipe (MIT, notice kept in
 # helper/gesture/LICENSE.aerospace-swipe) with every omacchiato fix folded
-# in — runs as a user launch agent. It serves all four directions: the
-# vertical swipes open and close the overview, and the horizontal ones
-# step through the workspaces over OmniWM IPC, with
-# workspaceSwipeEnabled = false in settings.toml. Config is
-# COPIED (launch agents can't read ~/Documents — TCC).
+# in — runs as a user launch agent. Three-finger swipes run Defi's
+# focus-column and focus-workspace. Config is COPIED (launch agents
+# can't read ~/Documents — TCC).
 GESTURE_APP="$HOME/.local/share/omacchiato/omacchiato-gesture.app"
 GESTURE_BIN="$GESTURE_APP/Contents/MacOS/omacchiato-gesture"
 mkdir -p "$HOME/.config/omacchiato"
@@ -621,15 +619,7 @@ fi
 # so every rebuild means dead swipes until the user re-grants. The only
 # safe rebuild is the one that does not happen: skip the whole block
 # unless the binary is missing or a source file actually changed.
-# omacchiato-omni: the scripts' held-socket client for OmniWM (plain C,
-# ~3 ms launch; no grants involved, so it is simply rebuilt when stale)
 G="$REPO_DIR/helper/gesture"
-if [ -n "$PREBUILT" ]; then
-  place omacchiato-omni "$HOME/.local/bin/omacchiato-omni"
-elif [ ! -x "$HOME/.local/bin/omacchiato-omni" ] || find "$G/omniwm.c" "$G/omniwm.h" "$G/omnicli.c" "$G/yyjson.c" "$G/yyjson.h" -newer "$HOME/.local/bin/omacchiato-omni" 2>/dev/null | grep -q .; then
-  "$REPO_DIR/bin/omacchiato-build" omni "$HOME/.local/bin/omacchiato-omni" \
-    || echo "omacchiato-omni build failed"
-fi
 GESTURE_STALE=""
 if [ -n "$PREBUILT" ]; then
   if [ "$(cdhash "$PREBUILT/omacchiato-gesture.app")" != "$(cdhash "$GESTURE_APP")" ]; then

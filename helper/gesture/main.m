@@ -4,14 +4,11 @@
 // LICENSE.aerospace-swipe) on 2026-08-28, with omacchiato's accumulated
 // fixes folded in: raw MultitouchSupport frames (macOS 26.3 stopped
 // carrying multi-touch data in CGEvent taps), wake re-registration,
-// per-direction command overrides, and shell execution for any
-// direction. Horizontal next/prev swipes cycle OmniWM workspaces over a
-// held IPC connection; any other direction runs a command.
+// and a shell command for each direction.
 //
 #include "Carbon/Carbon.h"
 #include "Cocoa/Cocoa.h"
 #include "config.h"
-#include "omniwm.h"
 #include <pthread.h>
 #import "event_tap.h"
 #include "haptic.h"
@@ -150,43 +147,27 @@ static void hid_device_appeared(void* refcon, io_iterator_t iter)
 		});
 }
 
-static omniwm* g_omni; // held OmniWM IPC connection (lazy)
-static pthread_mutex_t g_omni_lock = PTHREAD_MUTEX_INITIALIZER;
-
-static void switch_workspace(const char* ws)
+// A serial queue keeps two quick opposite swipes in order.
+static void run_command(const char* cmd)
 {
-	// OmniWM: the slot-scoped cycle runs in-process on a held IPC
-	// connection — one round-trip (~1 ms, plus OmniWM's own switch
-	// work) instead of shell + omniwmctl (~80 ms). fire_horizontal
-	// dispatches concurrently, so the connection is serialized.
-	if ((!strcmp(ws, "next") || !strcmp(ws, "prev")) && omniwm_available()) {
-		pthread_mutex_lock(&g_omni_lock);
-		if (!g_omni)
-			g_omni = omniwm_new();
-		int target = g_omni ? omniwm_cycle(g_omni, ws[0] == 'n' ? 1 : -1) : 0;
-		pthread_mutex_unlock(&g_omni_lock);
-		if (!target) {
-			fprintf(stderr, "omniwm: cycle failed\n");
-			return;
-		}
-		printf("Switched workspace (omniwm) to '%d'.\n", target);
+	if (!cmd || !*cmd)
 		return;
-	}
-	// omacchiato: a direction that looks like a COMMAND is run like the
-	// vertical gestures are, so horizontal swipes can route through
-	// omniwmctl and keep this engine's tuned mid-gesture thresholds
-	// (OmniWM's own swipe commits late and cannot be tuned). Called
-	// from fire_horizontal's dispatch_async, so popen may block here.
-	if (strchr(ws, '/')) {
-		FILE* p = popen(ws, "r");
+	static dispatch_queue_t q;
+	static dispatch_once_t once;
+	dispatch_once(&once, ^{
+		q = dispatch_queue_create("com.omacchiato.gesture.command", DISPATCH_QUEUE_SERIAL);
+	});
+	char* owned = strdup(cmd);
+	dispatch_async(q, ^{
+		FILE* p = popen(owned, "r");
 		if (p) {
 			char drain[256];
 			while (fread(drain, 1, sizeof drain, p) > 0) { }
 			pclose(p);
-		}
-		else
-			fprintf(stderr, "Error: failed to run horizontal swipe command '%s'.\n", ws);
-	}
+		} else
+			fprintf(stderr, "Error: failed to run swipe command '%s'.\n", owned);
+		free(owned);
+	});
 }
 
 static void reset_gesture_state(gesture_ctx* ctx)
@@ -195,77 +176,26 @@ static void reset_gesture_state(gesture_ctx* ctx)
 	ctx->last_fire_dir = 0;
 }
 
-static bool overlay_active(void)
-{
-	char path[128];
-	snprintf(path, sizeof path, "/tmp/omacchiato-overlay-active-%d", getuid());
-	FILE* f = fopen(path, "r");
-	if (!f)
-		return false;
-	int pid = 0;
-	int got = fscanf(f, "%d", &pid);
-	fclose(f);
-	// a flag whose writer died (crash while visible) must not gate
-	// horizontal swipes forever
-	if (got != 1 || pid <= 0 || kill((pid_t)pid, 0) != 0) {
-		unlink(path);
-		return false;
-	}
-	return true;
-}
-
 static void fire_gesture(gesture_ctx* ctx, int direction)
 {
 	if (direction == ctx->last_fire_dir)
 		return;
-	// the workspace overview is up: finger lift-off after the vertical
-	// swipe reads as a horizontal flick and switched workspaces UNDER
-	// the overlay (killing its focus). Consume, don't switch.
-	if (overlay_active()) {
-		ctx->last_fire_dir = direction;
-		ctx->state = GS_COMMITTED;
-		return;
-	}
-
 	ctx->last_fire_dir = direction;
 	ctx->state = GS_COMMITTED;
 	tap();
-
-	// a SERIAL queue: the global concurrent pool gives no ordering, so
-	// two rapid opposite-direction flicks could reach the IPC mutex out
-	// of order and replay a stale target. FIFO by construction here.
-	static dispatch_queue_t switch_q;
-	static dispatch_once_t once;
-	dispatch_once(&once, ^{
-		switch_q = dispatch_queue_create("com.omacchiato.gesture.switch", DISPATCH_QUEUE_SERIAL);
-	});
-	dispatch_async(switch_q, ^{
-		switch_workspace(direction > 0 ? g_config.swipe_right : g_config.swipe_left);
-	});
+	run_command(direction > 0 ? g_config.swipe_right : g_config.swipe_left);
 }
 
-// Vertical swipes run a user command (workspace overview etc.) instead
-// of a workspace step. One-shot: commits the gesture so nothing re-fires
-// until the fingers lift. Direction codes ±2 keep them distinct from
-// the horizontal ±1 so the committed-state reversal re-arm (an x-axis
-// concept) can tell them apart.
+// One-shot: a vertical swipe commits the gesture, so nothing fires again
+// until the fingers lift. Direction codes ±2 keep it apart from the
+// horizontal ±1, so the re-arm on a reversal (an x-axis idea) can tell
+// them apart.
 static void fire_vertical(gesture_ctx* ctx, int direction)
 {
-	const char* cmd = direction > 0 ? g_config.swipe_up : g_config.swipe_down;
 	ctx->last_fire_dir = direction * 2;
 	ctx->state = GS_COMMITTED;
-
-	char* owned = strdup(cmd);
-	dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-		FILE* p = popen(owned, "r");
-		if (p)
-			pclose(p);
-		else
-			fprintf(stderr, "Error: failed to run vertical swipe command '%s'.\n", owned);
-		free(owned);
-	});
-
 	tap();
+	run_command(direction > 0 ? g_config.swipe_up : g_config.swipe_down);
 }
 
 static void calculate_touch_averages(touch* touches, int count,

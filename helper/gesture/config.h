@@ -11,7 +11,6 @@
 #include <unistd.h>
 
 typedef struct {
-	bool natural_swipe;
 	bool wrap_around;
 	bool haptic;
 	bool skip_empty;
@@ -30,10 +29,8 @@ typedef struct {
 	float palm_velocity;
 	const char* swipe_left;
 	const char* swipe_right;
-	// Shell commands for vertical 4-finger swipes (workspace
-	// overview etc.). Empty string = gesture disabled. Unlike
-	// swipe_left/right (workspace directions), these run via
-	// /bin/sh so any overview UI can be wired in.
+	// Shell commands, one for each direction. An empty string turns
+	// the direction off.
 	const char* swipe_up;
 	const char* swipe_down;
 } Config;
@@ -41,7 +38,6 @@ typedef struct {
 static Config default_config()
 {
 	Config config;
-	config.natural_swipe = false;
 	config.wrap_around = true;
 	config.haptic = false;
 	config.skip_empty = true;
@@ -58,8 +54,8 @@ static Config default_config()
 	config.palm_disp = 0.025; // 2.5% pad from origin
 	config.palm_age = 0.06; // 60ms before judgment
 	config.palm_velocity = 0.1; // 10% of pad dimension per second
-	config.swipe_left = "prev";
-	config.swipe_right = "next";
+	config.swipe_left = "";
+	config.swipe_right = "";
 	config.swipe_up = "";
 	config.swipe_down = "";
 	return config;
@@ -128,10 +124,6 @@ static Config load_config()
 	yyjson_val* root = yyjson_doc_get_root(doc);
 	yyjson_val* item;
 
-	item = yyjson_obj_get(root, "natural_swipe");
-	if (item && yyjson_is_bool(item))
-		config.natural_swipe = yyjson_get_bool(item);
-
 	item = yyjson_obj_get(root, "wrap_around");
 	if (item && yyjson_is_bool(item))
 		config.wrap_around = yyjson_get_bool(item);
@@ -168,13 +160,6 @@ static Config load_config()
 	if (item && yyjson_is_real(item))
 		config.settle_factor = (float)yyjson_get_real(item);
 
-	config.swipe_left = config.natural_swipe ? "next" : "prev";
-	config.swipe_right = config.natural_swipe ? "prev" : "next";
-
-	// Optional overrides. next and prev cycle workspaces, a string with
-	// a '/' runs as a command, and anything else is a no-op. omacchiato
-	// keeps the natural_swipe defaults, because this daemon commits
-	// earlier than the swipe of OmniWM and can be tuned.
 	item = yyjson_obj_get(root, "swipe_left");
 	if (item && yyjson_is_str(item))
 		config.swipe_left = strdup(yyjson_get_str(item));
@@ -183,8 +168,7 @@ static Config load_config()
 	if (item && yyjson_is_str(item))
 		config.swipe_right = strdup(yyjson_get_str(item));
 
-	// Owned copies: the yyjson doc is freed below, so string values
-	// must be duplicated (left/right above are static literals).
+	// Owned copies: the yyjson doc is freed below.
 	item = yyjson_obj_get(root, "swipe_up");
 	if (item && yyjson_is_str(item))
 		config.swipe_up = strdup(yyjson_get_str(item));

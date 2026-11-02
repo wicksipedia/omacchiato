@@ -28,7 +28,6 @@ BRANCH = "main"
 BINARIES = [
     ("helper", "omacchiato-helper"),
     ("overview", "omacchiato-overview"),
-    ("omni", "omacchiato-omni"),
     ("bar", "omacchiato-bar.app"),
     ("gesture", "omacchiato-gesture.app"),
 ]
