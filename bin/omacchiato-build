@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # omacchiato-build <target> <out-path> — build and sign one binary.
 #
-# Targets: helper, overview (out-path is the binary) and bar,
+# Targets: helper (out-path is the binary) and bar,
 # gesture (out-path is the .app). install.sh and omacchiato-release both
 # build through this script, so a release holds the same binaries as a
 # local build.
@@ -11,7 +11,7 @@
 # ad-hoc signature stays, and every rebuild needs new grants.
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TARGET="${1:?usage: omacchiato-build <helper|overview|bar|gesture> <out-path>}"
+TARGET="${1:?usage: omacchiato-build <helper|bar|gesture> <out-path>}"
 OUT="${2:?usage: omacchiato-build <target> <out-path>}"
 PF=/System/Library/PrivateFrameworks
 G="$REPO_DIR/helper/gesture"
@@ -39,10 +39,6 @@ case "$TARGET" in
   helper)
     swiftc -O -F "$PF" -framework DisplayServices -o "$OUT" "$REPO_DIR/helper/main.swift"
     sign com.omacchiato.helper "$OUT"
-    ;;
-  overview)
-    swiftc -O -F "$PF" -framework SkyLight -o "$OUT" "$REPO_DIR/helper/overview.swift"
-    sign com.omacchiato.overview "$OUT"
     ;;
   bar)
     # The plist is compiled into the binary and is also the bundle's

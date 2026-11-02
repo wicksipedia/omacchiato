@@ -1,7 +1,6 @@
 # omacchiato — everything the setup needs, installable via `brew bundle`
 
-# Window management
-cask "omniwm"
+# Desktop apps
 cask "karabiner-elements"  # Caps Lock -> Super
 cask "ghostty"             # default terminal + floating TUI host (btop)
 cask "raycast"             # launcher on Cmd+Space, set in Raycast

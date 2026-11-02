@@ -370,10 +370,6 @@ func watch(_ path: String, create: Bool, handler: @escaping () -> Void) {
     src.resume()
 }
 
-// A window sent from one hidden workspace to another moves nothing on
-// screen, so SkyLight reports no event at all, measured with a probe. No
-// publisher exists for this, so the commands that move windows announce
-// it themselves (omacchiato-ws, and the overview's drag-reorder).
 // Super+K writes this file. The bar has no key tap, and should not grow one.
 let cheatPath = "/tmp/omacchiato-bar-cheatsheet"
 watch(cheatPath, create: true) { toggleCheatsheet() }
@@ -399,12 +395,6 @@ watch(popupPath, create: true) {
     }
     popupPoke = poke
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: poke)
-}
-
-let movedPath = "/tmp/omacchiato-bar-moved"
-watch(movedPath, create: true) {
-    tlog("moved poke")
-    kickRebuild()
 }
 
 // --- defi fast path ---------------------------------------------------------

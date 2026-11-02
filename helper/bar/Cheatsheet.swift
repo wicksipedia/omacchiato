@@ -69,8 +69,8 @@ let cheatColumns = 3
 let cheatRowH: CGFloat = 20
 let cheatPad: CGFloat = 18
 
-// The sheet takes key focus while open, like the overview, so it can be
-// typed into. hideCheatsheet hands focus back to the app that had it, so
+// The sheet takes key focus while open, so it can be typed into.
+// hideCheatsheet hands focus back to the app that had it, so
 // search never costs the user their window.
 final class CheatWindow: NSWindow {
     override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect { frameRect }

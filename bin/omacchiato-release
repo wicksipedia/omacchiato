@@ -27,7 +27,6 @@ BRANCH = "main"
 # target, path inside the tarball
 BINARIES = [
     ("helper", "omacchiato-helper"),
-    ("overview", "omacchiato-overview"),
     ("bar", "omacchiato-bar.app"),
     ("gesture", "omacchiato-gesture.app"),
 ]

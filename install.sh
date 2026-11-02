@@ -10,6 +10,7 @@ export OMACCHIATO_BANNER_SHOWN=1
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 
 "$REPO_DIR/migrate-omacosy.sh"
+"$REPO_DIR/migrate-omniwm.sh"
 
 # --- 0. Manifest: record what THIS machine gains ----------------------------
 # uninstall.sh removes only what is recorded here, so tools and settings
@@ -74,20 +75,6 @@ if ! command -v brew >/dev/null 2>&1; then
   # marked AFTER the install succeeds — an aborted attempt must not
   # tell uninstall.sh that homebrew is ours to remove
   mark "installed-homebrew"
-fi
-
-# OmniWM asks to be quit before Homebrew upgrades it, because Homebrew swaps
-# the app out underneath a running copy. The start step at the end of this
-# script brings it back.
-if pgrep -xq OmniWM && [ "$(brew outdated --cask --greedy --quiet omniwm 2>/dev/null)" = omniwm ]; then
-  log "Quitting OmniWM while Homebrew upgrades it"
-  osascript -e 'quit app "OmniWM"' 2>/dev/null || true
-  for _ in 1 2 3 4 5 6 7 8 9 10; do pgrep -xq OmniWM || break; sleep 1; done
-  if pgrep -xq OmniWM; then
-    # a hung quit must not leave Homebrew swapping the app underneath it
-    pkill -x OmniWM 2>/dev/null || true
-    for _ in 1 2 3 4 5; do pgrep -xq OmniWM || break; sleep 1; done
-  fi
 fi
 
 log "Installing packages (brew bundle)"
@@ -198,15 +185,6 @@ link "$REPO_DIR/config/starship.toml" "$HOME/.config/starship.toml"
 # ghostty reads this AND its Application Support config, so personal
 # settings there survive
 link "$REPO_DIR/config/ghostty"      "$HOME/.config/ghostty"
-# OmniWM: settings are canonical TOML, live-reloaded. OmniWM and theme-set
-# both write the file, and it holds per-desk values such as display pins,
-# so it is a local copy of the template, made once and never overwritten.
-# A repo symlink from an earlier install becomes a copy of the same file.
-if [ -L "$HOME/.config/omniwm" ] && [ "$(readlink "$HOME/.config/omniwm")" = "$REPO_DIR/config/omniwm" ]; then
-  rm "$HOME/.config/omniwm"
-fi
-mkdir -p "$HOME/.config/omniwm"
-[ -e "$HOME/.config/omniwm/settings.toml" ] || cp "$REPO_DIR/config/omniwm/settings.toml" "$HOME/.config/omniwm/settings.toml"
 
 # Add the omacchiato keys only to a herdr config with no keys table, so keys
 # that the user set stay. An unchanged block of older keys is replaced.
@@ -288,7 +266,7 @@ fetch_release() {
     log "The download or its checksum failed."
     return 1
   fi
-  for name in omacchiato-helper omacchiato-overview omacchiato-bar.app omacchiato-gesture.app; do
+  for name in omacchiato-helper omacchiato-bar.app omacchiato-gesture.app; do
     codesign --verify --strict -R="anchor apple generic and certificate leaf[subject.OU] = \"$RELEASE_TEAM\"" \
       "$RELEASE_TMP/x/$name" 2>/dev/null && continue
     log "$name in $tag does not carry the signature of team $RELEASE_TEAM."
@@ -325,16 +303,6 @@ elif [ ! -x "$HOME/.local/bin/omacchiato-helper" ] || [ "$REPO_DIR/helper/main.s
   log "Building omacchiato-helper"
   "$REPO_DIR/bin/omacchiato-build" helper "$HOME/.local/bin/omacchiato-helper"
 fi
-
-# workspace overview overlay (4-finger swipe up)
-if [ -n "$PREBUILT" ]; then
-  place omacchiato-overview "$HOME/.local/bin/omacchiato-overview"
-elif [ ! -x "$HOME/.local/bin/omacchiato-overview" ] || [ "$REPO_DIR/helper/overview.swift" -nt "$HOME/.local/bin/omacchiato-overview" ] \
-  || unsigned "$HOME/.local/bin/omacchiato-overview"; then
-  log "Building omacchiato-overview"
-  "$REPO_DIR/bin/omacchiato-build" overview "$HOME/.local/bin/omacchiato-overview"
-fi
-
 
 # the status bar itself: one process for the surfaces, reading its own
 # publishers (SkyLight, CoreAudio, IOPS, DisplayServices, SCDynamicStore,
@@ -439,14 +407,11 @@ link "$REPO_DIR/bin/omacchiato-github-prs" "$HOME/.local/bin/omacchiato-github-p
 link "$REPO_DIR/bin/omacchiato-keep-awake" "$HOME/.local/bin/omacchiato-keep-awake"
 link "$REPO_DIR/bin/omacchiato-updates" "$HOME/.local/bin/omacchiato-updates"
 link "$REPO_DIR/bin/omacchiato-stats" "$HOME/.local/bin/omacchiato-stats"
-link "$REPO_DIR/bin/omacchiato-ws" "$HOME/.local/bin/omacchiato-ws"
-link "$REPO_DIR/bin/omacchiato-ws-collapse" "$HOME/.local/bin/omacchiato-ws-collapse"
 link "$REPO_DIR/bin/omacchiato-update" "$HOME/.local/bin/omacchiato-update"
 link "$REPO_DIR/bin/omacchiato-spawn" "$HOME/.local/bin/omacchiato-spawn"
 link "$REPO_DIR/bin/omacchiato-herdr" "$HOME/.local/bin/omacchiato-herdr"
 link "$REPO_DIR/bin/omacchiato-defi" "$HOME/.local/bin/omacchiato-defi"
 link "$REPO_DIR/bin/omacchiato-karabiner-keys" "$HOME/.local/bin/omacchiato-karabiner-keys"
-link "$REPO_DIR/bin/omacchiato-omniwmctl" "$HOME/.local/bin/omacchiato-omniwmctl"
 link "$REPO_DIR/bin/omacchiato-herdr-worktree" "$HOME/.local/bin/omacchiato-herdr-worktree"
 link "$REPO_DIR/bin/omacchiato-popup" "$HOME/.local/bin/omacchiato-popup"
 link "$REPO_DIR/bin/omacchiato-permissions" "$HOME/.local/bin/omacchiato-permissions"
@@ -701,7 +666,7 @@ log "Checking the permissions of the bar and the gesture daemon"
 cat <<EOF
 
 Done. One-time macOS steps if this is a fresh machine:
-  1. Grant OmniWM     System Settings -> Privacy & Security -> Accessibility (required) and Input Monitoring (swipes)
+  1. Grant Defi       System Settings -> Privacy & Security -> Accessibility
   2. Karabiner-Elements: approve its driver extension + Input Monitoring
      when prompted (System Settings -> Privacy & Security)
 

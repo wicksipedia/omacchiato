@@ -11,6 +11,7 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 "$REPO_DIR/bin/omacchiato-banner"
 export OMACCHIATO_BANNER_SHOWN=1
 "$REPO_DIR/migrate-omacosy.sh"
+"$REPO_DIR/migrate-omniwm.sh"
 
 # Manifest written by install.sh: only what IS recorded gets removed,
 # so tools and settings that predate omacchiato are never touched.
@@ -19,11 +20,9 @@ MANIFEST="$HOME/.local/state/omacchiato/manifest"
 have() { [ -f "$MANIFEST" ] && grep -qxF "$1" "$MANIFEST"; }
 
 # --- 1. Stop the stack ------------------------------------------------------
-# Quitting the window manager restores the windows it was managing
-# (pkill backstops OmniWM's quit handler).
-log "Stopping OmniWM and the bar"
-osascript -e 'quit app "OmniWM"' 2>/dev/null || true
-pkill -f OmniWM.app 2>/dev/null || true
+# Quitting the window manager restores the windows it was managing.
+log "Stopping Defi and the bar"
+osascript -e 'quit app "Defi"' 2>/dev/null || true
 # an older install can still run AeroSpace; quitting it first puts back
 # the windows it parked off screen before its cask goes
 osascript -e 'quit app "AeroSpace"' 2>/dev/null || true
@@ -31,24 +30,8 @@ osascript -e 'quit app "Karabiner-Elements"' 2>/dev/null || true
 launchctl unload "$HOME/Library/LaunchAgents/com.omacchiato.bar.plist" 2>/dev/null || true
 rm -f "$HOME/Library/LaunchAgents/com.omacchiato.bar.plist" "$HOME/.local/bin/omacchiato-bar"
 rm -rf "$HOME/.local/share/omacchiato/omacchiato-bar.app"
-# overview is self-daemonizing (no launchd agent) — kill by pidfile
-# /tmp is shared. `[ -f ]` follows symlinks, so without the -L check a
-# link planted at this path could point at a file holding someone
-# else's pid and we would signal that instead. The contents are also
-# only trusted as far as "digits".
-# pidfile moved out of /tmp (purge-safe); check both for older installs
-PIDFILE="$HOME/.local/state/omacchiato/overview.pid"
-[ -f "$PIDFILE" ] || PIDFILE="/tmp/omacchiato-overview-$(id -u).pid"
-if [ -f "$PIDFILE" ] && [ ! -L "$PIDFILE" ]; then
-  OVERVIEW_PID="$(cat "$PIDFILE" 2>/dev/null || true)"
-  case "$OVERVIEW_PID" in
-    '' | *[!0-9]*) : ;;
-    *) kill "$OVERVIEW_PID" 2>/dev/null || true ;;
-  esac
-fi
-rm -f "$HOME/.local/bin/omacchiato-overview" "$HOME/.local/bin/omacchiato-toggle"
-rm -f /tmp/omacchiato-*.log /tmp/omacchiato-*.err "/tmp/omacchiato-overview-$(id -u).pid" \
-  "/tmp/omacchiato-overlay-active-$(id -u)" /tmp/omacchiato-ws-switch \
+rm -f "$HOME/.local/bin/omacchiato-toggle"
+rm -f /tmp/omacchiato-*.log /tmp/omacchiato-*.err \
   "/tmp/omacchiato-user-intent-$(id -u)" \
   "/tmp/omacchiato-guard-bounce-$(id -u)" \
   "/tmp/omacchiato-guard-cooldown-$(id -u)" \
@@ -237,10 +220,9 @@ Done. Left in place on purpose:
   - The menu bar returns fully after logging out and back in.
   - Claude desktop's caps-lock dictation shortcut was removed during setup;
     re-enable it in Claude's settings if you used it.
-  - If OmniWM still appears in System Settings -> General -> Login Items,
-    remove it there.
-  - OmniWM.app is a brew cask like the rest: removed above only when the
-    manifest says omacchiato installed it; one that predates omacchiato stays.
+  - Defi.app, which updates itself. Remove it from /Applications or
+    ~/Applications, with ~/.config/defi, if you no longer want it.
+  - OmniWM.app and ~/.config/omniwm, from an install before Defi.
   - Permission entries (Accessibility, Input Monitoring, Screen Recording,
     Location, Bluetooth) stay listed in System Settings -> Privacy &
     Security — macOS lets no script remove them. The binaries they named
