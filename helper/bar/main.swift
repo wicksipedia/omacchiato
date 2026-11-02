@@ -155,6 +155,24 @@ func applySurfaces(_ ids: [String: String]) {
         gone.window.orderOut(nil)
     }
     surfaces = kept
+    reserveBarSpace()
+}
+
+// macOS keeps windows out of the menu bar and notch strip, but the bar
+// is taller than the strip on a display without a notch. Defi adds the
+// difference to each display. Defi forgets it on a restart, and its
+// launch rebuilds the surfaces.
+func reservedTop(barHeight: CGFloat, screen: NSRect, visible: NSRect) -> Int {
+    Int(max(0, barHeight - (screen.maxY - visible.maxY)).rounded(.up))
+}
+
+func reserveBarSpace() {
+    let tops = surfaces.filter { !$0.monitorID.isEmpty }.map {
+        ($0.monitorID, reservedTop(barHeight: barHeight, screen: $0.screen.frame, visible: $0.screen.visibleFrame))
+    }
+    DispatchQueue.global(qos: .utility).async {
+        for (display, top) in tops { defi(["--monitor", display, "set-reserved-area", "top", String(top)]) }
+    }
 }
 
 func repaint() {

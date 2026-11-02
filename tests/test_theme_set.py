@@ -11,60 +11,66 @@ REPO = Path(__file__).resolve().parent.parent
 # is the system's own. Test the step with that Python when this Mac has it.
 PYTHON = "/usr/bin/python3" if os.path.exists("/usr/bin/python3") else sys.executable
 
-SETTINGS = """[appearance]
-mode = "light"
+CONFIG = """# my gaps
+[layout]
+gaps = 4.0
 
-[borders]
-enabled = true
-width = 4
+[decorations.borders]
+width = 6 # thick
+color = "#FF000000"
 
-[borders.glow]
-enabled = true
-opacity = 0.4
-radius = 12.0
-
-[borders.gradient]
-direction = "leftToRight"
-enabled = true
-
-[quakeTerminal]
-enabled = true
+[workspaces]
+names = ["dev"]
 """
 
 
-def settings_step():
-    """The Python that theme-set runs on OmniWM's settings.toml."""
+def defi_step():
+    """The Python that theme-set runs on Defi's config.toml."""
     text = (REPO / "bin" / "theme-set").read_text()
-    return re.search(r'OMNIWM_SETTINGS=.*?<<\'PY\'\n(.*?)\nPY\n', text, re.S).group(1)
+    return re.search(r'DEFI_CONFIG=.*?<<\'PY\'\n(.*?)\nPY\n', text, re.S).group(1)
 
 
-class OmniWMSettings(unittest.TestCase):
-    def run_step(self, path):
-        result = subprocess.run([PYTHON, "-c", settings_step(), str(path), str(REPO / "themes"), "catppuccin",
-                                 "light:catppuccin-latte,dark:catppuccin"], capture_output=True, text=True)
+class DefiBorders(unittest.TestCase):
+    def run_step(self, path, theme="catppuccin"):
+        borders = REPO / "themes" / theme / "borders.sh"
+        result = subprocess.run([PYTHON, "-c", defi_step(), str(path), str(borders)],
+                                capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_pair_keeps_the_users_border_taste(self):
+    def test_sets_the_theme_colours_and_keeps_every_other_line(self):
         with tempfile.TemporaryDirectory() as d:
-            path = Path(d) / "settings.toml"
-            path.write_text(SETTINGS)
+            path = Path(d) / "config.toml"
+            path.write_text(CONFIG)
             self.run_step(path)
             out = path.read_text()
-        self.assertIn('[appearance]\nmode = "automatic"', out)
-        self.assertIn("[borders.glow]\nenabled = true\nopacity = 0.4\nradius = 12.0", out)
-        self.assertIn('direction = "leftToRight"', out)
-        self.assertIn("[borders.darkColor]", out)
-        self.assertIn("[quakeTerminal]\nenabled = true", out)
+        self.assertIn('color = "#FFCBA6F7"', out)
+        self.assertIn('inactive_color = "#FF45475A"', out)
+        self.assertNotIn("#FF000000", out)
+        for line in ("# my gaps", "gaps = 4.0", "width = 6 # thick", 'names = ["dev"]'):
+            self.assertIn(line, out)
 
-    def test_an_unchanged_file_is_written_again(self):
-        # the write is what makes OmniWM reload its quake terminal
+    def test_adds_the_table_to_a_config_without_one(self):
         with tempfile.TemporaryDirectory() as d:
-            path = Path(d) / "settings.toml"
-            path.write_text(SETTINGS)
+            path = Path(d) / "config.toml"
+            path.write_text("[layout]\ngaps = 4.0")
+            self.run_step(path)
+            out = path.read_text()
+        self.assertTrue(out.startswith("[layout]\ngaps = 4.0\n\n[decorations.borders]\n"))
+
+    def test_creates_a_missing_config(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "config.toml"
+            self.run_step(path)
+            self.assertIn('color = "#FFCBA6F7"', path.read_text())
+
+    def test_a_second_run_does_not_write(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "config.toml"
+            path.write_text(CONFIG)
             self.run_step(path)
             before = path.stat().st_ino
             self.run_step(path)
-            self.assertNotEqual(path.stat().st_ino, before)
+            self.assertEqual(path.stat().st_ino, before)
 
 
 if __name__ == "__main__":

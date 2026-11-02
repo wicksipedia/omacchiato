@@ -49,3 +49,17 @@ struct DefiSnapshotTests {
         #expect(defiSnapshot(json).perMonitor.isEmpty)
     }
 }
+
+struct ReservedTopTests {
+    @Test("a notch strip taller than the bar needs no extra space")
+    func notched() {
+        #expect(reservedTop(barHeight: 34, screen: NSRect(x: 0, y: 0, width: 1800, height: 1169),
+                            visible: NSRect(x: 0, y: 0, width: 1800, height: 1131)) == 0)
+    }
+
+    @Test("a display with a hidden menu bar reserves the whole bar")
+    func hiddenMenuBar() {
+        #expect(reservedTop(barHeight: 34, screen: NSRect(x: -806, y: 1169, width: 3440, height: 1440),
+                            visible: NSRect(x: -806, y: 1169, width: 3440, height: 1440)) == 34)
+    }
+}
