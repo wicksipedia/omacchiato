@@ -26,10 +26,9 @@ import WeatherPanel
 #endif
 
 // --- cheatsheet (Super+K) --------------------------------------------------
-// Reads the live config — OmniWM's settings.toml and omacchiato's Karabiner
-// rules — never a list kept here. A cheatsheet that can disagree with the
-// keys is worse than none. The config's own section comments become the
-// headings, so the grouping is the author's, not a second opinion.
+// Reads omacchiato's Karabiner rules from the live config, never a list
+// kept here. Defi shows its own window keys while Ctrl+Opt is held, from
+// its live config, so this sheet points there instead of copying them.
 
 struct CheatEntry {
     let group: String
@@ -37,154 +36,12 @@ struct CheatEntry {
     let action: String
 }
 
-// "Control+Option+Command+Shift+1" becomes "Super+Shift+1": Caps Lock sends
-// Control+Option+Command, so collapse it back to Super, the one key the
-// user presses. Key names arrive already capitalised. Dropping " Arrow"
-// turns "Left Arrow" into "Left".
-func prettyOmniKey(_ raw: String) -> String {
-    var rest = raw
-    var parts: [String] = []
-    if rest.hasPrefix("Control+Option+Command+") {
-        parts.append("Super")
-        rest = String(rest.dropFirst("Control+Option+Command+".count))
-    }
-    for comp in rest.split(separator: "+") {
-        var key = String(comp)
-        if key.hasSuffix(" Arrow") { key = String(key.dropLast(" Arrow".count)) }
-        parts.append(key)
-    }
-    return parts.joined(separator: "+")
-}
+let karabinerKeyPrefix = "omacchiato-keys: "
 
-// Turns "switchWorkspace.0" into "switch workspace 1". The raw catalog id
-// keeps the config's exact wording, but printed verbatim it reads as a
-// mess: 0-based suffixes beside 1-based keycaps, and camelCase words. This
-// keeps the id's meaning but translates its casing and indexing to match
-// the keycap next to it.
-func humanizeOmniId(_ id: String) -> String {
-    func words(_ s: String) -> String {
-        var out = ""
-        for ch in s { out.append(ch.isUppercase ? " " + String(ch).lowercased() : String(ch)) }
-        return out.trimmingCharacters(in: .whitespaces)
-    }
-    let parts = id.split(separator: ".", maxSplits: 1).map(String.init)
-    // dwindle reality beats the catalog's niri-flavored names: moveColumn
-    // is a tile swap there, the binding people reach for daily, and plain
-    // move stacks into the neighbor as a group
-    let renamed = ["moveColumn": "swap window", "move": "stack into"]
-    let head = renamed[parts[0]] ?? words(parts[0])
-    guard parts.count > 1 else { return head }
-    if let n = Int(parts[1]) { return "\(head) \(n + 1)" }
-    switch parts[1] {
-    case "decrease10Percent": return "\(head) −10%"
-    case "increase10Percent": return "\(head) +10%"
-    default: return "\(head) \(words(parts[1]))"
-    }
-}
-
-// A strict-decoder rewrite can strip the comment headings. When that
-// happens, the sheet groups by id family instead.
-func omniGroup(_ id: String) -> String {
-    let h = String(id.split(separator: ".").first ?? "")
-    if h.lowercased().contains("workspace") { return "Workspaces" }
-    if h.hasPrefix("focus") { return "Focus" }
-    if h.hasPrefix("move") || h.hasPrefix("summon") { return "Move" }
-    if h.contains("Span") || h.hasPrefix("resize") || h.hasPrefix("balance")
-        || h.hasPrefix("cycleSize") || h.hasPrefix("set") { return "Size" }
-    if h.hasPrefix("toggle") || h.contains("Layout") || h.contains("Column")
-        || h.hasPrefix("preselect") || h.contains("olumn") { return "Layout & columns" }
-    return "System"
-}
-
-// [[hotkeys]] tables out of OmniWM's settings.toml: a binding string and
-// an action id per table, in either order.
-func omniwmCheatEntries() -> [CheatEntry] {
-    let path = "\(NSHomeDirectory())/.config/omniwm/settings.toml"
-    guard let text = try? String(contentsOfFile: path, encoding: .utf8) else { return [] }
-    var entries: [CheatEntry] = []
-    var group = ""
-    var lastWasComment = false
-    var inHotkey = false
-    var binding = ""
-    var id = ""
-    func flush() {
-        // The settings file lists every catalog id, and most are Unassigned.
-        // A cheatsheet should show only what you can press. About 90
-        // unassigned rows are left out — they made the sheet an unreadable
-        // wall.
-        if inHotkey, !binding.isEmpty, binding != "Unassigned", !id.isEmpty {
-            entries.append(CheatEntry(
-                group: group.isEmpty ? omniGroup(id) : group,
-                key: prettyOmniKey(binding), action: humanizeOmniId(id)))
-        }
-        binding = ""
-        id = ""
-    }
-    for raw in text.split(separator: "\n", omittingEmptySubsequences: false) {
-        let line = raw.trimmingCharacters(in: .whitespaces)
-        if line.hasPrefix("#") {
-            // A comment between tables starts the next group. A finished
-            // pending entry belongs to the heading it was written under,
-            // not the one about to start. TOML allows comments between a
-            // table's own keys, so a half-read table still keeps them.
-            if !binding.isEmpty, !id.isEmpty { flush() }
-            // The first line of a comment block is the heading; later
-            // lines are prose. Strip any "---" ruler decoration from it.
-            if !lastWasComment {
-                var title = String(line.dropFirst())
-                    .trimmingCharacters(in: CharacterSet(charactersIn: "- "))
-                if let c = title.firstIndex(where: { $0 == ":" || $0 == "." }) {
-                    title = String(title[..<c])
-                }
-                title = title.trimmingCharacters(in: .whitespaces)
-                if title.count > 34 { title = String(title.prefix(33)) + "…" }
-                group = title
-            }
-            lastWasComment = true
-            continue
-        }
-        lastWasComment = false
-        if line.hasPrefix("[") {
-            flush()
-            inHotkey = line == "[[hotkeys]]"
-            continue
-        }
-        guard inHotkey, let eq = line.firstIndex(of: "=") else { continue }
-        let key = line[line.startIndex..<eq].trimmingCharacters(in: .whitespaces)
-        let value = line[line.index(after: eq)...].trimmingCharacters(in: .whitespaces)
-        guard let q = value.first, q == "'" || q == "\"",
-            let close = value.dropFirst().firstIndex(of: q)
-        else { continue }
-        let v = String(value[value.index(after: value.startIndex)..<close])
-        if key == "binding" { binding = v } else if key == "id" { id = v }
-    }
-    flush()
-    // Derived groups arrive interleaved: switch and move alternate per
-    // workspace. This sorts by section while keeping each section's
-    // original order, using an explicit index tiebreak instead of relying
-    // on sort's stability.
-    let sectionOrder = ["Workspaces", "Focus", "Move", "Layout & columns", "Size", "System"]
-    let indexed = entries.enumerated().map { ($0.offset, $0.element) }
-    entries = indexed.sorted { a, b in
-        let ga = sectionOrder.firstIndex(of: a.1.group) ?? 99
-        let gb = sectionOrder.firstIndex(of: b.1.group) ?? 99
-        return ga != gb ? ga < gb : a.0 < b.0
-    }.map { $0.1 }
-    // Exec chords live in Karabiner because OmniWM's hotkeys cannot run a
-    // command. The sheet must show them, or half the shortcut map is
-    // invisible. Read back the rules omacchiato injected, by their
-    // description prefix.
-    entries.append(contentsOf: karabinerExecCheatEntries())
-    return entries
-}
-
-// Reads "omacchiato-omniwm: terminal" rules from karabiner.json. The
-// description holds the action name; from.key_code and its modifiers hold
-// the chord.
-func karabinerExecCheatEntries() -> [CheatEntry] {
-    let path = "\(NSHomeDirectory())/.config/karabiner/karabiner.json"
-    guard let data = FileManager.default.contents(atPath: path),
-        let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+// The description holds the action name; from.key_code and its modifiers
+// hold the chord.
+func cheatEntries(karabiner data: Data) -> [CheatEntry] {
+    guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
         let profiles = root["profiles"] as? [[String: Any]] else { return [] }
     var entries: [CheatEntry] = []
     for profile in profiles {
@@ -193,19 +50,18 @@ func karabinerExecCheatEntries() -> [CheatEntry] {
             let rules = cm["rules"] as? [[String: Any]] else { continue }
         for rule in rules {
             guard let desc = rule["description"] as? String,
-                desc.hasPrefix("omacchiato-omniwm: "),
+                desc.hasPrefix(karabinerKeyPrefix),
                 let manips = rule["manipulators"] as? [[String: Any]],
-                let from = manips.first?["from"] as? [String: Any],
+                let from = manips.last?["from"] as? [String: Any],
                 let keyCode = from["key_code"] as? String else { continue }
             let mods = ((from["modifiers"] as? [String: Any])?["mandatory"] as? [String]) ?? []
-            let hasShift = mods.contains("shift")
-            let key = keyCode == "return_or_enter" ? "Enter"
-                : keyCode == "spacebar" ? "Space" : keyCode.uppercased()
-            let chord = "Super+" + (hasShift ? "Shift+" : "") + key
-            entries.append(CheatEntry(group: "Apps and system (Karabiner)",
-                key: chord, action: String(desc.dropFirst("omacchiato-omniwm: ".count))))
+            let key = keyCode == "return_or_enter" ? "Enter" : keyCode == "escape" ? "Esc" : keyCode.uppercased()
+            entries.append(CheatEntry(group: "Apps and system",
+                key: "Super+" + (mods.contains("shift") ? "Shift+" : "") + key,
+                action: String(desc.dropFirst(karabinerKeyPrefix.count))))
         }
     }
+    entries.append(CheatEntry(group: "Windows (Defi)", key: "Hold Ctrl+Opt", action: "show Defi's window keys"))
     return entries
 }
 
@@ -365,11 +221,8 @@ func hideCheatsheet() {
 
 func toggleCheatsheet() {
     if cheatWindow != nil { hideCheatsheet(); return }
-    let entries = omniwmCheatEntries()
-    guard !entries.isEmpty else {
-        tlog("cheatsheet: no bindings parsed from omniwm settings.toml")
-        return
-    }
+    let path = "\(NSHomeDirectory())/.config/karabiner/karabiner.json"
+    let entries = cheatEntries(karabiner: FileManager.default.contents(atPath: path) ?? Data())
     let view = CheatsheetView(frame: .zero)
     view.entries = entries
     let size = view.measure()
