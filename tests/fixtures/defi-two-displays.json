@@ -1,0 +1,8 @@
+{"focusedMonitorID":1,"version":2,"monitors":[
+ {"activeWorkspace":"__defi_dynamic_3","display":1,"focused":true,"id":1,"workspaces":[
+  {"active":false,"applications":["com.microsoft.Outlook","com.microsoft.teams2"],"focusedApplication":"com.microsoft.teams2","id":"__defi_dynamic_1","kind":"ordinary","occupied":true,"position":1,"windowCount":2},
+  {"active":false,"applications":[],"id":"dev","name":"dev","kind":"named","occupied":false,"position":2,"windowCount":0},
+  {"active":true,"applications":["dev.herdr.app"],"focusedApplication":"dev.herdr.app","id":"__defi_dynamic_3","kind":"ordinary","occupied":true,"position":3,"windowCount":1},
+  {"active":false,"applications":[],"id":"__defi_dynamic_5","kind":"trailing","occupied":false,"position":4,"windowCount":0}]},
+ {"activeWorkspace":"__defi_dynamic_4","display":2,"focused":false,"id":4,"workspaces":[
+  {"active":true,"applications":[],"id":"__defi_dynamic_4","kind":"trailing","occupied":false,"position":1,"windowCount":0}]}]}

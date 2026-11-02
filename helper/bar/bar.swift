@@ -396,6 +396,7 @@ var palette = loadPalette()
 // during one contended rebuild, and every switch queued behind it.
 struct Snapshot {
     var perMonitor: [String: (workspaces: [String], visible: String)] = [:]
+    var labels: [String: String] = [:]
     var wsApps: [String: [String]] = [:]
     var focusedApp = ""
     var occupied: Set<String> = []
@@ -460,6 +461,35 @@ func omniwmSnapshot() -> Snapshot {
     }
     for (ws, wins) in placed {
         s.wsApps[ws] = handOf(layoutOrder(wins))
+    }
+    return s
+}
+
+// Defi's workspace state (version 2), keyed by its 1-based AppKit
+// display index. The trailing empty workspace shows only while active.
+func defiSnapshot(_ json: [String: Any]) -> Snapshot {
+    var s = Snapshot()
+    guard json["version"] as? Int == 2 else { return s }
+    for m in json["monitors"] as? [[String: Any]] ?? [] {
+        guard let display = m["display"] as? Int else { continue }
+        let active = m["activeWorkspace"] as? String ?? ""
+        let shown = (m["workspaces"] as? [[String: Any]] ?? []).filter {
+            $0["kind"] as? String != "trailing" || $0["id"] as? String == active
+        }
+        var ids: [String] = []
+        for w in shown {
+            guard let id = w["id"] as? String else { continue }
+            ids.append(id)
+            s.labels[id] = w["name"] as? String ?? (w["position"] as? Int).map(String.init) ?? ""
+            let apps = w["applications"] as? [String] ?? []
+            if w["occupied"] as? Bool == true { s.occupied.insert(id) }
+            if !apps.isEmpty { s.wsApps[id] = handOf(apps) }
+            if m["focused"] as? Bool == true, id == active {
+                s.focused = id
+                s.focusedApp = w["focusedApplication"] as? String ?? ""
+            }
+        }
+        s.perMonitor[String(display)] = (ids, active)
     }
     return s
 }
