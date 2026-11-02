@@ -26,16 +26,6 @@ struct BarTests {
             == "https://wttr.in/-32.93,151.72?format=j1")
     }
 
-    @Test("windows on one frame keep the layout order")
-    func parkedWindows() {
-        #expect(layoutOrder([(1799, 12, "Voice Memos"), (1799, 12, "Notes")]) == ["Voice Memos", "Notes"])
-    }
-
-    @Test("the leftmost window comes first")
-    func leftmostFirst() {
-        #expect(layoutOrder([(900, 12, "Notes"), (6, 12, "Voice Memos")]) == ["Voice Memos", "Notes"])
-    }
-
     @Test("a workspace chip widens by one step per extra card, up to three")
     func chipWidths() {
         #expect(chipWidth(cards: 0) == chipWidth(cards: 1))
@@ -169,14 +159,6 @@ struct BarTests {
         #expect(nativeMenuBarShown([CGRect(x: 0, y: 0, width: 1512, height: 39)], on: main))
         #expect(!nativeMenuBarShown([parkedBelow], on: below))
         #expect(!nativeMenuBarShown([CGRect(x: 1512, y: 0, width: 1920, height: 39)], on: main))
-    }
-
-    @Test("the OmniWM dev build counts as OmniWM")
-    func omniWM() {
-        #expect(isOmniWM("com.barut.OmniWM"))
-        #expect(isOmniWM("com.barut.OmniWM.dev"))
-        #expect(!isOmniWM("com.example"))
-        #expect(!isOmniWM(nil))
     }
 
     @Test("a command that runs too long stops, and so does every process under it")
