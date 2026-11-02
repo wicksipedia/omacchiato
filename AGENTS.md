@@ -1,8 +1,8 @@
 # Omacchiato: notes for coding agents
 
 Omacchiato is an omarchy-style tiling desktop for macOS 26: a status bar,
-a gesture daemon, a workspace overview, themes and install scripts
-around the OmniWM window manager. README.md describes the features and
+a gesture daemon, themes and install scripts around the Defi window
+manager. README.md describes the features and
 CONTRIBUTING.md holds the design rules. This file holds what the code does not show.
 Notes about one Mac go in AGENTS.local.md, which git ignores.
 
@@ -10,6 +10,11 @@ Notes about one Mac go in AGENTS.local.md, which git ignores.
 
 - Omacchiato is a fork of omacosy. `origin` is this fork,
   github.com/wicksipedia/omacchiato.
+- `migrate-omniwm.sh` moves an install from OmniWM to Defi. It quits
+  OmniWM, removes its login item, stops the old overview daemon, and
+  removes the binaries and links that only OmniWM used. It leaves
+  OmniWM.app and `~/.config/omniwm`. `install.sh` and `uninstall.sh` run
+  it after `migrate-omacosy.sh`.
 - `migrate-omacosy.sh` moves an omacosy install to the omacchiato names:
   agents, binaries, `~/.config` and `~/.local/state`, and the command
   names in `bar-plugins.conf` and the herdr config. `install.sh` and
@@ -87,8 +92,8 @@ Notes about one Mac go in AGENTS.local.md, which git ignores.
   Development identity and `gh`. It reuses the gesture app of the last
   release while `helper/gesture/` is the same.
 - TCC keys a grant on the code signature. Sign with the same Apple
-  Development identity and identifier every time, and the bar, overview
-  and helper keep their grants across rebuilds.
+  Development identity and identifier every time, and the bar and the
+  helper keep their grants across rebuilds.
 - `omacchiato-gesture` is the exception. TCC pins its grant to the exact
   build, so every rebuild needs a new Accessibility grant. `install.sh`
   rebuilds it only when a file in `helper/gesture/` changed.
@@ -111,8 +116,8 @@ Notes about one Mac go in AGENTS.local.md, which git ignores.
 - For the look of the bar, rebuild, restart and look at it, for example
   with `screencapture -x -R0,0,3000,40 bar.png`.
 - Logs: `/tmp/omacchiato-bar.log` (timings and `tlog` lines),
-  `/tmp/omacchiato-bar.err`, `/tmp/omacchiato-gesture.log`,
-  `/tmp/omacchiato-overview.log`, `/tmp/omacchiato-ws.log`.
+  `/tmp/omacchiato-bar.err`, `/tmp/omacchiato-gesture.log`. Defi's
+  own log: `omacchiato-defi trace`.
 - Launch agents: `com.omacchiato.bar` and `com.omacchiato.gesture`. Restart
   one with `launchctl kickstart -k "gui/$(id -u)/<label>"`.
 
@@ -204,7 +209,7 @@ Notes about one Mac go in AGENTS.local.md, which git ignores.
   `helper/ui/Sources/BarPills` holds the workspace chips, the music pill,
   `Marquee`, `Ticker` and the text routines, as `StatusGauge` holds the
   gauge. They take plain values and colours, so Xcode previews them.
-- `dur()` in the bar and in `overview.swift` returns 0 while Reduce
+- `dur()` in the bar returns 0 while Reduce
   motion is on. Pass every animation duration through it.
 - The wi-fi popup lists the networks in range. A scan blocks for
   seconds, so it runs off the main thread and calls `refreshPopup`, and
@@ -294,12 +299,13 @@ Notes about one Mac go in AGENTS.local.md, which git ignores.
   the bar opens that item's popup as a click would. It reads the file
   50 ms after a change, because a shell redirect empties the file first.
   Use it for screenshots instead of posted clicks.
-- `Super+K` opens a cheatsheet built from the `[[hotkeys]]` in
-  `~/.config/omniwm/settings.toml` and the Karabiner rules whose
-  descriptions start with `omacchiato-omniwm:`.
-- If OmniWM does not answer, the bar counts that as no window manager.
-  It still draws on every screen with no workspace chips, and looks for
-  OmniWM again every 5 s. If the bar is missing, read
+- `Super+K` opens a cheatsheet built from the Karabiner rules whose
+  descriptions start with `omacchiato-keys:`. Defi has no command that
+  lists its keys, so the sheet ends with one row that points to Defi's
+  own sheet (hold `Ctrl+Opt`), rather than a copy that drifts.
+- If Defi does not run, the bar draws on every screen with no workspace
+  chips. It watches for Defi to launch, and tries again after 1, 3 and
+  8 s, because Defi's CLI answers a moment after the app starts. If the bar is missing, read
   `/tmp/omacchiato-bar.err` and
   `launchctl print "gui/$(id -u)/com.omacchiato.bar"` (runs, last exit code).
 
@@ -309,9 +315,10 @@ Notes about one Mac go in AGENTS.local.md, which git ignores.
   `kAXUIElementDestroyedNotification` only to the element that goes away,
   so each window gets its own, and `kAXWindowCreatedNotification` adds
   new ones. A second after a close, `shouldQuit` reads the windows.
-- Count `AXStandardWindow` and `AXDialog`. OmniWM's parked windows are
-  still in `AXWindows` as `AXStandardWindow`. Finder lists an
-  `AXDesktop`, which does not count.
+- Count `AXStandardWindow` and `AXDialog`. Finder lists an
+  `AXDesktop`, which does not count. Check how Defi's windows on hidden
+  workspaces show in `AXWindows` before you rely on that count.
+- Never quit Defi: `neverQuitPrefixes` holds `com.qeude.defi`.
 - Off unless `quit_on_close = on`, because a new user would not expect
   apps to quit.
 
@@ -352,18 +359,13 @@ Notes about one Mac go in AGENTS.local.md, which git ignores.
   to `terminal 1` of the application. It skips `errAENoSuchObject`
   (no window open). A handler error comes back inside the reply, not as
   a thrown error.
-- OmniWM's quake terminal reads the Ghostty config only when OmniWM
-  reloads its `settings.toml`. So theme-set writes the Ghostty palette
-  before it edits OmniWM's settings.
-- Under a pair, OmniWM's `[appearance] mode` is `automatic`.
-- OmniWM draws the focus border (`[borders]` in settings.toml). theme-set
-  rebuilds every `[borders.*]` table from `themes/<name>/borders.sh`:
-  `ACTIVE_COLOR` is the colour, `GRADIENT_COLOR` adds a gradient and
-  `GLOW=1` a glow. A pair also writes `darkColor` and dark gradient
-  endpoints. OmniWM has one glow switch for both appearances, so a pair
-  glows only if both halves set `GLOW=1`. It keeps the user's `[borders]`
-  on/off and width, glow radius and opacity, and gradient direction. The
-  overview reads its accent from the same file.
+- Defi draws the focus border. theme-set reads `ACTIVE_COLOR` and
+  `INACTIVE_COLOR` (`0xAARRGGBB`) from `themes/<name>/borders.sh`, and
+  writes them as `color` and `inactive_color` (`#AARRGGBB`) under
+  `[decorations.borders]` in `~/.config/defi/config.toml`. It creates
+  the table or the file if needed, keeps every other line, and writes
+  only when a value changed. Defi reloads the file live. Defi has no
+  gradient or glow, so `GRADIENT_COLOR` and `GLOW` go unused.
 - `theme-next` (`Super+Shift+T`) calls theme-set with one name, so it
   ends a light/dark pair.
 - Runs of theme-set take turns under `lockf`, and a run that finds a
@@ -374,61 +376,58 @@ Notes about one Mac go in AGENTS.local.md, which git ignores.
   `/tmp/omacchiato-theme.log`.
 - The bar and Karabiner start theme-set with launchd's PATH, where
   `python3` is the system's 3.9. Keep its Python to 3.9: `tomllib` (3.11)
-  once stopped it before the `settings.toml` write, so OmniWM never
-  reloaded and the quake terminal kept the old palette.
+  once stopped it before a window manager's config write, so the border
+  kept the old colours.
   `tests/test_theme_set.py` runs that step with `/usr/bin/python3`.
 
-## OmniWM
+## Defi
 
-- `config/omniwm/settings.toml` is a template. `install.sh` copies it
-  once to `~/.config/omniwm/settings.toml` and never overwrites the copy.
-  OmniWM and theme-set write the copy, and OmniWM reloads it live. Values
-  for one desk, such as display pins by `displayUUID`, belong in the
-  copy, never in the template.
-- Nine workspaces in total, all Niri: 1–5 on the main display and 6–9 on
-  the secondary display.
-- Gestures: `fingerCount = 3` is the Niri column scroll, which focuses
-  the column where it stops. `workspaceSwipeEnabled = false`, because
-  `omacchiato-gesture` serves all four 4-finger swipes. `macos-defaults.sh` turns off the system's 3- and
-  4-finger horizontal swipes.
+- Defi (github.com/qeude/Defi) installs and updates itself, into
+  `/Applications` or `~/Applications`. `install.sh` runs Defi's
+  `script/install.sh` only when neither folder has `Defi.app`, and
+  otherwise starts Defi if `defi-daemon` does not run.
+  `config/requirements.conf` holds no minimum for it.
+- Everything calls the CLI through `bin/omacchiato-defi`, which finds
+  `Contents/MacOS/defi` in either app folder, then on `PATH`. A call takes
+  about 5 ms. `--monitor N` is the 1-based index in `NSScreen.screens`.
+- Defi posts the distributed notification
+  `com.qeude.defi.workspaceChanged`, with the full state as JSON in
+  `userInfo`, on each workspace change and also on a focus change inside
+  one workspace. `defiSnapshot` reads it; it needs `version` 2, and
+  `list-workspaces --json` gives the same document.
+- Workspaces are dynamic, with ids such as `__defi_dynamic_3`. Each
+  display has named, ordinary and trailing workspaces. The trailing one
+  is the empty workspace at the end, and the bar shows its chip only
+  while it is active.
+- `reserved_top` in Defi's config applies to every display. The bar
+  sets the strip per display at runtime instead, with
+  `set-reserved-area top <points>`: the bar height, or 0 where the notch
+  is taller than the bar. Defi forgets it on a restart, so the bar sets
+  it again whenever it rebuilds its surfaces.
+- Defi's keys are on `Ctrl+Opt` (`default_key_modifier`), with Shift to
+  move. Omacchiato binds no window keys of its own. The user's `[keys]`
+  table in `~/.config/defi/config.toml` overrides Defi's defaults.
+- Gestures: `omacchiato-gesture` serves the three-finger swipes and runs
+  the commands in `gesture.json` (`focus-column`, `focus-workspace`)
+  through `omacchiato-defi`, on a serial queue. `macos-defaults.sh` turns
+  off the system's three-finger swipes and gives the four-finger swipes
+  back to macOS.
 - The trackpad taps on each fired swipe, under `haptic` in
   `gesture.json`. The tap comes at the commit, before the switch
   lands. `haptic_tap` opens the actuator for each tap: a handle that
   stays open goes quiet after some minutes and still reports success,
   which is why a tap worked only right after a restart. Pattern 6 is
   the strongest tap, and 15 and 16 give none.
-- `followsMouse = false`, so focus follows clicks and keys only.
-- OmniWM hotkeys cannot run shell commands.
-  `bin/omacchiato-karabiner-omniwm install` adds Karabiner rules for those
-  chords and replaces its own rules on each run. `install.sh` copies
-  `config/karabiner/karabiner.json` over the live file, so it must add
-  the OmniWM rules after that copy and after it writes `apps.conf`.
-- The Karabiner rules, the bar and the overview run `omniwmctl` through
-  `bin/omacchiato-omniwmctl`, which finds it in the Homebrew link, the
-  release app or a dev build. `omacchiato-omni`
-  (`helper/gesture/omnicli.c`) is a fast IPC client for the scripts.
-  OmniWM rejects all IPC while its overview is open.
-- OmniWM does not start while another window manager runs. It shows a
-  "Conflicting Window Managers" dialog and does not check again, so
-  launch it again after the other manager quits.
-- A local OmniWM build shares the bundle ID `com.barut.OmniWM` with the
-  Homebrew build. A grant can move between the two, and "Quit & Reopen"
-  launches `/Applications/OmniWM.app`. Start a local build by its path.
-- OmniWM's `make dev-install` puts `OmniWM Dev.app` in `~/Applications`,
-  with the bundle ID `com.barut.OmniWM.dev` and the same IPC socket.
-  Match OmniWM by bundle-ID prefix. An exact match once made the bar
-  treat the dev build as no window manager.
-- Screen Recording is optional for OmniWM.
-- If OmniWM cannot use `settings.toml` at startup, it runs with its
-  defaults, which turn IPC off. An explicit settings save then moves the
-  file to `settings.toml.corrupt`. Check that file before you edit the
-  defaults: OmniWM reloads a copied-back file live, and `omniwmctl` answers
-  again once IPC is on. `settings.toml.pre-v3` is the byte copy from a
-  schema upgrade. OmniWM's Health panel lists both files until they move.
-- To work on upstream OmniWM (BarutSRB/OmniWM), run
-  `./Scripts/dev-tools.sh setup` once. CI runs `make verify` (format,
-  lint and build) and
-  `LIBRARY_PATH="$(./Scripts/ghostty-preflight.sh print-library-dir)" swift test`.
+- The Karabiner rules run commands only: `bin/omacchiato-karabiner-keys
+  install` adds them and replaces its own rules on each run. It also
+  removes the `omacchiato-omniwm:` rules of older installs. `install.sh`
+  copies `config/karabiner/karabiner.json` over the live file, so it must
+  add the rules after that copy and after it writes `apps.conf`.
+- Screen Recording is optional for Defi: without it, Defi moves windows
+  with no animation and the Overview cards have no pictures.
+- `omacchiato-defi status` and `trace` show what Defi did. Use them
+  before you blame Omacchiato for a focus problem: a focus that flicked
+  back once came from Defi itself and went away with a Defi update.
 
 ## install.sh
 
@@ -445,20 +444,17 @@ Notes about one Mac go in AGENTS.local.md, which git ignores.
   stops the dwindle, borders and ffm agents and removes their binaries
   and links. The blocks after the bar build remove their config files
   and the AeroSpace config.
-- While the previous window manager still runs, it warns and does not
-  start OmniWM. Quitting a window manager strands the windows it parked
-  off screen, so the user quits it.
 - `uninstall.sh` removes only what the manifest
   (`~/.local/state/omacchiato/manifest`) lists. It runs
-  `migrate-omacosy.sh` first, so it also removes the retired agents of an
-  install that never ran a newer `install.sh`.
+  `migrate-omacosy.sh` and `migrate-omniwm.sh` first, so it also removes
+  the retired agents of an install that never ran a newer `install.sh`.
 
 ## Permissions (`bin/omacchiato-permissions`)
 
 - TCC charges a request to the responsible process. A child that `popen`,
-  `posix_spawn` or `Process` starts uses its parent's grants. A swipe
-  starts the overview through the gesture daemon, so the overview uses
-  that daemon's Screen Recording grant.
+  `posix_spawn` or `Process` starts uses its parent's grants. The
+  gesture daemon still asks for Screen Recording, a leftover from the
+  overview, which a swipe used to start.
 - `install.sh` runs `omacchiato-permissions` at the end.
   `omacchiato-update` runs it on every run except `--check`, also when
   there is nothing to pull.
@@ -543,4 +539,4 @@ Notes about one Mac go in AGENTS.local.md, which git ignores.
 audit from 2026-08-17. Upstream fixed or removed its real findings.
 Low items that remain: fixed `/tmp` log paths (a risk only on a Mac with
 more than one account), `popen` of the `gesture.json` command strings,
-and `omacchiato-karabiner-omniwm`, which sources `apps.conf` as shell.
+and `omacchiato-karabiner-keys`, which sources `apps.conf` as shell.

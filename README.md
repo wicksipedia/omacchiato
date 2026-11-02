@@ -10,12 +10,11 @@
 
 omakase + macOS + macchiato. An [omarchy](https://omarchy.org)-style tiling
 desktop for macOS 26 and 27, built around the
-[OmniWM](https://github.com/BarutSRB/OmniWM) window manager. One
-`install.sh` gives you a Super key on Caps Lock, niri columns and
-Hyprland's dwindle layout, a status bar that draws its pills, popups,
-sliders and screen dimming from one process, one gauge for the battery
-and the wi-fi, trackpad swipes, a
-workspace overview with live window previews, and a theme switch that
+[Defi](https://github.com/qeude/Defi) window manager. One `install.sh`
+gives you a Super key on Caps Lock, scrolling columns on dynamic
+workspaces, a status bar that draws its pills, popups, sliders and
+screen dimming from one process, one gauge for the battery and the
+wi-fi, three-finger swipes that move the focus, and a theme switch that
 recolours the bar, the focus border, the terminal and the wallpaper in
 one command.
 
@@ -33,20 +32,19 @@ asks again for the permissions of the bar and the gesture daemon.
 
 Numbers from this repo, measured on the author's desk:
 
-- The whole environment idles at about **293MB** across OmniWM, the
-  bar, the overview, the gesture daemon and Karabiner's two user
-  processes. Per-process figures are under [Memory use](#memory-use).
-- A workspace switch repaints the bar in **2.5 ms**, because the bar
-  holds the window model in memory and asks no one anything. The shell
+- The whole environment idles at about **170MB** across Defi, the
+  bar, the gesture daemon and Karabiner's two user processes. Per-process figures are under [Memory use](#memory-use).
+- A workspace switch repaints the bar in about **6 ms**, because Defi
+  sends its whole state with each change and the bar asks no one
+  anything. The shell
   bar it replaced took 164 ms for the same event.
 - The bar makes **one network call** by default, the weather fetch.
   Delete that pill and nothing leaves the machine. There is no
   telemetry and no background update check.
 - Omacchiato's own binaries never run as root. Karabiner-Elements does,
   and [What it does not do](#what-it-does-not-do) says what that means.
-- Five small binaries, Swift and C, built by the installer: the bar,
-  the overview, the gesture daemon, a system helper and an IPC client
-  for OmniWM that launches in about 3 ms.
+- Three small binaries, Swift and C, built by the installer: the bar,
+  the gesture daemon and a system helper.
 
 > Built for macOS 26 (Tahoe) and in daily use on macOS 27, on one desk:
 > a MacBook Pro plus two external displays. It uses display roles
@@ -77,12 +75,17 @@ Accounts, keeps the permission grants across rebuilds; see
 
 `install.sh` is idempotent. It installs Homebrew if missing, runs
 `brew bundle`, compiles the helper binaries, symlinks configs (backing
-up anything it would replace), copies OmniWM's settings template once,
-adds Karabiner rules for your app choices, hides the native menu bar,
+up anything it would replace), installs Defi with Defi's own installer
+if no Defi.app is there, adds Karabiner rules for your app choices, hides the native menu bar,
 applies the default theme (tokyo-night) and starts the services. It
-also checks app versions against `config/requirements.conf`: OmniWM,
-and herdr if it is installed. It prints the `brew` command that fixes
-one that is too old.
+also checks app versions against `config/requirements.conf`: herdr, if
+it is installed. It prints the `brew` command that fixes one that is
+too old. Defi updates itself, so it has no minimum here.
+
+An install from before Defi moves over on its first run:
+`migrate-omniwm.sh` quits OmniWM, removes its login item, stops the old
+workspace overview and removes the scripts that only OmniWM used.
+OmniWM.app and `~/.config/omniwm` stay, so you can go back.
 
 [Permissions](#permissions) lists every grant it asks for, what each
 one is used for, and what breaks without it. Karabiner-Elements also
@@ -112,35 +115,27 @@ run it.
 
 ## What you get
 
-### Tiling on OmniWM
+### Tiling on Defi
 
-OmniWM tiles the windows. Workspaces start in its niri layout, a row
-of columns that scrolls sideways, and `Option+Shift+L` switches a
-workspace to dwindle, where each new window splits the focused one
-along its longer edge. That is the omarchy feel, and on a 3440-wide
-display it is the difference between a usable third window and three
-narrow strips. `omacchiato-spawn`, which the terminal chord runs,
-preselects omarchy's insertion side (right of a wide window, below a
-tall one) and serialises spawns, so a burst of `Super+Enter` becomes a
-clean staircase instead of splitting the same cell again and again.
+Defi tiles the windows in columns that scroll sideways, and stacks
+windows inside a column. Its workspaces are dynamic: each display keeps
+the workspaces that hold windows, plus one empty workspace at the end.
+The bar shows a chip for each workspace with windows, and a chip for the
+empty one while you are on it. Defi's keys are on `Ctrl+Opt`, which
+leaves `Opt` free for typing; add `Shift` and the same key moves the
+column instead of the focus. Hold `Ctrl+Opt` on its own and Defi shows
+its keys.
 
-Nine workspaces in total, not a set per display: 1 to 5 on the main
-display and 6 to 9 on the secondary one. `Super+N` reaches workspace N
-from anywhere. Unplug a display and its workspaces move to the nearest
-one; plug it back in and each window goes home, so anything you opened
-while undocked stays put.
-
-OmniWM draws the focus border, and each theme sets its colour, a
-gradient and a glow.
+Defi draws the focus border, and each theme sets its colours.
 
 ### Super on Caps Lock
 
 Karabiner remaps Caps Lock to `cmd+ctrl+alt`, a combination macOS
 never uses, so omarchy's scheme works letter for letter without
 breaking typing or app shortcuts. Caps Lock tapped alone is Escape.
-OmniWM's hotkeys cannot run shell commands, so the chords that open
-apps, switch themes, lock the screen and show the cheatsheet are
-Karabiner rules that `install.sh` writes for you. The full map is
+Defi owns the window keys. Super keeps the chords that open apps,
+switch themes, lock the screen and show the cheatsheet, as Karabiner
+rules that `install.sh` writes for you. The full map is
 under [Keybindings](#keybindings), and `Super+K` draws it on screen
 from the live config.
 
@@ -153,9 +148,8 @@ the system's own publishers (SkyLight for window churn, CoreAudio for
 volume, IOPS for battery, DisplayServices for brightness,
 SCDynamicStore for the network, IOBluetooth for devices, Apple Music's
 own broadcast for the track) and polls for nothing macOS announces;
-its only timers are the weather fetch and the clock. OmniWM keeps a
-42-point strip at the top of each display free for it, and fullscreen
-windows keep out of the strip too.
+its only timers are the weather fetch and the clock. The bar asks Defi
+to keep a strip at the top of each display free for it.
 
 #### One gauge for the battery and the wi-fi
 
@@ -374,41 +368,29 @@ popup rows, and the bar draws the result. The format is under
   </tr>
 </table>
 
-### Workspace overview
+### Overview
 
-![Workspace overview: live preview cards over the dimmed wallpaper, chips for the empty workspaces](docs/screenshots/overview.jpg)
-
-A 4-finger swipe up, or `Super+O`, dims the wallpaper and gives every
-non-empty workspace of the pointer's display a card with live window
-previews (ScreenCaptureKit, composed into the tile layout), app icons
-and an accent ring on the focused workspace. Click a card or press its
-digit to jump; empty workspaces show as small chips, and digits work
-for them too. Swipe down, press Escape or click the backdrop to
-dismiss. It is a resident daemon, so it opens at once.
-
-Type while it is open and a search pill filters the cards to matching
-window titles and apps; `Enter` jumps to the first hit. Drag a card to
-reorder the workspaces, or drop it on an empty chip to move the
-workspace there.
+Defi's Overview, on `Ctrl+Opt+O`, shows the workspaces of each display
+as cards. Click a window to go to it, or drag it to another workspace.
+With the Screen Recording grant, the cards show pictures of the windows.
 
 ### Gestures
 
-`omacchiato-gesture` serves the 4-finger swipes: up opens the overview,
-down closes it, and left or right steps through the workspaces. It
-reads raw trackpad contacts, because macOS 26 stopped carrying touch
-data in normal events, and it commits earlier than the swipe of OmniWM
-does. So `workspaceSwipeEnabled` is `false` in `settings.toml`, and
-OmniWM keeps the 3-finger swipe that scrolls the niri columns and
-focuses the column it stops on. A fast flick can pass more than one
-column. The trackpad taps once when a swipe fires; set
-`"haptic": false` in `~/.config/omacchiato/gesture.json` to stop it. `macos-defaults.sh` turns off the system's 4-finger
-gestures and its 3-finger swipe between full-screen apps, so Mission
-Control never fights them, and `uninstall.sh` restores them.
+`omacchiato-gesture` serves the three-finger swipes, and each one runs a
+Defi command: left and right focus the next column, as `Ctrl+Opt+←/→`
+do, and up and down change the workspace, as `Ctrl+Opt+↑/↓` do. The
+swipes follow the natural direction. The daemon reads raw trackpad
+contacts, because macOS 26 stopped carrying touch data in normal
+events. The trackpad taps once when a swipe fires; set
+`"haptic": false` in `~/.config/omacchiato/gesture.json` to stop it.
+The commands are in that file too. `macos-defaults.sh` turns off the
+system's three-finger swipes and leaves the four-finger swipes to macOS,
+for Spaces and Mission Control. `uninstall.sh` restores them.
 
 ### Themes that follow macOS
 
-`theme-set <name>` switches everything at once: the bar, OmniWM's
-focus border (colour, gradient and glow), the wallpaper on every
+`theme-set <name>` switches everything at once: the bar, Defi's
+focus border, the wallpaper on every
 display, Ghostty, herdr, and any terminal that follows omarchy's
 `~/.config/omarchy/current/theme` convention. `Super+Shift+T` cycles
 the themes and `Super+Shift+B` cycles the current theme's wallpapers.
@@ -430,10 +412,9 @@ one.
 
 With `quit_on_close = on` in `bar-pills.conf`, the bar quits an app when
 its last window closes, as on Windows. It counts standard windows and
-dialogs, minimized ones and the ones OmniWM parks on other workspaces,
-and it asks the app to quit normally, so unsaved work still gets its
+dialogs, minimized ones too, and it asks the app to quit normally, so unsaved work still gets its
 prompt. The apps in `~/.config/omacchiato/quit-on-close.conf`, one
-bundle ID a line, stay open. Finder, Omacchiato, OmniWM, menu bar apps
+bundle ID a line, stay open. Finder, Omacchiato, Defi, menu bar apps
 and apps with a menu bar icon always do.
 The first `install.sh` run copies the list and the on/off setting from
 Vorssaint if it finds them. Settings has a Quit on Close page for both,
@@ -443,7 +424,7 @@ page.
 
 ### Parking the setup
 
-`omacchiato-toggle off` returns to a vanilla Mac in one command (OmniWM
+`omacchiato-toggle off` returns to a vanilla Mac in one command (Defi
 quits, and the gesture daemon and the bar stop) without uninstalling.
 `omacchiato-toggle on` brings everything back, and no argument flips.
 `./uninstall.sh` removes what the install manifest lists and restores
@@ -458,7 +439,6 @@ the code this repo absorbed, with what Omacchiato uses each for.
 
 | Tool | Used for | Source |
 |---|---|---|
-| OmniWM | The window manager: niri and dwindle layouts, the focus border, the command palette, the quake terminal and the horizontal swipes | [BarutSRB/OmniWM](https://github.com/BarutSRB/OmniWM) |
 | Karabiner-Elements | Caps Lock as Super, and the chords that run commands | [pqrs-org/Karabiner-Elements](https://github.com/pqrs-org/Karabiner-Elements) |
 | Ghostty | The default terminal, with a hidden titlebar and colours from the theme. The activity popup opens btop in your terminal | [ghostty-org/ghostty](https://github.com/ghostty-org/ghostty) |
 | Raycast | The launcher on `Cmd+Space`, a hotkey you set in Raycast itself | [raycast.com](https://www.raycast.com) |
@@ -479,6 +459,7 @@ the code this repo absorbed, with what Omacchiato uses each for.
 | Tool | Used for | Source |
 |---|---|---|
 | Homebrew | Installed if missing, then `brew bundle` | [Homebrew/brew](https://github.com/Homebrew/brew) |
+| Defi | The window manager: scrolling columns, dynamic workspaces, the focus border and the Overview. Installed with Defi's own script only when no Defi.app is there, because it updates itself | [qeude/Defi](https://github.com/qeude/Defi) |
 | airpods-control | The AirPods pill's noise control modes. It ships source only, so `install.sh` builds the tagged release with the Command Line Tools, pinned by version and checksum. It uses a private Apple API; see [The AirPods pill](docs/bar.md#the-airpods-pill) | [raulgg/airpods-control](https://github.com/raulgg/airpods-control) |
 | tokscale | The AI usage pill: plan usage for each provider, and the last seven days of tokens, sessions and cost. Homebrew has no formula, so `install.sh` takes the macOS binary from the npm package, pinned by version and checksum | [junhoyeo/tokscale](https://github.com/junhoyeo/tokscale) |
 | herdr | Optional, 0.9.5 or newer. If herdr is installed, `install.sh` adds the keys in `config/herdr/keys.toml`, `theme-set` sets its theme, and `Ctrl+Alt+G` opens a worktree off a branch you pick | [herdrdev/herdr](https://github.com/herdrdev/herdr) |
@@ -494,8 +475,8 @@ the code this repo absorbed, with what Omacchiato uses each for.
 | [`omacchiato-updates`](bin/omacchiato-updates) | The update pill | `git` |
 | [`omacchiato-stats`](bin/omacchiato-stats) | The CPU, memory and disk pills | `ps`, `vm_stat`, `sysctl` |
 | [`omacchiato-herdr-worktree`](bin/omacchiato-herdr-worktree) | herdr's `Ctrl+Alt+G` worktree picker | `git`, `herdr` |
-| [`theme-set`](bin/theme-set), [`theme-next`](bin/theme-next), [`theme-bg-next`](bin/theme-bg-next) | Themes and wallpapers | Ghostty, OmniWM, herdr |
-| [`omacchiato-ws`](bin/omacchiato-ws), [`omacchiato-ws-collapse`](bin/omacchiato-ws-collapse), [`omacchiato-spawn`](bin/omacchiato-spawn) | Workspace cycling, undocking, and spawning on the omarchy side | OmniWM over IPC |
+| [`theme-set`](bin/theme-set), [`theme-next`](bin/theme-next), [`theme-bg-next`](bin/theme-bg-next) | Themes and wallpapers | Ghostty, Defi, herdr |
+| [`omacchiato-defi`](bin/omacchiato-defi), [`omacchiato-spawn`](bin/omacchiato-spawn) | Run the Defi CLI from either app folder; open a new window of an app | Defi |
 | [`omacchiato-toggle`](bin/omacchiato-toggle), [`omacchiato-update`](bin/omacchiato-update), [`omacchiato-requirements`](bin/omacchiato-requirements) | Parking, updating and the version check | launchd, git, Homebrew |
 
 ### Absorbed and borrowed
@@ -504,101 +485,61 @@ the code this repo absorbed, with what Omacchiato uses each for.
 |---|---|---|
 | omarchy | The idea, the 22-colour theme format, the palettes and the MIT-licensed wallpapers | [omacom/omarchy](https://github.com/omacom/omarchy) |
 | aerospace-swipe | The gesture engine, which lives on as `omacchiato-gesture` (MIT, notice kept in `helper/gesture/`) | [acsandmann/aerospace-swipe](https://github.com/acsandmann/aerospace-swipe) |
-| yyjson | The JSON parser inside `omacchiato-gesture` and `omacchiato-omni` (MIT) | [ibireme/yyjson](https://github.com/ibireme/yyjson) |
+| yyjson | The JSON parser inside `omacchiato-gesture` (MIT) | [ibireme/yyjson](https://github.com/ibireme/yyjson) |
 | wttr.in | The weather pill's one request | [chubin/wttr.in](https://github.com/chubin/wttr.in) |
 | Catppuccin, Gruvbox, Tokyo Night | The palettes behind three of the themes, by way of omarchy's packs | [catppuccin/catppuccin](https://github.com/catppuccin/catppuccin), [morhetz/gruvbox](https://github.com/morhetz/gruvbox), [tokyo-night/tokyo-night-vscode-theme](https://github.com/tokyo-night/tokyo-night-vscode-theme) |
 
 ## Keybindings
 
 Super is Caps Lock held. Karabiner sends it as `cmd+ctrl+alt`, and a
-tap alone is Escape. Chords marked *Karabiner* come from
-`bin/omacchiato-karabiner-omniwm`; the rest are OmniWM hotkeys from
-`config/omniwm/settings.toml`. `Super+K` draws the same map on screen
-from the live config, and you can type to filter it.
+tap alone is Escape. The Super chords come from
+`bin/omacchiato-karabiner-keys`. The window keys are Defi's, on
+`Ctrl+Opt`. `Super+K` draws the Super chords on screen, and you can type
+to filter them. Hold `Ctrl+Opt` for Defi's own list.
 
-### Workspaces
-
-| Chord | Action |
-|---|---|
-| `Super+1..9` | switch to workspace N, resolved on the display under the pointer (*Karabiner*) |
-| `Super+Shift+1..9` | move the focused window to workspace N (*Karabiner*) |
-| `Super+Tab` / `Super+Shift+Tab` | next / previous workspace of the display under the pointer (*Karabiner*) |
-| `Super+B` | back and forth between the last two workspaces |
-| `Super+O` | workspace overview (*Karabiner*) |
-| `Super+Shift+O` | throw the focused window to the workspace on show on the next display (*Karabiner*) |
-| `Super+Shift+Space` | throw every window of the workspace to the next display (*Karabiner*) |
-| `Ctrl+Alt+Tab` / `Ctrl+Alt+Shift+Tab` | focus the next / previous display; the pointer moves with focus (*Karabiner*) |
-| `Ctrl+Cmd+`` ` `` | focus the display you came from |
-| `Ctrl+Alt+Shift+Page Up` / `Page Down` | move the column to the workspace up / down |
-
-### Focus
+### Windows (Defi)
 
 | Chord | Action |
 |---|---|
-| `Super+Arrows` | focus the window in that direction |
-| `Ctrl+Alt+1..9` | focus column N |
-| `Alt+Home` / `Alt+End` | focus the first / last column |
+| `Ctrl+Opt+←` / `→` | focus the column to the left / right |
+| `Ctrl+Opt+↑` / `↓` | switch to the workspace above / below |
+| `Ctrl+Opt+J` / `K` | focus the next / previous window in a stack |
+| `Ctrl+Opt+[` / `]` | focus the first / last column |
+| `Ctrl+Opt+C` | centre the focused column |
+| `Ctrl+Opt+Shift+←` / `→` | move the column left / right |
+| `Ctrl+Opt+Shift+↑` / `↓` | move the column to the workspace above / below |
+| `Ctrl+Opt+-` / `=` | cycle the column width |
+| `Ctrl+Opt+F` | toggle the column's full width |
+| `Ctrl+Opt+O` | open the Overview |
 
-### Moving windows
-
-| Chord | Action |
-|---|---|
-| `Super+Shift+Arrows` | swap with the neighbour under dwindle; move the column under niri |
-| `Ctrl+Alt+Shift+Arrows` | stack the window into the neighbour as a group |
-| `Ctrl+Alt+Home` / `Ctrl+Alt+End` | move the column to the first / last position |
-
-### Layout and size
-
-| Chord | Action |
-|---|---|
-| `Super+W` | close the window (*Karabiner* sends `Cmd+W`, or `Cmd+Shift+W` in Ghostty, where herdr takes `Cmd+W`) |
-| `Super+T` | toggle floating |
-| `Super+S` | raise every floating window |
-| `Super+F` | fullscreen inside the workspace; the bar strip stays |
-| `Super+N` | native macOS fullscreen, a separate Space outside the workspace model |
-| `Super+J` | toggle the split direction (dwindle) |
-| `Alt+Shift+L` | switch the workspace between niri and dwindle |
-| `Alt+T` | tabbed column on or off |
-| `Super+`` ` `` / `Super+Shift+`` ` `` | show or hide scratchpad 1 / send the window to scratchpad 1 |
-| `Super+-` / `Super+=` | narrower / wider: the column under niri, the split under dwindle (*Karabiner*) |
-| `Super+Shift+-` / `Super+Shift+=` | shorter / taller, in either layout (*Karabiner*) |
-| `Alt+,` / `Alt+.` | cycle the preset sizes backward / forward |
-| `Alt+Shift+F` | toggle the column's full width |
-| `Ctrl+Alt+F` | expand the column into the free space |
-| `Ctrl+Alt+R` | reset the window's height in its column |
-| `Alt+Shift+B` | balance sizes |
-
-### Apps and system
+### Apps and system (Karabiner)
 
 | Chord | Action |
 |---|---|
-| `Super+Enter` | terminal, spawned on the omarchy side of the focused tile (*Karabiner*) |
-| `Super+Shift+Enter` | browser (*Karabiner*) |
-| `Super+A` | the Herdr desktop app: open it or bring it forward, or run herdr in Ghostty without the app (*Karabiner*) |
-| `Super+Space` | OmniWM's command palette (*Karabiner*) |
-| `Alt+`` ` `` | OmniWM's quake terminal, which reads the Ghostty config |
-| `Ctrl+Alt+M` | the front app's menu bar as a menu at the pointer |
-| `Super+Shift+F` / `+M` / `+G` | Finder / music / messenger, from `apps.conf` (*Karabiner*) |
-| `Super+Shift+E` / `+C` / `+Y` | Outlook / Teams / a YouTube web app in `~/Applications` (*Karabiner*) |
-| `Super+Shift+T` | next theme; one name, so a light/dark pair stops (*Karabiner*) |
-| `Super+Shift+B` | next wallpaper of the current theme (*Karabiner*) |
-| `Super+Shift+L` | lock the screen (*Karabiner*) |
-| `Super+M` | mute or unmute the microphone (*Karabiner*) |
-| `Super+Esc` | keep awake on or off (*Karabiner*) |
-| `Super+K` | keybinding cheatsheet (*Karabiner*) |
+| `Super+Enter` | terminal |
+| `Super+Shift+Enter` | browser |
+| `Super+A` | the Herdr desktop app: open it or bring it forward, or run herdr in Ghostty without the app |
+| `Super+W` | close the window (`Cmd+W`, or `Cmd+Shift+W` in Ghostty, where herdr takes `Cmd+W`) |
+| `Super+Shift+F` / `+M` / `+G` | Finder / music / messenger, from `apps.conf` |
+| `Super+Shift+E` / `+C` / `+Y` | Outlook / Teams / a YouTube web app in `~/Applications` |
+| `Super+Shift+T` | next theme; one name, so a light/dark pair stops |
+| `Super+Shift+B` | next wallpaper of the current theme |
+| `Super+Shift+L` | lock the screen |
+| `Super+M` | mute or unmute the microphone |
+| `Super+Esc` | keep awake on or off |
+| `Super+K` | keybinding cheatsheet |
 | `Cmd+Space` | Raycast, once you give it that hotkey in Raycast's settings |
 
 Screenshots, clipboard and app switching stay macOS's own
-(`Cmd+Shift+3/4/5`, `Cmd+C/V`, `Cmd+Tab`). `Alt+Tab` above works on
-windows, which macOS's own switcher does not.
+(`Cmd+Shift+3/4/5`, `Cmd+C/V`, `Cmd+Tab`).
 
 ### Trackpad and mouse
 
 | Gesture | Action |
 |---|---|
-| 4-finger swipe left / right | switch workspace (`omacchiato-gesture`) |
-| 3-finger swipe left / right | scroll the niri columns; focus lands on the column it stops on (OmniWM) |
-| 4-finger swipe up / down | open / close the overview (`omacchiato-gesture`) |
+| 3-finger swipe left / right | focus the next column (`omacchiato-gesture`, through Defi) |
+| 3-finger swipe up / down | switch workspace (`omacchiato-gesture`, through Defi) |
+| 4-finger swipes | macOS's own: Spaces and Mission Control |
 | Click a workspace chip | jump to it |
 | Click a pill | open its popup; click a plugin pill without rows to re-run it |
 | Scroll on the volume or brightness pill | adjust in 5% steps; brightness keeps going past zero into the shade |
@@ -629,18 +570,13 @@ Ghostty gives these keys to herdr, so Ghostty's own tabs have no keys.
 | `Alt+Tab` / `Alt+Shift+Tab` | next / previous workspace |
 | `Ctrl+Alt+G` | new worktree off a branch you pick; herdr's own dialog branches off HEAD |
 
-`Alt+Tab` reaches herdr only if OmniWM does not take it. An install from
-before this change has an `Option+Tab` hotkey in
-`~/.config/omniwm/settings.toml`. Delete that `[[hotkeys]]` table.
-
 ### On the modifier space
 
 omarchy layers `Super+Ctrl` and `Super+Alt` on top of `Super`. This
 setup cannot: Super is `cmd+ctrl+alt`, so those modifiers are spent
 and Shift is the only layer left, two against omarchy's four. Bindings
 that would collide moved by mnemonic (lock is `Super+Shift+L`, not
-`Super+Ctrl+L`), and the overflow lives on Option chords, such as
-`Option+Shift+L` for the layout toggle.
+`Super+Ctrl+L`), and the window keys live on Defi's `Ctrl+Opt`.
 
 ## Permissions
 
@@ -653,21 +589,17 @@ grant hide themselves rather than half-work.
 `omacchiato-gesture`. For each one that is off, it opens the page in
 System Settings, waits for you to switch it on, and checks again.
 `install.sh` runs it at the end. It does not check the grants of
-Karabiner-Elements or OmniWM.
-
-macOS gives a grant to the app that starts a program, not to the program
-itself. So a swipe opens the overview with the gesture daemon's Screen
-Recording grant, and `Super+O` opens it with Karabiner's.
+Karabiner-Elements or Defi.
 
 | Grant | Who asks | What it does | Without it |
 |---|---|---|---|
-| **Accessibility** | OmniWM, `omacchiato-gesture`, `omacchiato-bar` (reads the focused app's menus for the app-pill popup, and reads and clicks other apps' menu bar icons for the menu bar apps pill) | Move, resize and focus other apps' windows. This is the tiling itself, and it is the broadest permission here. | Nothing tiles. Not optional in practice. |
-| **Input Monitoring** | Karabiner-Elements and OmniWM; `omacchiato-gesture` on macOS 26 | Karabiner reads keys to remap Caps Lock; `omacchiato-gesture` reads raw trackpad contacts, because macOS 26 stopped carrying touch data in normal events. On macOS 27 it reads them without this grant. | No Super key, no swipe gestures. |
-| **Screen Recording** | `omacchiato-gesture` for a swipe, Karabiner-Elements for `Super+O`; OmniWM (optional) | Captures a thumbnail per window for the overview cards, including windows the window manager has stashed offscreen. OmniWM uses it for its own overview thumbnails, the image of a window you drag, and Hidden Bar icons. | Cards fall back to app icons and titles. OmniWM starts without it. |
+| **Accessibility** | Defi, `omacchiato-gesture`, `omacchiato-bar` (reads the focused app's menus for the app-pill popup, and reads and clicks other apps' menu bar icons for the menu bar apps pill) | Move, resize and focus other apps' windows. This is the tiling itself, and it is the broadest permission here. | Nothing tiles. Not optional in practice. |
+| **Input Monitoring** | Karabiner-Elements; `omacchiato-gesture` on macOS 26 | Karabiner reads keys to remap Caps Lock; `omacchiato-gesture` reads raw trackpad contacts, because macOS 26 stopped carrying touch data in normal events. On macOS 27 it reads them without this grant. | No Super key, no swipe gestures. |
+| **Screen Recording** | Defi (optional); `omacchiato-gesture` | Defi uses it for its animations and the window pictures in the Overview. `omacchiato-gesture` still asks for it, but nothing it runs uses it now. | Defi moves windows without animation, and the Overview cards have no pictures. |
 | **Bluetooth** | `omacchiato-bar` | Reads adapter power and the paired-device list for the bluetooth pill and its menu. A plugin pill runs as a child of the bar, so it reads Bluetooth with this grant: the AirPods pill needs it. | The bluetooth pill hides itself, and the AirPods pill shows no battery. |
 | **Calendar** | `omacchiato-bar` | Reads the events of the current day for the clock popup. It never writes to a calendar. | The clock popup shows a row that opens the setting instead of your day. |
 | **Location** | `omacchiato-bar` | Reads the wi-fi network's name and the names of the networks in range, which macOS classes as location data. The weather pill also reads your position once per fetch, rounds it to about a kilometre, and sends that to wttr.in. | The wi-fi popup's title row reads "wi-fi" instead of your network's name, and it lists no networks to join. The weather comes from the place that wttr.in guesses from your IP address. |
-| **Automation** | `omacchiato-bar`, `theme-set`, and the terminal that runs `install.sh` | Apple Events to **Music** (the current track and its artwork), to **Ghostty** (reloading its colours after a theme change) to **Calendar** (opening the week you click in the clock popup) and to **System Events** (sleep, lock and restart from the Apple menu; setting the wallpaper; adding OmniWM as a login item). | The media pill has no artwork; a week click does nothing; those menu rows do nothing; OmniWM does not start at login until you add it under System Settings > General > Login Items. |
+| **Automation** | `omacchiato-bar`, `theme-set`, and the terminal that runs `install.sh` | Apple Events to **Music** (the current track and its artwork), to **Ghostty** (reloading its colours after a theme change) to **Calendar** (opening the week you click in the clock popup) and to **System Events** (sleep, lock and restart from the Apple menu; setting the wallpaper). | The media pill has no artwork; a week click does nothing; those menu rows do nothing. |
 | **Files and Folders** | `omacchiato-bar` | Only if your clone lives in `~/Documents`, `~/Desktop` or `~/Downloads`. The bar reads its palette from the theme directory inside the repo, and macOS walls launchd agents off from those folders. | The bar **hangs at startup** waiting on the prompt. Clone to `~/.local/share/omacchiato` and this never comes up. |
 | **Keychain** | tokscale, when the AI usage pill shows Claude | Reads the Claude Code sign-in token from your login keychain with `security`, to ask Anthropic for your usage. It never writes to the keychain and never refreshes the token. | The Claude section has no usage windows. |
 | **Allow in the Background** | `install.sh` (launch agents for the bar and the gesture daemon) | macOS lists the agents under System Settings > General > Login Items & Extensions. They start at login and restart if they quit. | The parts whose switch is off do not run. |
@@ -761,16 +693,12 @@ omarchy's scheme drop straight in.
 `theme-bg-next <path>` sets any image you like as the wallpaper.
 Switching themes restarts at the theme's first wallpaper.
 
-OmniWM's focus border comes from `borders.sh`. `ACTIVE_COLOR` is the
-border colour, an optional `GRADIENT_COLOR` turns the border into a
-gradient from `ACTIVE_COLOR` to that colour, and `GLOW=1` adds
-OmniWM's glow in the border's colours. With a light/dark pair,
-`theme-set` also writes the dark theme's colours as OmniWM's dark-mode
-border colours, so the border changes with the macOS appearance at
-once. The theme owns the colours and turns the gradient and glow on or
-off; OmniWM's border on/off and width, the glow's radius and opacity,
-and the gradient's direction stay yours, so set those in OmniWM's
-Settings.
+Defi's focus border comes from `borders.sh`. `theme-set` writes
+`ACTIVE_COLOR` as the border of the focused window and `INACTIVE_COLOR`
+as the border of the others, to `[decorations.borders]` in
+`~/.config/defi/config.toml`. Defi reloads that file live, and every
+other line in it stays yours, border width included. Defi draws no
+gradient or glow, so it ignores `GRADIENT_COLOR` and `GLOW`.
 
 Every colour in `sketchybar.sh` is `0xAARRGGBB`, so the leading byte
 sets opacity. `ITEM_BG` fills the pills on the bar and `ROW_BG` fills
@@ -778,10 +706,6 @@ a highlighted row or a slider track inside a popup. They are separate
 because a pill that reads well at half opacity over a wallpaper is too
 faint for a track inside a solid popup. A theme that names only
 `ITEM_BG` gets it for both.
-
-`theme-set` also writes `[appearance] mode` in OmniWM's
-`settings.toml` from the luminance of the theme's `background` colour,
-so a light theme gets light chrome without extra configuration.
 
 `theme-set` writes `~/.config/omacchiato/ghostty-theme` from the palette
 and asks Ghostty to reload. The Ghostty config includes that file, so
@@ -791,11 +715,7 @@ config files load after the XDG one, so it would win. The reload goes
 through `omacchiato-helper ghostty-reload`, not `SIGUSR2`, which Ghostty
 accepts and ignores on macOS. The helper aims one Apple Event at each
 Ghostty process, because Omacchiato opens an instance per window and
-AppleScript addresses an app by bundle. OmniWM's quake terminal reads
-the same Ghostty config files but is not a Ghostty process; it
-re-reads them when OmniWM reloads `settings.toml`, which `theme-set`
-edits for the focus border, so `theme-set` writes the Ghostty file
-first.
+AppleScript addresses an app by bundle.
 
 herdr follows too. `theme-set` writes `[theme] name` in
 `~/.config/herdr/config.toml` and runs `herdr server reload-config`.
@@ -822,9 +742,7 @@ theme-set light:catppuccin-latte,dark:catppuccin
 `theme-set` stores the pair in `~/.config/omacchiato/theme.conf` and
 applies the half that matches the current appearance. The bar watches
 the system appearance and runs `theme-set` with the pair again when it
-changes, and once when it starts. A pair sets OmniWM's
-`[appearance] mode` to `automatic`, so OmniWM's own chrome follows the
-system directly.
+changes, and once when it starts.
 
 `theme-set` with one name stores that name instead, and so does
 `Super+Shift+T`, which runs `theme-next`. Either one stops the
@@ -832,40 +750,35 @@ following until you set a pair again. On the first switch, macOS asks
 whether omacchiato-bar can control Ghostty; refuse and the terminal keeps
 its old colours.
 
-## Tiling and OmniWM
+## Tiling and Defi
 
-[docs/omniwm.md](docs/omniwm.md) covers how windows behave under the
-niri and dwindle layouts, what a new window does to the column it joins,
-and the OmniWM settings Omacchiato writes or leaves to you.
+Defi's [README](https://github.com/qeude/Defi) and its
+`CONFIGURATION.md` cover the layout and every setting. Omacchiato writes
+only the border colours into `~/.config/defi/config.toml`.
 
+The bar sets Defi's reserved area for each display at runtime, with
+`defi --monitor N set-reserved-area top <points>`. The `reserved_top`
+setting applies to every display, but a display with a notch taller
+than the bar needs no strip. Defi forgets the runtime value when it
+restarts, so the bar sets it again each time Defi starts.
 
 ## Memory use
 
-About **347MB** of physical footprint (what Activity Monitor calls
-Memory) on average across OmniWM, the bar, the overview daemon, the
-gesture daemon and Karabiner's two user processes. The figures below
-are averages of 30 samples taken 10 seconds apart, on 2026-09-30, on a
-MacBook with only its built-in display. An earlier measurement, on
-2026-09-14 and docked to two external displays, came to 293MB.
+About **170MB** of physical footprint (what Activity Monitor calls
+Memory) across Defi, the bar, the gesture daemon and Karabiner's two
+user processes. This is one reading on 2026-11-02, a few minutes after
+the bar restarted, on a MacBook docked to an external display.
 Footprint is the number to compare: resident set size counts each
 process's share of the shared system frameworks more than once.
-Karabiner's three root processes need root to measure, so they are not
-in the total; their resident size is about 39MB. Largest first:
+Karabiner's root processes need root to measure, so they are not in the
+total. Largest first:
 
-| | average |
+| | footprint |
 |---|---|
-| OmniWM | 184MB |
-| `omacchiato-overview` | 54MB |
-| Karabiner (2 user processes) | 52MB |
-| `omacchiato-bar` | 47MB |
-| `omacchiato-gesture` | 10MB |
-
-The figures move with uptime. `omacchiato-overview` caches a
-half-resolution capture per window shown, so it starts near 9MB and
-settles between about 25MB and 55MB. It plateaus there because it
-filters the cache to the visible set on each open. Packaging the bar
-as an `.app`, which is what unlocks the wi-fi network name, cost about
-1MB.
+| Defi | 74MB |
+| Karabiner (2 user processes) | 57MB |
+| `omacchiato-bar` | 30MB |
+| `omacchiato-gesture` | 9MB |
 
 The bar starts near 25MB and settles near 40MB once its popups have
 opened. The Settings window adds about 80MB while it is open, and the
@@ -892,7 +805,7 @@ place.
 
 MIT (see `LICENSE`). Standing on [omarchy](https://omarchy.org) (the
 whole idea, plus MIT-licensed theme palettes and wallpapers),
-[OmniWM](https://github.com/BarutSRB/OmniWM),
+[Defi](https://github.com/qeude/Defi),
 [Karabiner-Elements](https://karabiner-elements.pqrs.org) and
 [aerospace-swipe](https://github.com/acsandmann/aerospace-swipe)
 (MIT; its gesture engine lives on here as `omacchiato-gesture`, notice

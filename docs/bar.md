@@ -131,9 +131,9 @@ does not show. Shift+Option steps a quarter step. Option alone still
 opens Sound settings. An output with no volume control, such as some
 HDMI displays, passes the key on to macOS.
 
-Quit on close counts standard windows and dialogs, minimized ones and
-the ones OmniWM parks on other workspaces. It never quits a menu bar
-app, an app with a menu bar icon, Finder, Omacchiato or OmniWM. The
+Quit on close counts standard windows and dialogs, minimized ones too.
+It never quits a menu bar app, an app with a menu bar icon, Finder,
+Omacchiato or Defi. The
 apps in `~/.config/omacchiato/quit-on-close.conf`, one bundle ID a
 line, stay open too. The first `install.sh` run copies that list, and
 the on or off setting, from Vorssaint if it finds them.
