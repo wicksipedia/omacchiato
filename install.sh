@@ -164,7 +164,7 @@ link() {
 # These are READ, not sourced. apps.local.conf is a file the README
 # invites you to paste values into, and `source` would execute whatever
 # is in it. The values then land in ~/.config/omacchiato/apps.conf, which
-# omacchiato-karabiner-omniwm sources, and inside single-quoted shell
+# omacchiato-karabiner-keys sources, and inside single-quoted shell
 # commands in the Karabiner rules. A name carrying a quote or a newline
 # could close the string and run its own command, so anything outside a
 # plain app name is refused rather than substituted.
@@ -233,11 +233,11 @@ fi
 mkdir -p "$HOME/.config/karabiner"
 # preserve a pre-omacchiato karabiner config once, for uninstall to restore.
 # A file that an earlier install wrote is not the user's: it differs from
-# the template once the OmniWM rules are in it, or after a template change.
+# the template once the Karabiner keys are in it, or after a template change.
 if [ -f "$HOME/.config/karabiner/karabiner.json" ] \
   && [ ! -f "$HOME/.config/karabiner/karabiner.json.bak.omacchiato" ] \
   && ! have "karabiner-config-copied" \
-  && ! grep -qE '"(omacchiato|omacosy)-omniwm:' "$HOME/.config/karabiner/karabiner.json" \
+  && ! grep -qE '"(omacchiato|omacosy)-(omniwm|keys):' "$HOME/.config/karabiner/karabiner.json" \
   && ! cmp -s "$REPO_DIR/config/karabiner/karabiner.json" "$HOME/.config/karabiner/karabiner.json"; then
   cp "$HOME/.config/karabiner/karabiner.json" "$HOME/.config/karabiner/karabiner.json.bak.omacchiato"
   mark "had-karabiner-config"
@@ -403,8 +403,8 @@ printf 'TERMINAL=%s\nBROWSER=%s\nMUSIC=%s\nMESSENGER=%s\n' \
 # after apps.conf, so the injected rules launch the user's chosen apps.
 # A kept karabiner.json is the user's, rules too, so it stays as it is.
 if [ "$KARABINER_COPIED" = 1 ]; then
-  "$REPO_DIR/bin/omacchiato-karabiner-omniwm" install \
-    || log "WARNING: the OmniWM Karabiner rules did not install. Re-run install.sh."
+  "$REPO_DIR/bin/omacchiato-karabiner-keys" install \
+    || log "WARNING: the Karabiner keys did not install. Re-run install.sh."
   # the snapshot holds the rules too
   cp "$HOME/.config/karabiner/karabiner.json" "$STATE_DIR/karabiner.json.installed"
 fi
@@ -445,7 +445,7 @@ link "$REPO_DIR/bin/omacchiato-update" "$HOME/.local/bin/omacchiato-update"
 link "$REPO_DIR/bin/omacchiato-spawn" "$HOME/.local/bin/omacchiato-spawn"
 link "$REPO_DIR/bin/omacchiato-herdr" "$HOME/.local/bin/omacchiato-herdr"
 link "$REPO_DIR/bin/omacchiato-defi" "$HOME/.local/bin/omacchiato-defi"
-link "$REPO_DIR/bin/omacchiato-karabiner-omniwm" "$HOME/.local/bin/omacchiato-karabiner-omniwm"
+link "$REPO_DIR/bin/omacchiato-karabiner-keys" "$HOME/.local/bin/omacchiato-karabiner-keys"
 link "$REPO_DIR/bin/omacchiato-omniwmctl" "$HOME/.local/bin/omacchiato-omniwmctl"
 link "$REPO_DIR/bin/omacchiato-herdr-worktree" "$HOME/.local/bin/omacchiato-herdr-worktree"
 link "$REPO_DIR/bin/omacchiato-popup" "$HOME/.local/bin/omacchiato-popup"

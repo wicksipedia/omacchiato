@@ -142,7 +142,7 @@ done
 # otherwise remove our copy. An older install backed up its own file, with
 # the OmniWM rules in it, as the user's: that backup is not restored.
 if have "had-karabiner-config" && [ -f "$HOME/.config/karabiner/karabiner.json.bak.omacchiato" ] \
-  && ! grep -qE '"(omacchiato|omacosy)-omniwm:' "$HOME/.config/karabiner/karabiner.json.bak.omacchiato"; then
+  && ! grep -qE '"(omacchiato|omacosy)-(omniwm|keys):' "$HOME/.config/karabiner/karabiner.json.bak.omacchiato"; then
   log "Restoring pre-omacchiato karabiner.json"
   mv "$HOME/.config/karabiner/karabiner.json.bak.omacchiato" "$HOME/.config/karabiner/karabiner.json"
 else
