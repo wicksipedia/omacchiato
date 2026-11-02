@@ -444,6 +444,7 @@ link "$REPO_DIR/bin/omacchiato-ws-collapse" "$HOME/.local/bin/omacchiato-ws-coll
 link "$REPO_DIR/bin/omacchiato-update" "$HOME/.local/bin/omacchiato-update"
 link "$REPO_DIR/bin/omacchiato-spawn" "$HOME/.local/bin/omacchiato-spawn"
 link "$REPO_DIR/bin/omacchiato-herdr" "$HOME/.local/bin/omacchiato-herdr"
+link "$REPO_DIR/bin/omacchiato-defi" "$HOME/.local/bin/omacchiato-defi"
 link "$REPO_DIR/bin/omacchiato-karabiner-omniwm" "$HOME/.local/bin/omacchiato-karabiner-omniwm"
 link "$REPO_DIR/bin/omacchiato-omniwmctl" "$HOME/.local/bin/omacchiato-omniwmctl"
 link "$REPO_DIR/bin/omacchiato-herdr-worktree" "$HOME/.local/bin/omacchiato-herdr-worktree"
@@ -669,20 +670,24 @@ launchctl load "$HOME/Library/LaunchAgents/com.omacchiato.gesture.plist" 2>/dev/
 
 # --- 6. Services ------------------------------------------------------------
 
-# OmniWM does not start beside another window manager, and quitting one
-# strands the windows it parked off screen, so a running AeroSpace is
-# left for the user to quit. Its login item goes, or it would take the
-# next login.
-if pgrep -xq AeroSpace; then
-  log "WARNING: AeroSpace is running. Quit it, then start OmniWM: open -a OmniWM"
-else
-  log "Starting OmniWM"
-  pgrep -xq OmniWM || open -a OmniWM \
-    || log "WARNING: OmniWM did not start. Check the brew bundle output above."
+# Defi installs and updates itself. Run its installer only when no
+# Defi.app exists. Save it to a file first, so a cut-off download runs
+# nothing.
+if [ ! -d /Applications/Defi.app ] && [ ! -d "$HOME/Applications/Defi.app" ]; then
+  log "Installing Defi"
+  defi_installer="$(mktemp)"
+  if curl -fsSL -o "$defi_installer" https://raw.githubusercontent.com/qeude/Defi/main/script/install.sh; then
+    sh "$defi_installer" || log "WARNING: the Defi installer failed. Run it again: https://github.com/qeude/Defi#get-started"
+  else
+    log "WARNING: could not download the Defi installer"
+  fi
+  rm -f "$defi_installer"
+elif ! pgrep -xq defi-daemon; then
+  log "Starting Defi"
+  open -b com.qeude.defi || log "WARNING: Defi did not start"
 fi
 osascript -e 'tell application "System Events"
   if exists login item "AeroSpace" then delete login item "AeroSpace"
-  if not (exists login item "OmniWM") then make new login item at end with properties {path:"/Applications/OmniWM.app", hidden:false}
 end tell' 2>/dev/null || true
 
 # The remapping runs in launchd-managed services; the app itself is only
