@@ -405,7 +405,11 @@ DistributedNotificationCenter.default().addObserver(
 ) { note in
     guard let state = note.userInfo as? [String: Any] else { return }
     let t0 = DispatchTime.now().uptimeNanoseconds
-    let s = defiSnapshot(state)
+    let s = defiSnapshot(state, onScreen: appsOnScreen)
+    // Defi animates a switch, so read the window order again once it lands.
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        if apply(defiSnapshot(state, onScreen: appsOnScreen)) { repaint() }
+    }
     if surfaces.contains(where: { $0.monitorID.isEmpty || s.perMonitor[$0.monitorID] == nil }) {
         rebuildSurfaces()
     }

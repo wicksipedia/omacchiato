@@ -63,3 +63,41 @@ struct ReservedTopTests {
                             visible: NSRect(x: -806, y: 1169, width: 3440, height: 1440)) == 34)
     }
 }
+
+struct ColumnOrderTests {
+    @Test("the apps on screen give the order, left to right")
+    func seen() {
+        #expect(columnOrder(["claude", "safari"], seen: ["safari", "claude"], last: []) == ["safari", "claude"])
+    }
+
+    @Test("a column scrolled off screen keeps its place from the last look")
+    func partial() {
+        #expect(columnOrder(["a", "b", "c"], seen: ["b"], last: ["a", "b", "c"]) == ["a", "b", "c"])
+        #expect(columnOrder(["a", "b", "c"], seen: ["c", "a"], last: ["a", "b", "c"]) == ["c", "a", "b"])
+    }
+
+    @Test("a new app goes last, and a closed one drops out")
+    func changes() {
+        #expect(columnOrder(["a", "b", "d"], seen: [], last: ["b", "c", "a"]) == ["b", "a", "d"])
+    }
+
+    @Test("a hidden workspace keeps the order it showed in")
+    func remembered() {
+        var json: [String: Any] = ["version": 2, "monitors": [[
+            "display": 1, "activeWorkspace": "w1", "focused": true,
+            "workspaces": [
+                ["id": "w1", "kind": "ordinary", "occupied": true, "applications": ["claude", "safari"]],
+                ["id": "w2", "kind": "ordinary", "occupied": true, "applications": ["outlook"]],
+            ],
+        ] as [String: Any]]]
+        var orders: [String: [String]] = [:]
+        let shown = defiSnapshot(json, onScreen: { _ in ["safari", "claude", "herdr"] }, orders: &orders)
+        #expect(shown.wsApps["w1"] == ["safari", "claude"])
+
+        var monitor = (json["monitors"] as! [[String: Any]])[0]
+        monitor["activeWorkspace"] = "w2"
+        json["monitors"] = [monitor]
+        let hidden = defiSnapshot(json, onScreen: { _ in ["outlook"] }, orders: &orders)
+        #expect(hidden.wsApps["w1"] == ["safari", "claude"])
+    }
+}

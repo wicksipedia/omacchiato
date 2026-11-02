@@ -386,12 +386,62 @@ let mediaQueue = DispatchQueue(label: "com.omacchiato.bar.media")
 
 // with no window manager the snapshot is empty, and the bar draws no chips
 func fetchSnapshot() -> Snapshot {
-    defiActive() ? defiState().map(defiSnapshot) ?? Snapshot() : Snapshot()
+    defiActive() ? defiState().map { defiSnapshot($0, onScreen: appsOnScreen) } ?? Snapshot() : Snapshot()
+}
+
+// Defi lists a workspace's apps by bundle ID, not by column. So the bar
+// reads the column order from the windows while a workspace shows, and
+// keeps that order for when it is hidden.
+var columnOrders: [String: [String]] = [:]
+let columnLock = NSLock()
+
+// The apps seen on screen, left to right. An app that is not seen goes
+// after the app that came before it at the last look. A new app goes last.
+func columnOrder(_ apps: [String], seen: [String], last: [String]) -> [String] {
+    let present = Set(apps)
+    var out: [String] = []
+    for a in seen where present.contains(a) && !out.contains(a) { out.append(a) }
+    var prev: String?
+    for a in last where present.contains(a) {
+        if !out.contains(a) {
+            out.insert(a, at: prev.flatMap { out.firstIndex(of: $0) }.map { $0 + 1 } ?? 0)
+        }
+        prev = a
+    }
+    for a in apps where !out.contains(a) { out.append(a) }
+    return out
+}
+
+// The bundle IDs of the windows on a display (1-based AppKit index),
+// left to right. A window needs half its width on the display, so a
+// window that Defi parks at an edge does not count.
+func appsOnScreen(_ display: Int) -> [String] {
+    let screens = NSScreen.screens
+    guard display >= 1, display <= screens.count,
+          let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+            as? [[String: Any]] else { return [] }
+    let bounds = CGDisplayBounds(screenID(screens[display - 1]))
+    var windows: [(x: CGFloat, app: String)] = []
+    for w in list {
+        guard (w[kCGWindowLayer as String] as? Int) == 0,
+              let b = w[kCGWindowBounds as String] as? [String: CGFloat],
+              let pid = w[kCGWindowOwnerPID as String] as? pid_t,
+              let app = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier else { continue }
+        let rect = CGRect(x: b["X"] ?? 0, y: b["Y"] ?? 0, width: b["Width"] ?? 0, height: b["Height"] ?? 0)
+        guard rect.width > 0, rect.intersection(bounds).width >= rect.width / 2 else { continue }
+        windows.append((rect.minX, app))
+    }
+    return windows.sorted { $0.x < $1.x }.map(\.app)
+}
+
+func defiSnapshot(_ json: [String: Any], onScreen: (Int) -> [String] = { _ in [] }) -> Snapshot {
+    columnLock.withLock { defiSnapshot(json, onScreen: onScreen, orders: &columnOrders) }
 }
 
 // Defi's workspace state (version 2), keyed by its 1-based AppKit
 // display index. The trailing empty workspace shows only while active.
-func defiSnapshot(_ json: [String: Any]) -> Snapshot {
+func defiSnapshot(_ json: [String: Any], onScreen: (Int) -> [String],
+                  orders: inout [String: [String]]) -> Snapshot {
     var s = Snapshot()
     guard json["version"] as? Int == 2 else { return s }
     for m in json["monitors"] as? [[String: Any]] ?? [] {
@@ -405,7 +455,12 @@ func defiSnapshot(_ json: [String: Any]) -> Snapshot {
             guard let id = w["id"] as? String else { continue }
             ids.append(id)
             s.labels[id] = w["name"] as? String ?? (w["position"] as? Int).map(String.init) ?? ""
-            let apps = w["applications"] as? [String] ?? []
+            var apps = w["applications"] as? [String] ?? []
+            if id == active, !apps.isEmpty {
+                let seen = onScreen(display)
+                if !seen.isEmpty { orders[id] = columnOrder(apps, seen: seen, last: orders[id] ?? []) }
+            }
+            apps = columnOrder(apps, seen: [], last: orders[id] ?? [])
             if w["occupied"] as? Bool == true { s.occupied.insert(id) }
             if !apps.isEmpty { s.wsApps[id] = handOf(apps) }
             if m["focused"] as? Bool == true, id == active {
