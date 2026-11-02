@@ -452,9 +452,8 @@ Notes about one Mac go in AGENTS.local.md, which git ignores.
 ## Permissions (`bin/omacchiato-permissions`)
 
 - TCC charges a request to the responsible process. A child that `popen`,
-  `posix_spawn` or `Process` starts uses its parent's grants. The
-  gesture daemon still asks for Screen Recording, a leftover from the
-  overview, which a swipe used to start.
+  `posix_spawn` or `Process` starts uses its parent's grants, so a
+  gesture command runs with the gesture daemon's grants.
 - `install.sh` runs `omacchiato-permissions` at the end.
   `omacchiato-update` runs it on every run except `--check`, also when
   there is nothing to pull.

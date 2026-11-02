@@ -567,10 +567,6 @@ void waitForAccessibilityAndRestart(void)
 // omacchiato-permissions.
 static int request_permissions(void)
 {
-	// A swipe starts omacchiato-overview as a child, and the child uses this
-	// app's Screen Recording grant.
-	CGRequestScreenCaptureAccess();
-	printf("screen-recording %s\n", CGPreflightScreenCaptureAccess() ? "granted" : "denied");
 	// last, because its dialog stays up after the exit
 	NSDictionary* options = @{(__bridge id)kAXTrustedCheckOptionPrompt : @YES};
 	printf("accessibility %s\n", AXIsProcessTrustedWithOptions((__bridge CFDictionaryRef)options) ? "granted" : "denied");
