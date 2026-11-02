@@ -137,7 +137,7 @@ func nativeMenuBarShown(_ frames: [CGRect], on display: CGRect) -> Bool {
     }
 }
 
-// Clicks the icon the way OmniWM's HiddenBarClickForwarder does. Returns
+// Clicks the icon for real, with the pointer at the top edge. Returns
 // false without clicking if the icon has no clickable position. Call off
 // the main thread: it waits for the menu bar to appear.
 func clickMenuBarItem(_ item: MenuBarItem) -> Bool {

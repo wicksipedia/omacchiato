@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # omacchiato-toggle [on|off|toggle] — park the whole tiling setup without
-# uninstalling. `off`: OmniWM quits (it has no enable toggle), and the
-# trackpad-gesture daemon and the bar stop. `on` restores all of it.
+# uninstalling. `off`: Defi quits, and the trackpad-gesture daemon and
+# the bar stop. `on` restores all of it.
 # No args = flip.
 #
 # Untouched either way: Karabiner's CapsLock=Super remap (harmless
-# while OmniWM is off) and the native menu bar's auto-hide default
+# while Defi is off) and the native menu bar's auto-hide default
 # (the native menu bar is there once the bar is down).
 set -euo pipefail
 
@@ -20,8 +20,7 @@ fi
 
 case "$mode" in
   off)
-    osascript -e 'quit app "OmniWM"' 2>/dev/null || true
-    pkill -f OmniWM.app 2>/dev/null || true
+    "$HOME/.local/bin/omacchiato-defi" quit >/dev/null 2>&1 || true
     for a in "${AGENTS[@]}"; do
       launchctl bootout "gui/$UID_N/$a" 2>/dev/null || true
     done
@@ -32,7 +31,7 @@ case "$mode" in
     for a in "${AGENTS[@]}"; do
       launchctl bootstrap "gui/$UID_N" "$HOME/Library/LaunchAgents/$a.plist" 2>/dev/null || true
     done
-    open -a OmniWM 2>/dev/null || true
+    open -b com.qeude.defi 2>/dev/null || true
     rm -f "$STATE"
     echo "omacchiato: ON — tiling restored"
     ;;

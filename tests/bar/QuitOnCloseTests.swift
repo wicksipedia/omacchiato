@@ -18,11 +18,11 @@ import Testing
         #expect(shouldQuit(windows: ["AXFloatingWindow", "AXDesktop"], bundleID: "com.apple.TextEdit", exceptions: none, everShowedWindow: true))
     }
 
-    @Test("never quit an exception, an app that never showed a window, Finder, Omacchiato or OmniWM")
+    @Test("never quit an exception, an app that never showed a window, Finder, Omacchiato or Defi")
     func neverQuit() {
         #expect(!shouldQuit(windows: [], bundleID: "com.apple.Music", exceptions: ["com.apple.Music"], everShowedWindow: true))
         #expect(!shouldQuit(windows: [], bundleID: "com.apple.TextEdit", exceptions: none, everShowedWindow: false))
-        for id in ["com.apple.finder", "com.omacchiato.bar", "com.barut.OmniWM", "com.barut.OmniWM.dev", nil] {
+        for id in ["com.apple.finder", "com.omacchiato.bar", "com.qeude.defi", nil] {
             #expect(!shouldQuit(windows: [], bundleID: id, exceptions: none, everShowedWindow: true))
         }
     }

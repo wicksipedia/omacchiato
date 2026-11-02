@@ -1,61 +1,12 @@
 #!/bin/bash
-# omacchiato-spawn <App> [args...] — open a new window of App on the
-# omarchy side of the focused tile, one spawn at a time. The args go to
-# the app through `open --args`.
-#
-# OmniWM's dwindle insertion side is not omarchy's: with smartSplit off a
-# new window goes RIGHT in horizontal splits and ABOVE in vertical ones
-# (frames are y-up; "second child" lands at the top), while Hyprland's
-# force_split=2 is right/below — so the spiral never read as the omarchy
-# staircase. OmniWM's one-shot `preselect <dir>` fixes the side per
-# spawn: apply its own orientation rule (height * splitWidthMultiplier >
-# width -> vertical) to the focused tile and preselect down/right. No
-# state, no prediction — one query and one command, through a sanctioned
-# API. Spawns are serialized (lock + wait for the window to appear) so a
-# burst becomes a clean staircase instead of splitting the same cell over
-# and over.
+# omacchiato-spawn <App> [args...]: open a new window of App. The args go
+# to the app through `open --args`.
 APP="$1"
 [ -n "$APP" ] || exit 1
 shift
-
-# macOS ships no flock; mkdir is the portable atomic lock. A holder that
-# died is stolen after ~5s so the terminal key can never go dead.
-LOCK="/tmp/omacchiato-spawn-$(id -u).lock.d"
-for i in $(seq 120); do
-  mkdir "$LOCK" 2>/dev/null && break
-  [ "$i" -ge 100 ] && { rm -rf "$LOCK"; }
-  sleep 0.05
-done
-trap 'rmdir "$LOCK" 2>/dev/null' EXIT
-
-OMNI="$HOME/.local/bin/omacchiato-omni"
-
-# Open on the workspace that the display under the pointer shows.
-# OmniWM frames are y-up from the main display's bottom, the cursor is y-down.
-IFS=, read -r cx cy <<<"$("$HOME/.local/bin/omacchiato-helper" cursor 2>/dev/null)"
-if [ -n "$cy" ]; then
-  ws="$("$OMNI" query displays 2>/dev/null | /usr/bin/jq -r --argjson x "$cx" --argjson y "$cy" '
-    .result.payload.displays as $d | ($d[] | select(.isMain) | .frame.height) as $mh
-    | [$d[] | select(.frame as $f | $x >= $f.x and $x < $f.x + $f.width
-        and $mh - $y >= $f.y and $mh - $y < $f.y + $f.height)
-      | .activeWorkspace.rawName][0] // empty' 2>/dev/null)"
-  [ -n "$ws" ] && [ "$ws" != "$("$OMNI" active 2>/dev/null)" ] && "$OMNI" focus "$ws" >/dev/null 2>&1
-fi
-mult="$(sed -n 's/^splitWidthMultiplier = //p' "$HOME/.config/omniwm/settings.toml" 2>/dev/null | head -1)"
-"$OMNI" preselect-for-focused "${mult:-1.4}" >/dev/null 2>&1 || true
-before="$("$OMNI" window-count 2>/dev/null || echo 0)"
-# the next spawn may go once this window exists: a windows-changed
-# subscription says so the moment it does. Subscribed BEFORE the
-# open — `open -na` can block until the app is up, and a window that
-# registered before the subscription would never be seen (measured:
-# one spawn in three hit the cap that way). 2 s cap so a launch that
-# never shows a window cannot wedge the terminal key.
-"$OMNI" wait-window "$before" 2000 >/dev/null 2>&1 &
-waiter=$!
 # A second Safari process does not open a window, so ask the running one.
 if [ "$APP" = Safari ] && pgrep -xq Safari; then
   osascript -e 'tell application "Safari"' -e 'make new document' -e 'activate' -e 'end tell' >/dev/null 2>&1
 else
   open -na "$APP" ${1:+--args} "$@"
 fi
-wait "$waiter" 2>/dev/null || true

@@ -4,14 +4,14 @@ import AppKit
 // When the last window of an app closes, the bar quits the app, except for
 // the apps in quit-on-close.conf.
 
-// Windows that OmniWM parks off screen on other workspaces are still in
+// Windows that Defi parks off screen on other workspaces are still in
 // AXWindows, as AXStandardWindow. A minimized window keeps its subrole,
 // so it counts. A settings window is often AXDialog.
 let countedSubroles: Set<String> = ["AXStandardWindow", "AXDialog"]
 
 // Finder never quits for real, and the bar must not quit itself or the
 // window manager.
-let neverQuitPrefixes = ["com.apple.finder", "com.omacchiato.", "com.barut.OmniWM"]
+let neverQuitPrefixes = ["com.apple.finder", "com.omacchiato.", "com.qeude.defi"]
 
 // A menu bar app (LSUIElement) turns into a regular app while its settings
 // window shows, and an app with a menu bar icon keeps working with no
