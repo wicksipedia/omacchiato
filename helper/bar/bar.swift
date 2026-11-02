@@ -116,8 +116,13 @@ func focusWorkspace(_ ws: String, on display: String) {
 // ponytail: an app with windows on two workspaces goes to the one Defi picks
 func focusApp(_ app: String, on ws: String, display: String) {
     focusWorkspace(ws, on: display)
-    DispatchQueue.main.async {
-        NSRunningApplication.runningApplications(withBundleIdentifier: app).first?.activate()
+    // Defi focuses the workspace's remembered window up to ~100 ms after
+    // the switch, so an earlier activate loses. Check again in case it lands later.
+    for delay in [0.15, 0.4] {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            guard NSWorkspace.shared.frontmostApplication?.bundleIdentifier != app else { return }
+            NSRunningApplication.runningApplications(withBundleIdentifier: app).first?.activate()
+        }
     }
 }
 
