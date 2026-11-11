@@ -175,7 +175,7 @@ func omniwmCheatEntries() -> [CheatEntry] {
     // invisible. Read back the rules omacchiato injected, by their
     // description prefix.
     entries.append(contentsOf: karabinerExecCheatEntries())
-    return entries
+    return collapseCheatEntries(entries)
 }
 
 // Reads "omacchiato-omniwm: terminal" rules from karabiner.json. The
@@ -198,15 +198,52 @@ func karabinerExecCheatEntries() -> [CheatEntry] {
                 let from = manips.first?["from"] as? [String: Any],
                 let keyCode = from["key_code"] as? String else { continue }
             let mods = ((from["modifiers"] as? [String: Any])?["mandatory"] as? [String]) ?? []
-            let hasShift = mods.contains("shift")
-            let key = keyCode == "return_or_enter" ? "Enter"
-                : keyCode == "spacebar" ? "Space" : keyCode.uppercased()
-            let chord = "Super+" + (hasShift ? "Shift+" : "") + key
             entries.append(CheatEntry(group: "Apps and system (Karabiner)",
-                key: chord, action: String(desc.dropFirst("omacchiato-omniwm: ".count))))
+                key: karabinerChord(keyCode, mods: mods),
+                action: String(desc.dropFirst("omacchiato-omniwm: ".count))))
         }
     }
     return entries
+}
+
+// Writes a Karabiner key_code and its mandatory modifiers as the sheet's
+// chord text. Command, Control and Option together are Super.
+func karabinerChord(_ keyCode: String, mods: [String]) -> String {
+    let names = ["return_or_enter": "Enter", "spacebar": "Space", "tab": "Tab", "escape": "Esc",
+                 "equal_sign": "=", "hyphen": "-", "grave_accent_and_tilde": "Grave"]
+    let key = names[keyCode] ?? keyCode.uppercased()
+    var parts: [String] = []
+    let isSuper = ["command", "control", "option"].allSatisfy(mods.contains)
+    if isSuper { parts.append("Super") }
+    for (mod, name) in [("control", "Control"), ("option", "Option"), ("command", "Command")]
+    where !isSuper && mods.contains(mod) { parts.append(name) }
+    if mods.contains("shift") { parts.append("Shift") }
+    return (parts + [key]).joined(separator: "+")
+}
+
+// Folds a numbered run into one row: "Super+1 … Super+9 / workspace slot N"
+// becomes "Super+[1-9] / workspace slot". Each key and action must hold the
+// same number, and the numbers must run without a gap. The row takes the
+// place of the first entry of its run.
+func collapseCheatEntries(_ entries: [CheatEntry]) -> [CheatEntry] {
+    func split(_ e: CheatEntry) -> (template: String, number: Int)? {
+        guard let last = e.key.last, let n = last.wholeNumberValue,
+            e.action.hasSuffix(" \(n)") else { return nil }
+        let action = String(e.action.dropLast(" \(n)".count))
+        return ("\(e.group)\u{1}\(e.key.dropLast())\u{1}\(action)", n)
+    }
+    var runs: [String: [Int]] = [:]
+    for e in entries { if let s = split(e) { runs[s.template, default: []].append(s.number) } }
+    var out: [CheatEntry] = []
+    var emitted: Set<String> = []
+    for e in entries {
+        guard let s = split(e), let ns = runs[s.template], ns.count >= 3,
+            ns.sorted() == Array(ns.min()!...ns.max()!) else { out.append(e); continue }
+        guard emitted.insert(s.template).inserted else { continue }
+        out.append(CheatEntry(group: e.group, key: "\(e.key.dropLast())[\(ns.min()!)-\(ns.max()!)]",
+                              action: String(e.action.dropLast(" \(s.number)".count))))
+    }
+    return out
 }
 
 let cheatColumns = 3
