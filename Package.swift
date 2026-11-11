@@ -31,6 +31,7 @@ let package = Package(
                 .product(name: "StatsPanel", package: "ui"),
                 .product(name: "PanelDesigns", package: "ui"),
                 .product(name: "SettingsPanel", package: "ui"),
+                .product(name: "CheatsheetPanel", package: "ui"),
             ],
             path: "helper/bar",
             linkerSettings: [.unsafeFlags([
@@ -54,6 +55,7 @@ let package = Package(
             .product(name: "StatsPanel", package: "ui"),
             .product(name: "PanelDesigns", package: "ui"),
             .product(name: "SettingsPanel", package: "ui"),
+            .product(name: "CheatsheetPanel", package: "ui"),
         ], path: "tests/bar"),
     ],
     swiftLanguageModes: [.v5]

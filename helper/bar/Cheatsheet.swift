@@ -23,6 +23,7 @@ import RowsPanel
 import StatusPanel
 import ThemePanel
 import WeatherPanel
+import CheatsheetPanel
 #endif
 
 // --- cheatsheet (Super+K) --------------------------------------------------
@@ -30,12 +31,6 @@ import WeatherPanel
 // rules — never a list kept here. A cheatsheet that can disagree with the
 // keys is worse than none. The config's own section comments become the
 // headings, so the grouping is the author's, not a second opinion.
-
-struct CheatEntry {
-    let group: String
-    let key: String
-    let action: String
-}
 
 // "Control+Option+Command+Shift+1" becomes "Super+Shift+1": Caps Lock sends
 // Control+Option+Command, so collapse it back to Super, the one key the
@@ -246,157 +241,56 @@ func collapseCheatEntries(_ entries: [CheatEntry]) -> [CheatEntry] {
     return out
 }
 
-let cheatColumns = 3
-let cheatRowH: CGFloat = 20
-let cheatPad: CGFloat = 18
-
-// The sheet takes key focus while open, like the overview, so it can be
-// typed into. hideCheatsheet hands focus back to the app that had it, so
-// search never costs the user their window.
+// The window covers the screen, so a search that shrinks the sheet never
+// resizes it.
 final class CheatWindow: NSWindow {
+    var model: CheatsheetModel?
+
     override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect { frameRect }
     override var canBecomeKey: Bool { true }
-}
 
-final class CheatsheetView: NSView {
-    var entries: [CheatEntry] = []
-    var filter = ""
-    private var keyFont: NSFont { nerdFont("Bold", 12) }
-    private var actFont: NSFont { nerdFont("Regular", 12) }
-    private var headFont: NSFont { nerdFont("Bold", 13) }
-
-    private func visibleEntries() -> [CheatEntry] {
-        guard !filter.isEmpty else { return entries }
-        let f = filter.lowercased()
-        return entries.filter {
-            $0.key.lowercased().contains(f) || $0.action.lowercased().contains(f)
-                || $0.group.lowercased().contains(f)
+    override func sendEvent(_ event: NSEvent) {
+        switch event.type {
+        case .leftMouseDown, .rightMouseDown: hideCheatsheet()
+        case .keyDown: cheatKey(event)
+        default: super.sendEvent(event)
         }
     }
 
-    // rows are (heading?, entry?) laid into balanced columns
-    private func rows() -> [(String?, CheatEntry?)] {
-        var out: [(String?, CheatEntry?)] = []
-        var seen = ""
-        for e in visibleEntries() {
-            if e.group != seen {
-                if !out.isEmpty { out.append((nil, nil)) } // breathing room
-                out.append((e.group, nil))
-                seen = e.group
-            }
-            out.append((nil, e))
-        }
-        return out
-    }
-
-    private func columns() -> [[(String?, CheatEntry?)]] {
-        let all = rows()
-        guard !all.isEmpty else { return [] }
-        let per = Int((Double(all.count) / Double(cheatColumns)).rounded(.up))
-        return stride(from: 0, to: all.count, by: per).map {
-            Array(all[$0..<min($0 + per, all.count)])
-        }
-    }
-
-    private func columnWidths() -> [(key: CGFloat, total: CGFloat)] {
-        columns().map { col in
-            var k: CGFloat = 0, a: CGFloat = 0
-            for (head, e) in col {
-                if let head { k = max(k, advance(head, headFont)) }
-                if let e {
-                    k = max(k, advance(e.key, keyFont))
-                    a = max(a, advance(e.action, actFont))
-                }
-            }
-            return (k, k + 14 + a)
-        }
-    }
-
-    func measure() -> NSSize {
-        let cols = columns()
-        guard !cols.isEmpty else { return NSSize(width: 320, height: 80) }
-        let widths = columnWidths()
-        let w = widths.reduce(0) { $0 + $1.total } + CGFloat(cols.count - 1) * 28
-        let tallest = cols.map(\.count).max() ?? 0
-        return NSSize(width: w + cheatPad * 2,
-                      height: CGFloat(tallest) * cheatRowH + cheatPad * 2 + 26)
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        let body = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5),
-                                xRadius: 8, yRadius: 8)
-        palette.barBG.setFill()
-        body.fill()
-        palette.accent.setStroke()
-        body.lineWidth = 1
-        body.stroke()
-
-        let title = filter.isEmpty
-            ? "keybindings — Super is Caps Lock · type to search · Super+K, Esc or click to close"
-            : "search: \(filter)▏ — \(visibleEntries().count) match\(visibleEntries().count == 1 ? "" : "es") · Esc clears"
-        drawText(title, nerdFont("Bold", 12), palette.accent.withAlphaComponent(0.8),
-                 leftAt: cheatPad, midY: bounds.maxY - cheatPad - 6)
-
-        var x = cheatPad
-        for (i, col) in columns().enumerated() {
-            let width = columnWidths()[i]
-            var y = bounds.maxY - cheatPad - 30
-            for (head, e) in col {
-                if let head {
-                    drawText(head, headFont, palette.accent, leftAt: x, midY: y - cheatRowH / 2)
-                } else if let e {
-                    drawText(e.key, keyFont, palette.label, leftAt: x, midY: y - cheatRowH / 2)
-                    drawText(e.action, actFont, palette.muted,
-                             leftAt: x + width.key + 14, midY: y - cheatRowH / 2)
-                }
-                y -= cheatRowH
-            }
-            x += width.total + 28
-        }
-    }
-
-    override func mouseDown(with event: NSEvent) { hideCheatsheet() }
-
-    override var acceptsFirstResponder: Bool { true }
-    override func keyDown(with event: NSEvent) {
+    private func cheatKey(_ event: NSEvent) {
+        guard let model else { return }
         switch event.keyCode {
-        case 53: // esc — clear an active search first, close on the second
-            if filter.isEmpty { hideCheatsheet() } else { filter = ""; refit() }
-        case 51: // backspace
-            if !filter.isEmpty { filter.removeLast(); refit() }
+        case 53: // Esc clears a search first, and closes on the second press
+            if model.filter.isEmpty { hideCheatsheet() } else { model.filter = "" }
+        case 51:
+            if !model.filter.isEmpty { model.filter.removeLast() }
         case 40 where event.modifierFlags.contains([.command, .control, .option]):
-            hideCheatsheet() // Super+K also closes the sheet, even though it holds key focus
+            hideCheatsheet() // Super+K closes the sheet, which holds key focus
         default:
-            guard let chars = event.charactersIgnoringModifiers,
-                !chars.isEmpty,
+            guard let chars = event.charactersIgnoringModifiers, !chars.isEmpty,
                 !event.modifierFlags.contains(.command),
                 chars.rangeOfCharacter(from: .alphanumerics.union(CharacterSet(charactersIn: "+- "))) != nil
             else { return }
-            filter += chars
-            refit()
+            model.filter += chars
         }
-    }
-
-    // the sheet shrinks to its matches — re-measure and keep the centre
-    private func refit() {
-        guard let window = window else { needsDisplay = true; return }
-        let size = measure()
-        let c = NSPoint(x: window.frame.midX, y: window.frame.midY)
-        frame = NSRect(origin: .zero, size: size)
-        window.setFrame(NSRect(x: c.x - size.width / 2, y: c.y - size.height / 2,
-                               width: size.width, height: size.height), display: true)
-        needsDisplay = true
     }
 }
 
 var cheatWindow: CheatWindow?
 var cheatPrevApp: NSRunningApplication?
+var cheatClickMonitor: Any?
+var cheatResignObserver: NSObjectProtocol?
 
-func hideCheatsheet() {
-    cheatWindow?.orderOut(nil)
+func hideCheatsheet(restoreFocus: Bool = true) {
+    guard let window = cheatWindow else { return }
     cheatWindow = nil
-    // hand focus back to whoever had it before the sheet took key
-    cheatPrevApp?.activate()
+    if let m = cheatClickMonitor { NSEvent.removeMonitor(m) }
+    if let o = cheatResignObserver { NotificationCenter.default.removeObserver(o) }
+    cheatClickMonitor = nil
+    cheatResignObserver = nil
+    window.orderOut(nil)
+    // after a click on another app, that app keeps the focus it just took
+    if restoreFocus { cheatPrevApp?.activate() }
     cheatPrevApp = nil
 }
 
@@ -407,30 +301,28 @@ func toggleCheatsheet() {
         tlog("cheatsheet: no bindings parsed from omniwm settings.toml")
         return
     }
-    let view = CheatsheetView(frame: .zero)
-    view.entries = entries
-    let size = view.measure()
-    view.frame = NSRect(origin: .zero, size: size)
-    // centred on the display holding the cursor, like every other
-    // full-surface thing here
     let mouse = NSEvent.mouseLocation
     let screen = NSScreen.screens.first { $0.frame.contains(mouse) } ?? NSScreen.main!
-    let window = CheatWindow(
-        contentRect: NSRect(x: screen.frame.midX - size.width / 2,
-                            y: screen.frame.midY - size.height / 2,
-                            width: size.width, height: size.height),
-        styleMask: .borderless, backing: .buffered, defer: false)
+    let model = CheatsheetModel(entries: entries)
+    let view = CheatsheetView(model: model)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    let window = CheatWindow(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false)
+    window.model = model
     window.isOpaque = false
     window.backgroundColor = .clear
-    window.hasShadow = true
+    window.hasShadow = false
     window.level = .popUpMenu
     window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
-    window.contentView = view
-    // Take key focus so typing filters; hideCheatsheet gives it back to this app.
+    window.contentView = NSHostingView(rootView: view)
     cheatPrevApp = NSWorkspace.shared.frontmostApplication
     NSApp.activate(ignoringOtherApps: true)
     window.makeKeyAndOrderFront(nil)
-    window.makeFirstResponder(view)
     cheatWindow = window
+    // A clear window passes clicks to the app behind it, so watch other apps.
+    cheatClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { _ in
+        hideCheatsheet(restoreFocus: false)
+    }
+    cheatResignObserver = NotificationCenter.default.addObserver(
+        forName: NSWindow.didResignKeyNotification, object: window, queue: .main) { _ in hideCheatsheet(restoreFocus: false) }
     tlog("cheatsheet: \(entries.count) bindings")
 }

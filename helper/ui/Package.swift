@@ -27,9 +27,11 @@ let package = Package(
         .library(name: "StatsPanel", targets: ["StatsPanel"]),
         .library(name: "PanelDesigns", targets: ["PanelDesigns"]),
         .library(name: "SettingsPanel", targets: ["SettingsPanel"]),
+        .library(name: "CheatsheetPanel", targets: ["CheatsheetPanel"]),
     ],
     targets: [
         .target(name: "StatusGauge"),
+        .target(name: "CheatsheetPanel"),
         .target(name: "BarPills"),
         .target(name: "WeatherPanel", dependencies: ["StatusPanel"]),
         .target(name: "StatusPanel", dependencies: ["StatusGauge"]),

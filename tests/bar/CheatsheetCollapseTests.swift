@@ -1,4 +1,5 @@
 import Testing
+import CheatsheetPanel
 @testable import omacchiato_bar
 
 struct CheatsheetCollapseTests {
@@ -30,5 +31,15 @@ struct CheatsheetCollapseTests {
         #expect(karabinerChord("tab", mods: ["command", "control", "option"]) == "Super+Tab")
         #expect(karabinerChord("tab", mods: ["control", "option", "shift"]) == "Control+Option+Shift+Tab")
         #expect(karabinerChord("equal_sign", mods: ["command", "control", "option", "shift"]) == "Super+Shift+=")
+    }
+}
+
+struct CheatsheetPanelTests {
+    @Test("a chord shows with the Mac key symbols, and Super as Caps Lock")
+    func symbols() {
+        #expect(chordSymbols("Super+Shift+[1-9]") == "⇪⇧ [1–9]")
+        #expect(chordSymbols("Control+Option+Shift+Left Arrow") == "⌃⌥⇧←")
+        #expect(chordSymbols("Hyper+Grave") == "⇪⇧`")
+        #expect(chordSymbols("Super+Enter") == "⇪↩")
     }
 }
