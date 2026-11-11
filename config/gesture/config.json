@@ -1,8 +1,10 @@
 {
   "haptic": true,
-  "fingers": 3,
-  "swipe_left": "$HOME/.local/bin/omacchiato-defi focus-column right >/dev/null 2>&1",
-  "swipe_right": "$HOME/.local/bin/omacchiato-defi focus-column left >/dev/null 2>&1",
-  "swipe_up": "$HOME/.local/bin/omacchiato-defi focus-workspace down >/dev/null 2>&1",
-  "swipe_down": "$HOME/.local/bin/omacchiato-defi focus-workspace up >/dev/null 2>&1"
+  "natural_swipe": true,
+  "wrap_around": true,
+  "skip_empty": false,
+  "fingers": 4,
+  "cursor_monitor": true,
+  "swipe_up": "$HOME/.local/bin/omacchiato-overview >/dev/null 2>&1",
+  "swipe_down": "$HOME/.local/bin/omacchiato-overview close >/dev/null 2>&1"
 }

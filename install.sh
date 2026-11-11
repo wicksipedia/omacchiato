@@ -10,7 +10,6 @@ export OMACCHIATO_BANNER_SHOWN=1
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 
 "$REPO_DIR/migrate-omacosy.sh"
-"$REPO_DIR/migrate-omniwm.sh"
 
 # --- 0. Manifest: record what THIS machine gains ----------------------------
 # uninstall.sh removes only what is recorded here, so tools and settings
@@ -75,6 +74,20 @@ if ! command -v brew >/dev/null 2>&1; then
   # marked AFTER the install succeeds — an aborted attempt must not
   # tell uninstall.sh that homebrew is ours to remove
   mark "installed-homebrew"
+fi
+
+# OmniWM asks to be quit before Homebrew upgrades it, because Homebrew swaps
+# the app out underneath a running copy. The start step at the end of this
+# script brings it back.
+if pgrep -xq OmniWM && [ "$(brew outdated --cask --greedy --quiet omniwm 2>/dev/null)" = omniwm ]; then
+  log "Quitting OmniWM while Homebrew upgrades it"
+  osascript -e 'quit app "OmniWM"' 2>/dev/null || true
+  for _ in 1 2 3 4 5 6 7 8 9 10; do pgrep -xq OmniWM || break; sleep 1; done
+  if pgrep -xq OmniWM; then
+    # a hung quit must not leave Homebrew swapping the app underneath it
+    pkill -x OmniWM 2>/dev/null || true
+    for _ in 1 2 3 4 5; do pgrep -xq OmniWM || break; sleep 1; done
+  fi
 fi
 
 log "Installing packages (brew bundle)"
@@ -151,7 +164,7 @@ link() {
 # These are READ, not sourced. apps.local.conf is a file the README
 # invites you to paste values into, and `source` would execute whatever
 # is in it. The values then land in ~/.config/omacchiato/apps.conf, which
-# omacchiato-karabiner-keys sources, and inside single-quoted shell
+# omacchiato-karabiner-omniwm sources, and inside single-quoted shell
 # commands in the Karabiner rules. A name carrying a quote or a newline
 # could close the string and run its own command, so anything outside a
 # plain app name is refused rather than substituted.
@@ -185,6 +198,15 @@ link "$REPO_DIR/config/starship.toml" "$HOME/.config/starship.toml"
 # ghostty reads this AND its Application Support config, so personal
 # settings there survive
 link "$REPO_DIR/config/ghostty"      "$HOME/.config/ghostty"
+# OmniWM: settings are canonical TOML, live-reloaded. OmniWM and theme-set
+# both write the file, and it holds per-desk values such as display pins,
+# so it is a local copy of the template, made once and never overwritten.
+# A repo symlink from an earlier install becomes a copy of the same file.
+if [ -L "$HOME/.config/omniwm" ] && [ "$(readlink "$HOME/.config/omniwm")" = "$REPO_DIR/config/omniwm" ]; then
+  rm "$HOME/.config/omniwm"
+fi
+mkdir -p "$HOME/.config/omniwm"
+[ -e "$HOME/.config/omniwm/settings.toml" ] || cp "$REPO_DIR/config/omniwm/settings.toml" "$HOME/.config/omniwm/settings.toml"
 
 # Add the omacchiato keys only to a herdr config with no keys table, so keys
 # that the user set stay. An unchanged block of older keys is replaced.
@@ -211,11 +233,11 @@ fi
 mkdir -p "$HOME/.config/karabiner"
 # preserve a pre-omacchiato karabiner config once, for uninstall to restore.
 # A file that an earlier install wrote is not the user's: it differs from
-# the template once the Karabiner keys are in it, or after a template change.
+# the template once the OmniWM rules are in it, or after a template change.
 if [ -f "$HOME/.config/karabiner/karabiner.json" ] \
   && [ ! -f "$HOME/.config/karabiner/karabiner.json.bak.omacchiato" ] \
   && ! have "karabiner-config-copied" \
-  && ! grep -qE '"(omacchiato|omacosy)-(omniwm|keys):' "$HOME/.config/karabiner/karabiner.json" \
+  && ! grep -qE '"(omacchiato|omacosy)-omniwm:' "$HOME/.config/karabiner/karabiner.json" \
   && ! cmp -s "$REPO_DIR/config/karabiner/karabiner.json" "$HOME/.config/karabiner/karabiner.json"; then
   cp "$HOME/.config/karabiner/karabiner.json" "$HOME/.config/karabiner/karabiner.json.bak.omacchiato"
   mark "had-karabiner-config"
@@ -266,7 +288,7 @@ fetch_release() {
     log "The download or its checksum failed."
     return 1
   fi
-  for name in omacchiato-helper omacchiato-bar.app omacchiato-gesture.app; do
+  for name in omacchiato-helper omacchiato-overview omacchiato-omni omacchiato-bar.app omacchiato-gesture.app; do
     codesign --verify --strict -R="anchor apple generic and certificate leaf[subject.OU] = \"$RELEASE_TEAM\"" \
       "$RELEASE_TMP/x/$name" 2>/dev/null && continue
     log "$name in $tag does not carry the signature of team $RELEASE_TEAM."
@@ -303,6 +325,16 @@ elif [ ! -x "$HOME/.local/bin/omacchiato-helper" ] || [ "$REPO_DIR/helper/main.s
   log "Building omacchiato-helper"
   "$REPO_DIR/bin/omacchiato-build" helper "$HOME/.local/bin/omacchiato-helper"
 fi
+
+# workspace overview overlay (4-finger swipe up)
+if [ -n "$PREBUILT" ]; then
+  place omacchiato-overview "$HOME/.local/bin/omacchiato-overview"
+elif [ ! -x "$HOME/.local/bin/omacchiato-overview" ] || [ "$REPO_DIR/helper/overview.swift" -nt "$HOME/.local/bin/omacchiato-overview" ] \
+  || unsigned "$HOME/.local/bin/omacchiato-overview"; then
+  log "Building omacchiato-overview"
+  "$REPO_DIR/bin/omacchiato-build" overview "$HOME/.local/bin/omacchiato-overview"
+fi
+
 
 # the status bar itself: one process for the surfaces, reading its own
 # publishers (SkyLight, CoreAudio, IOPS, DisplayServices, SCDynamicStore,
@@ -371,8 +403,8 @@ printf 'TERMINAL=%s\nBROWSER=%s\nMUSIC=%s\nMESSENGER=%s\n' \
 # after apps.conf, so the injected rules launch the user's chosen apps.
 # A kept karabiner.json is the user's, rules too, so it stays as it is.
 if [ "$KARABINER_COPIED" = 1 ]; then
-  "$REPO_DIR/bin/omacchiato-karabiner-keys" install \
-    || log "WARNING: the Karabiner keys did not install. Re-run install.sh."
+  "$REPO_DIR/bin/omacchiato-karabiner-omniwm" install \
+    || log "WARNING: the OmniWM Karabiner rules did not install. Re-run install.sh."
   # the snapshot holds the rules too
   cp "$HOME/.config/karabiner/karabiner.json" "$STATE_DIR/karabiner.json.installed"
 fi
@@ -407,11 +439,13 @@ link "$REPO_DIR/bin/omacchiato-github-prs" "$HOME/.local/bin/omacchiato-github-p
 link "$REPO_DIR/bin/omacchiato-keep-awake" "$HOME/.local/bin/omacchiato-keep-awake"
 link "$REPO_DIR/bin/omacchiato-updates" "$HOME/.local/bin/omacchiato-updates"
 link "$REPO_DIR/bin/omacchiato-stats" "$HOME/.local/bin/omacchiato-stats"
+link "$REPO_DIR/bin/omacchiato-ws" "$HOME/.local/bin/omacchiato-ws"
+link "$REPO_DIR/bin/omacchiato-ws-collapse" "$HOME/.local/bin/omacchiato-ws-collapse"
 link "$REPO_DIR/bin/omacchiato-update" "$HOME/.local/bin/omacchiato-update"
 link "$REPO_DIR/bin/omacchiato-spawn" "$HOME/.local/bin/omacchiato-spawn"
 link "$REPO_DIR/bin/omacchiato-herdr" "$HOME/.local/bin/omacchiato-herdr"
-link "$REPO_DIR/bin/omacchiato-defi" "$HOME/.local/bin/omacchiato-defi"
-link "$REPO_DIR/bin/omacchiato-karabiner-keys" "$HOME/.local/bin/omacchiato-karabiner-keys"
+link "$REPO_DIR/bin/omacchiato-karabiner-omniwm" "$HOME/.local/bin/omacchiato-karabiner-omniwm"
+link "$REPO_DIR/bin/omacchiato-omniwmctl" "$HOME/.local/bin/omacchiato-omniwmctl"
 link "$REPO_DIR/bin/omacchiato-herdr-worktree" "$HOME/.local/bin/omacchiato-herdr-worktree"
 link "$REPO_DIR/bin/omacchiato-popup" "$HOME/.local/bin/omacchiato-popup"
 link "$REPO_DIR/bin/omacchiato-permissions" "$HOME/.local/bin/omacchiato-permissions"
@@ -562,9 +596,11 @@ fi
 # --- 4. Trackpad gestures (omacchiato-gesture) ---------------------------------
 # The gesture engine — absorbed from aerospace-swipe (MIT, notice kept in
 # helper/gesture/LICENSE.aerospace-swipe) with every omacchiato fix folded
-# in — runs as a user launch agent. Three-finger swipes run Defi's
-# focus-column and focus-workspace. Config is COPIED (launch agents
-# can't read ~/Documents — TCC).
+# in — runs as a user launch agent. It serves all four directions: the
+# vertical swipes open and close the overview, and the horizontal ones
+# step through the workspaces over OmniWM IPC, with
+# workspaceSwipeEnabled = false in settings.toml. Config is
+# COPIED (launch agents can't read ~/Documents — TCC).
 GESTURE_APP="$HOME/.local/share/omacchiato/omacchiato-gesture.app"
 GESTURE_BIN="$GESTURE_APP/Contents/MacOS/omacchiato-gesture"
 mkdir -p "$HOME/.config/omacchiato"
@@ -584,7 +620,15 @@ fi
 # so every rebuild means dead swipes until the user re-grants. The only
 # safe rebuild is the one that does not happen: skip the whole block
 # unless the binary is missing or a source file actually changed.
+# omacchiato-omni: the scripts' held-socket client for OmniWM (plain C,
+# ~3 ms launch; no grants involved, so it is simply rebuilt when stale)
 G="$REPO_DIR/helper/gesture"
+if [ -n "$PREBUILT" ]; then
+  place omacchiato-omni "$HOME/.local/bin/omacchiato-omni"
+elif [ ! -x "$HOME/.local/bin/omacchiato-omni" ] || find "$G/omniwm.c" "$G/omniwm.h" "$G/omnicli.c" "$G/yyjson.c" "$G/yyjson.h" -newer "$HOME/.local/bin/omacchiato-omni" 2>/dev/null | grep -q .; then
+  "$REPO_DIR/bin/omacchiato-build" omni "$HOME/.local/bin/omacchiato-omni" \
+    || echo "omacchiato-omni build failed"
+fi
 GESTURE_STALE=""
 if [ -n "$PREBUILT" ]; then
   if [ "$(cdhash "$PREBUILT/omacchiato-gesture.app")" != "$(cdhash "$GESTURE_APP")" ]; then
@@ -625,24 +669,20 @@ launchctl load "$HOME/Library/LaunchAgents/com.omacchiato.gesture.plist" 2>/dev/
 
 # --- 6. Services ------------------------------------------------------------
 
-# Defi installs and updates itself. Run its installer only when no
-# Defi.app exists. Save it to a file first, so a cut-off download runs
-# nothing.
-if [ ! -d /Applications/Defi.app ] && [ ! -d "$HOME/Applications/Defi.app" ]; then
-  log "Installing Defi"
-  defi_installer="$(mktemp)"
-  if curl -fsSL -o "$defi_installer" https://raw.githubusercontent.com/qeude/Defi/main/script/install.sh; then
-    sh "$defi_installer" || log "WARNING: the Defi installer failed. Run it again: https://github.com/qeude/Defi#get-started"
-  else
-    log "WARNING: could not download the Defi installer"
-  fi
-  rm -f "$defi_installer"
-elif ! pgrep -xq defi-daemon; then
-  log "Starting Defi"
-  open -b com.qeude.defi || log "WARNING: Defi did not start"
+# OmniWM does not start beside another window manager, and quitting one
+# strands the windows it parked off screen, so a running AeroSpace is
+# left for the user to quit. Its login item goes, or it would take the
+# next login.
+if pgrep -xq AeroSpace; then
+  log "WARNING: AeroSpace is running. Quit it, then start OmniWM: open -a OmniWM"
+else
+  log "Starting OmniWM"
+  pgrep -xq OmniWM || open -a OmniWM \
+    || log "WARNING: OmniWM did not start. Check the brew bundle output above."
 fi
 osascript -e 'tell application "System Events"
   if exists login item "AeroSpace" then delete login item "AeroSpace"
+  if not (exists login item "OmniWM") then make new login item at end with properties {path:"/Applications/OmniWM.app", hidden:false}
 end tell' 2>/dev/null || true
 
 # The remapping runs in launchd-managed services; the app itself is only
@@ -666,7 +706,7 @@ log "Checking the permissions of the bar and the gesture daemon"
 cat <<EOF
 
 Done. One-time macOS steps if this is a fresh machine:
-  1. Grant Defi       System Settings -> Privacy & Security -> Accessibility
+  1. Grant OmniWM     System Settings -> Privacy & Security -> Accessibility (required) and Input Monitoring (swipes)
   2. Karabiner-Elements: approve its driver extension + Input Monitoring
      when prompted (System Settings -> Privacy & Security)
 

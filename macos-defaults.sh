@@ -44,14 +44,19 @@ killall SystemUIServer 2>/dev/null || true
 
 echo "macos-defaults: menu bar set to auto-hide (log out/in if it doesn't apply immediately)"
 
-# Three-finger swipes belong to omacchiato-gesture, which sends them to
-# Defi. Left on, the system would also switch Spaces or open Mission
-# Control on the same swipe. Four-finger swipes stay with macOS.
-for domain in com.apple.AppleMultitouchTrackpad com.apple.driver.AppleBluetoothMultitouch.trackpad; do
-  defaults write "$domain" TrackpadThreeFingerHorizSwipeGesture -int 0 2>/dev/null || true
-  defaults write "$domain" TrackpadThreeFingerVertSwipeGesture -int 0 2>/dev/null || true
-  defaults write "$domain" TrackpadFourFingerHorizSwipeGesture -int 2 2>/dev/null || true
-  defaults write "$domain" TrackpadFourFingerVertSwipeGesture -int 2 2>/dev/null || true
-done
-defaults write com.apple.dock showMissionControlGestureEnabled -bool true
-echo "macos-defaults: 3-finger swipes released to omacchiato-gesture, 4-finger swipes to macOS (Dock restart applies)"
+# The 4-finger swipes belong to omacchiato (workspace swipes and the
+# overview). Left enabled, the SYSTEM also fires Mission
+# Control / Spaces on the same gesture — MC opens on top of the
+# overview and eats every click and keystroke (and SCK captures catch
+# windows mid-MC-zoom). Trackpad -> More Gestures equivalents: off.
+defaults write com.apple.AppleMultitouchTrackpad TrackpadFourFingerVertSwipeGesture -int 0
+defaults write com.apple.AppleMultitouchTrackpad TrackpadFourFingerHorizSwipeGesture -int 0
+defaults write com.apple.driver.AppleBluetoothMultitouch.trackpad TrackpadFourFingerVertSwipeGesture -int 0 2>/dev/null || true
+defaults write com.apple.driver.AppleBluetoothMultitouch.trackpad TrackpadFourFingerHorizSwipeGesture -int 0 2>/dev/null || true
+defaults write com.apple.dock showMissionControlGestureEnabled -bool false
+# OmniWM's column scroll uses three fingers (fingerCount in
+# settings.toml), so the system's 3-finger swipe between full-screen
+# apps is off too.
+defaults write com.apple.AppleMultitouchTrackpad TrackpadThreeFingerHorizSwipeGesture -int 0
+defaults write com.apple.driver.AppleBluetoothMultitouch.trackpad TrackpadThreeFingerHorizSwipeGesture -int 0 2>/dev/null || true
+echo "macos-defaults: 4-finger swipes released to omacchiato-gesture (Dock restart applies)"

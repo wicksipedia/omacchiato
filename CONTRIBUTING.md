@@ -5,8 +5,8 @@ Small repo, strong opinions. PRs are welcome when they keep these.
 ## The doctrines
 
 - **Events over polling — always ask "who publishes this?" first.**
-  Window changes come from SkyLight notifications and Defi's
-  `workspaceChanged` notification, network state from SCDynamicStore, bluetooth from IOBluetooth
+  Window changes come from SkyLight notifications and OmniWM's `watch`
+  stream, network state from SCDynamicStore, bluetooth from IOBluetooth
   notifications, power from IOPS, app lifecycle from NSWorkspace. A
   timer is acceptable only as a guarded safety net that never acts as
   the primary path, or where no publisher exists at all (the weather
@@ -17,11 +17,12 @@ Small repo, strong opinions. PRs are welcome when they keep these.
   Hardcoded lists in this repo have rotted before.
 - **The bar is one process.** Bar, popups and OSDs are surfaces of
   `helper/bar/`. They draw from a model that the bar holds in
-  memory and feeds from publishers (SkyLight, Defi's notification,
+  memory and feeds from publishers (SkyLight, OmniWM's `watch` stream,
   CoreAudio, IOPS, DisplayServices, SCDynamicStore, IOBluetooth).
   Nothing on a render path may fork. A workspace switch repaints the
-  chips from the state that Defi's notification carries. After a window
-  or display event, the bar reads Defi's full state off the main queue.
+  chips from the `watch` stream, which is already running. The full
+  OmniWM snapshot runs off the main queue, 150 ms after a window or
+  display event.
 - **Ask for a font family and VERIFY you got it.** Requesting a family
   that is not installed does not fail, it silently substitutes; that is
   how half a bar ended up rendering in Hiragino Sans without one error
@@ -68,8 +69,9 @@ Small repo, strong opinions. PRs are welcome when they keep these.
   `tests/`, so the bug stays fixed.
 - Test on stock bash: `bash -n` is the floor, `/bin/bash script.sh`
   is the truth.
-- The debug story is `/tmp/omacchiato-*.log`. The bar writes there
-  with `tlog`, and launchd sends the gesture daemon's output there. The bar's stderr goes to `/tmp/omacchiato-bar.err`. Keep it
+- The debug story is `/tmp/omacchiato-*.log`. The bar and the overview
+  write there with `tlog`, and launchd sends the gesture daemon's output
+  there. The bar's stderr goes to `/tmp/omacchiato-bar.err`. Keep it
   that way; it is what bug reports run on.
 - Theme packs are the easiest contribution: copy a directory under
   `themes/`, provide `colors.toml`, `sketchybar.sh` (the bar reads its

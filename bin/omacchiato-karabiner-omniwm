@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+# omacchiato-karabiner-omniwm <install|remove> — the exec chords.
+#
+# OmniWM's hotkey system has no exec/shell command (verified against
+# HotkeyCommand.swift: window-management cases only), so every chord
+# that RUNS something — terminal, launcher, apps, theme, lock, the
+# cheatsheet — lives in Karabiner instead. Karabiner is already
+# resident for Caps Lock, and its complex modifications run
+# shell_command.
+#
+# install.sh runs `install` after it copies karabiner.json and writes
+# apps.conf. Each run replaces the rules that an earlier run added.
+# Karabiner live-reloads karabiner.json, so the rules apply at once.
+#
+# Super = Caps Lock = command+control+option (the existing remap), so
+# the chords arrive as ordinary modifier combos.
+set -euo pipefail
+
+KARABINER="$HOME/.config/karabiner/karabiner.json"
+APPS="$HOME/.config/omacchiato/apps.conf"   # resolved by install.sh
+MARK="omacchiato-omniwm"                     # rule-description prefix, removal key
+
+[ -f "$KARABINER" ] || { echo "no karabiner.json" >&2; exit 1; }
+
+TERMINAL=Ghostty BROWSER=Safari MUSIC=Spotify MESSENGER=Slack
+[ -f "$APPS" ] && . "$APPS" 2>/dev/null
+
+export KARABINER MARK TERMINAL BROWSER MUSIC MESSENGER
+python3 - "$1" <<'PY'
+import json, os, sys
+
+path = os.environ["KARABINER"]
+mark = os.environ["MARK"]
+action = sys.argv[1]
+
+def rule(desc, key, mods, cmd=None, to_key=None, to_mods=None):
+    to = [{"shell_command": cmd}] if cmd else [{"key_code": to_key, "modifiers": to_mods or []}]
+    return {
+        "description": f"{mark}: {desc}",
+        "manipulators": [{
+            "type": "basic",
+            "from": {"key_code": key, "modifiers": {"mandatory": mods}},
+            "to": to,
+        }],
+    }
+
+SUPER = ["command", "control", "option"]
+SHIFT = SUPER + ["shift"]
+home = os.environ["HOME"]
+apps = {k: os.environ[k] for k in ("TERMINAL", "BROWSER", "MUSIC", "MESSENGER")}
+
+# workspace slots: OmniWM's native switchWorkspace.N is name-global
+# (always the main set), blind to which screen you are on — these route
+# through omacchiato-omni's cursor-display slot resolution instead. The
+# native ids are Unassigned in settings.toml so nothing double-fires.
+slot_rules = []
+for n in range(1, 10):
+    key = str(n)
+    slot_rules.append(rule(f"workspace slot {n}", key, SUPER, cmd=f"{home}/.local/bin/omacchiato-omni slot {n} >/dev/null 2>&1"))
+    slot_rules.append(rule(f"move to slot {n}", key, SHIFT, cmd=f"{home}/.local/bin/omacchiato-omni slot {n} move >/dev/null 2>&1"))
+
+ctl = f"{home}/.local/bin/omacchiato-omniwmctl"
+
+def close_window_rule():
+    r = rule("close window", "w", SUPER, to_key="w", to_mods=["command"])
+    m = r["manipulators"][0]
+    r["manipulators"].insert(0, {**m,
+        "to": [{"key_code": "w", "modifiers": ["command", "shift"]}],
+        "conditions": [{"type": "frontmost_application_if", "bundle_identifiers": ["^com\\.mitchellh\\.ghostty$"]}]})
+    return r
+
+# One set of resize chords for both layouts: niri changes the column
+# width or the window's height in its column, dwindle resizes the split.
+# A command exits non-zero outside its own layout, so the fallback runs.
+def resize_rule(desc, key, mods, niri, dwindle):
+    return rule(desc, key, mods, cmd=f"{ctl} command {niri} >/dev/null 2>&1 || {ctl} command {dwindle} >/dev/null 2>&1")
+
+rules = slot_rules + [
+    # omacchiato-spawn preselects the omarchy insertion side and serializes
+    # bursts — a bare `open -na` gives OmniWM's above-not-below spiral
+    rule("terminal", "return_or_enter", SUPER, cmd=f"{home}/.local/bin/omacchiato-spawn '{apps['TERMINAL']}'"),
+    rule("browser", "return_or_enter", SHIFT, cmd=f"{home}/.local/bin/omacchiato-spawn '{apps['BROWSER']}'"),
+    rule("herdr", "a", SUPER, cmd=f"{home}/.local/bin/omacchiato-herdr"),
+    # OmniWM's command palette on the launcher chord; Raycast keeps its
+    # own Cmd+Space hotkey
+    rule("launcher", "spacebar", SUPER, cmd=f"{ctl} command open-command-palette >/dev/null 2>&1"),
+    rule("overview", "o", SUPER, cmd=f"{home}/.local/bin/omacchiato-overview"),
+    # throws go to the OTHER display, not a direction — resolved
+    # per-press by omacchiato-omni from the display arrangement
+    rule("throw window to other monitor", "o", SHIFT, cmd=f"{home}/.local/bin/omacchiato-omni throw-window >/dev/null 2>&1"),
+    rule("throw workspace to other monitor", "spacebar", SHIFT, cmd=f"{home}/.local/bin/omacchiato-omni throw-workspace >/dev/null 2>&1"),
+    # slot-scoped cycling (1-9 stays 1-9): OmniWM's own next/prev walks
+    # the guest workspaces too on a single display
+    rule("next workspace", "tab", SUPER, cmd=f"{home}/.local/bin/omacchiato-ws next"),
+    rule("previous workspace", "tab", SHIFT, cmd=f"{home}/.local/bin/omacchiato-ws prev"),
+    rule("files", "f", SHIFT, cmd="open -a Finder"),
+    rule("music", "m", SHIFT, cmd=f"open -a '{apps['MUSIC']}'"),
+    rule("messenger", "g", SHIFT, cmd=f"open -a '{apps['MESSENGER']}'"),
+    # first letters where they were free, the nearest sense where they
+    # were not: o throws a window and t cycles themes
+    rule("email", "e", SHIFT, cmd="open -a 'Microsoft Outlook'"),
+    rule("chat", "c", SHIFT, cmd="open -a 'Microsoft Teams'"),
+    rule("video", "y", SHIFT, cmd=f"open -a '{home}/Applications/YouTube.app'"),
+    rule("next theme", "t", SHIFT, cmd=f"{home}/.local/bin/theme-next"),
+    rule("next wallpaper", "b", SHIFT, cmd=f"{home}/.local/bin/theme-bg-next"),
+    rule("lock", "l", SHIFT, cmd=f"{home}/.local/bin/omacchiato-helper lock"),
+    rule("mute microphone", "m", SUPER, cmd=f"{home}/.local/bin/omacchiato-helper mic toggle >/dev/null 2>&1"),
+    rule("keep awake", "escape", SUPER, cmd=f"{home}/.local/bin/omacchiato-keep-awake toggle"),
+    rule("cheatsheet", "k", SUPER, cmd="/usr/bin/touch /tmp/omacchiato-bar-cheatsheet"),
+    # OmniWM has no close-window command (HotkeyCommand.swift) — send
+    # the app-level Cmd+W instead, which closes the focused window.
+    # In Ghostty, herdr takes Cmd+W to close a tab, so send Ghostty's
+    # own close_window key.
+    close_window_rule(),
+    # OmniWM cannot focus a display that has no workspace. With more
+    # displays than workspace sets, one direction can land on such a
+    # display, so try the other direction when the first does nothing.
+    # ponytail: one step back only — a full cycle over several empty
+    # displays needs a display picker in omacchiato-omni
+    rule("focus next display", "tab", ["control", "option"],
+         cmd=f"{ctl} command focus-monitor next >/dev/null 2>&1 || {ctl} command focus-monitor prev >/dev/null 2>&1"),
+    rule("focus previous display", "tab", ["control", "option", "shift"],
+         cmd=f"{ctl} command focus-monitor prev >/dev/null 2>&1 || {ctl} command focus-monitor next >/dev/null 2>&1"),
+    resize_rule("wider", "equal_sign", SUPER, "set-container-primary-span +10%", "resize horizontal grow"),
+    resize_rule("narrower", "hyphen", SUPER, "set-container-primary-span -10%", "resize horizontal shrink"),
+    resize_rule("taller", "equal_sign", SHIFT, "set-window-secondary-span +10%", "resize vertical grow"),
+    resize_rule("shorter", "hyphen", SHIFT, "set-window-secondary-span -10%", "resize vertical shrink"),
+]
+
+with open(path) as f:
+    cfg = json.load(f)
+
+changed = False
+for profile in cfg.get("profiles", []):
+    if not profile.get("selected", False) and len(cfg["profiles"]) > 1:
+        continue
+    cm = profile.setdefault("complex_modifications", {})
+    existing = cm.setdefault("rules", [])
+    kept = [r for r in existing if not r.get("description", "").startswith(mark)]
+    if action == "install":
+        cm["rules"] = kept + rules
+        changed = True
+    else:
+        if len(kept) != len(existing):
+            changed = True
+        cm["rules"] = kept
+
+if changed:
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(cfg, f, indent=4)
+    os.replace(tmp, path)
+print(f"{action}: {'applied' if changed else 'no change'}")
+PY

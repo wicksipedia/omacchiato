@@ -1,6 +1,6 @@
 // omacchiato-bar: the status bar, its popups and its OSDs, in one process.
 // It keeps the window model in memory and updates it from SkyLight and
-// Defi events, so a workspace switch needs no subprocess call. The
+// OmniWM events, so a workspace switch needs no subprocess call. The
 // right-cluster pills read IOPS, CoreAudio, DisplayServices,
 // SCDynamicStore and IOBluetooth directly instead of shelling out.
 // Timings land in /tmp/omacchiato-bar.log as `switch <ws> <ms>`.
@@ -75,24 +75,52 @@ let EVENT_WINDOW_DESTROY: UInt32 = 1326
 
 // --- plumbing -------------------------------------------------------------
 
-// Defi can start or quit while this runs, so check per use, never cache.
-let defiBundleID = "com.qeude.defi"
+// OmniWM can start or quit while this runs, so check per use, never
+// cache. The running-app lookup is in-process and cheap enough to be the
+// whole check.
+let omniwmBundleID = "com.barut.OmniWM"
 
-func defiActive() -> Bool {
-    !NSRunningApplication.runningApplications(withBundleIdentifier: defiBundleID).isEmpty
+// Match by prefix. The dev build, com.barut.OmniWM.dev, uses the same socket.
+func isOmniWM(_ bundleID: String?) -> Bool {
+    bundleID?.hasPrefix(omniwmBundleID) == true
 }
 
-let defiBin = NSHomeDirectory() + "/.local/bin/omacchiato-defi"
+func omniwmActive() -> Bool {
+    NSWorkspace.shared.runningApplications.contains { isOmniWM($0.bundleIdentifier) }
+}
 
-// Some callers run on the main thread, so a hung Defi must not hang the bar.
-let defiTimeout: TimeInterval = 2
+// the wrapper finds omniwmctl in the Homebrew link, the release app or a dev build
+let omniwmctlBin = NSHomeDirectory() + "/.local/bin/omacchiato-omniwmctl"
 
 @discardableResult
-func defi(_ args: [String]) -> String { shell(defiBin, args, timeout: defiTimeout) }
+func omniwmctl(_ args: [String]) -> String { shell(omniwmctlBin, args, timeout: omniTimeout) }
 
-func defiState() -> [String: Any]? {
-    guard let data = defi(["list-workspaces", "--json"]).data(using: .utf8) else { return nil }
-    return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+// Some callers run on the main thread, so a hung OmniWM must not hang the bar.
+let omniTimeout: TimeInterval = 2
+
+// One query, unwrapped to its payload. The CLI prints the whole
+// IPCResponse envelope; the payload sits two levels down, at
+// result.payload (see OmniWM docs/IPC-CLI.md, Response Format).
+func omniQuery(_ name: String, _ args: [String] = []) -> [String: Any]? {
+    // Fast path: omacchiato-omni keeps a persistent socket and starts in
+    // about 3 ms; omniwmctl needs about 10 ms. It speaks
+    // `query <name> [fields-csv]` and prints the same envelope. A flag
+    // like --focused stays on omniwmctl.
+    let omni = "\(NSHomeDirectory())/.local/bin/omacchiato-omni"
+    var out = ""
+    if FileManager.default.isExecutableFile(atPath: omni),
+       args.isEmpty || (args.count == 2 && args[0] == "--fields") {
+        out = shell(omni, args.isEmpty ? ["query", name] : ["query", name, args[1]], timeout: omniTimeout)
+    }
+    if out.isEmpty {
+        out = omniwmctl(["query", name] + args + ["--format", "json"])
+    }
+    guard let data = out.data(using: .utf8),
+          let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          (root["ok"] as? Bool) == true,
+          let result = root["result"] as? [String: Any]
+    else { return nil }
+    return result["payload"] as? [String: Any]
 }
 
 // At "will launch" the activation policy is not known yet, so read the
@@ -105,25 +133,21 @@ func hasDockIcon(_ app: NSRunningApplication) -> Bool {
     return url.pathExtension == "app" && !on("LSUIElement") && !on("LSBackgroundOnly")
 }
 
-// Click to jump. A workspace belongs to one display, so the chip's
-// display goes with it.
-func focusWorkspace(_ ws: String, on display: String) {
-    defi(["--monitor", display, "workspace", ws])
+// Click to jump. OmniWM's focus-name call resolves a raw workspace ID
+// across all monitors, which matches a chip on either display.
+func focusWorkspace(_ ws: String) {
+    omniwmctl(["workspace", "focus-name", ws])
 }
 
-// A click on one card of a chip's hand brings that app forward. Defi
-// follows the activation to the app's window.
-// ponytail: an app with windows on two workspaces goes to the one Defi picks
-func focusApp(_ app: String, on ws: String, display: String) {
-    focusWorkspace(ws, on: display)
-    // Defi focuses the workspace's remembered window up to ~100 ms after
-    // the switch, so an earlier activate loses. Check again in case it lands later.
-    for delay in [0.15, 0.4] {
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-            guard NSWorkspace.shared.frontmostApplication?.bundleIdentifier != app else { return }
-            NSRunningApplication.runningApplications(withBundleIdentifier: app).first?.activate()
-        }
-    }
+// A click on one card of a chip's hand focuses that app's window.
+func focusApp(_ app: String, on ws: String) {
+    let wins = omniQuery("windows", ["--fields", "id,workspace,app"])?["windows"] as? [[String: Any]] ?? []
+    // ponytail: the first window of the app wins; a hand shows each app once
+    guard let id = wins.first(where: {
+        ($0["workspace"] as? [String: Any])?["rawName"] as? String == ws
+            && ($0["app"] as? [String: Any])?["name"] as? String == app
+    })?["id"] as? String else { return focusWorkspace(ws) }
+    omniwmctl(["window", "navigate", id])
 }
 
 // The card under x in a chip whose hand holds `count` cards, left to right.
@@ -348,8 +372,7 @@ func menuBarFont(_ weight: NSFont.Weight, _ size: CGFloat = 13) -> NSFont {
 // such as the workspace set or the notch, belongs to the surface.
 final class Model {
     var focused = ""
-    var labels: [String: String] = [:] // chip text for each workspace ID
-    var wsApps: [String: [String]] = [:] // up to three bundle IDs per workspace
+    var wsApps: [String: [String]] = [:] // up to three app names per workspace, leftmost window first
     var focusedApp = "" // may be on any display
     var occupied: Set<String> = []
     var frontApp = ""
@@ -365,15 +388,14 @@ struct Media: Equatable {
 let model = Model()
 var palette = loadPalette()
 
-// The slow path: one Defi CLI call, run when a window is created or
-// destroyed or a display changes. Defi's notification covers the rest.
+// The slow path: who lives where. Three CLI calls, run only when a window
+// is created or destroyed, never on a workspace switch.
 //
 // This runs off the main queue and applies its result on it. Measured
 // fact: running the CLI calls inline on main blocked rendering for 7.6 s
 // during one contended rebuild, and every switch queued behind it.
 struct Snapshot {
     var perMonitor: [String: (workspaces: [String], visible: String)] = [:]
-    var labels: [String: String] = [:]
     var wsApps: [String: [String]] = [:]
     var focusedApp = ""
     var occupied: Set<String> = []
@@ -386,91 +408,70 @@ let mediaQueue = DispatchQueue(label: "com.omacchiato.bar.media")
 
 // with no window manager the snapshot is empty, and the bar draws no chips
 func fetchSnapshot() -> Snapshot {
-    defiActive() ? defiState().map { defiSnapshot($0, onScreen: appsOnScreen) } ?? Snapshot() : Snapshot()
+    omniwmActive() ? omniwmSnapshot() : Snapshot()
 }
 
-// Defi lists a workspace's apps by bundle ID, not by column. So the bar
-// reads the column order from the windows while a workspace shows, and
-// keeps that order for when it is hidden.
-var columnOrders: [String: [String]] = [:]
-let columnLock = NSLock()
-
-// The apps seen on screen, left to right. An app that is not seen goes
-// after the app that came before it at the last look. A new app goes last.
-func columnOrder(_ apps: [String], seen: [String], last: [String]) -> [String] {
-    let present = Set(apps)
-    var out: [String] = []
-    for a in seen where present.contains(a) && !out.contains(a) { out.append(a) }
-    var prev: String?
-    for a in last where present.contains(a) {
-        if !out.contains(a) {
-            out.insert(a, at: prev.flatMap { out.firstIndex(of: $0) }.map { $0 + 1 } ?? 0)
-        }
-        prev = a
-    }
-    for a in apps where !out.contains(a) { out.append(a) }
-    return out
-}
-
-// The bundle IDs of the windows on a display (1-based AppKit index),
-// left to right. A window needs half its width on the display, so a
-// window that Defi parks at an edge does not count.
-func appsOnScreen(_ display: Int) -> [String] {
-    let screens = NSScreen.screens
-    guard display >= 1, display <= screens.count,
-          let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
-            as? [[String: Any]] else { return [] }
-    let bounds = CGDisplayBounds(screenID(screens[display - 1]))
-    var windows: [(x: CGFloat, app: String)] = []
-    for w in list {
-        guard (w[kCGWindowLayer as String] as? Int) == 0,
-              let b = w[kCGWindowBounds as String] as? [String: CGFloat],
-              let pid = w[kCGWindowOwnerPID as String] as? pid_t,
-              let app = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier else { continue }
-        let rect = CGRect(x: b["X"] ?? 0, y: b["Y"] ?? 0, width: b["Width"] ?? 0, height: b["Height"] ?? 0)
-        guard rect.width > 0, rect.intersection(bounds).width >= rect.width / 2 else { continue }
-        windows.append((rect.minX, app))
-    }
-    return windows.sorted { $0.x < $1.x }.map(\.app)
-}
-
-func defiSnapshot(_ json: [String: Any], onScreen: (Int) -> [String] = { _ in [] }) -> Snapshot {
-    columnLock.withLock { defiSnapshot(json, onScreen: onScreen, orders: &columnOrders) }
-}
-
-// Defi's workspace state (version 2), keyed by its 1-based AppKit
-// display index. The trailing empty workspace shows only while active.
-func defiSnapshot(_ json: [String: Any], onScreen: (Int) -> [String],
-                  orders: inout [String: [String]]) -> Snapshot {
+// omniwmctl answers two queries: workspaces, with each one's display, and
+// windows, with the app names the icon chips need. This slow path also
+// carries focus; the workspace-bar stream below covers the fast path.
+func omniwmSnapshot() -> Snapshot {
     var s = Snapshot()
-    guard json["version"] as? Int == 2 else { return s }
-    for m in json["monitors"] as? [[String: Any]] ?? [] {
-        guard let display = m["display"] as? Int else { continue }
-        let active = m["activeWorkspace"] as? String ?? ""
-        let shown = (m["workspaces"] as? [[String: Any]] ?? []).filter {
-            $0["kind"] as? String != "trailing" || $0["id"] as? String == active
+    var sets: [String: [String]] = [:]
+    var visible: [String: String] = [:]
+    if let list = omniQuery("workspaces",
+                            ["--fields", "raw-name,display"])?["workspaces"]
+        as? [[String: Any]] {
+        for w in list {
+            guard let name = w["rawName"] as? String,
+                  let monitor = (w["display"] as? [String: Any])?["id"] as? String else { continue }
+            sets[monitor, default: []].append(name)
         }
-        var ids: [String] = []
-        for w in shown {
-            guard let id = w["id"] as? String else { continue }
-            ids.append(id)
-            s.labels[id] = w["name"] as? String ?? (w["position"] as? Int).map(String.init) ?? ""
-            var apps = w["applications"] as? [String] ?? []
-            if id == active, !apps.isEmpty {
-                let seen = onScreen(display)
-                if !seen.isEmpty { orders[id] = columnOrder(apps, seen: seen, last: orders[id] ?? []) }
-            }
-            apps = columnOrder(apps, seen: [], last: orders[id] ?? [])
-            if w["occupied"] as? Bool == true { s.occupied.insert(id) }
-            if !apps.isEmpty { s.wsApps[id] = handOf(apps) }
-            if m["focused"] as? Bool == true, id == active {
-                s.focused = id
-                s.focusedApp = w["focusedApplication"] as? String ?? ""
-            }
+    }
+    // Visible and focused come from the displays query. The workspaces
+    // query's isVisible/isFocused go dark on empty workspaces, so a
+    // focused empty workspace 8 or 9 never lit its pill. omacchiato-ws
+    // hit the same trap.
+    if let displays = omniQuery("displays", [])?["displays"] as? [[String: Any]] {
+        for d in displays {
+            guard let id = d["id"] as? String,
+                  let active = (d["activeWorkspace"] as? [String: Any])?["rawName"] as? String
+            else { continue }
+            visible[id] = active
+            if (d["isCurrent"] as? Bool) == true { s.focused = active }
         }
-        s.perMonitor[String(display)] = (ids, active)
+    }
+    for id in surfaces.map({ $0.monitorID }) {
+        s.perMonitor[id] = (sets[id] ?? [], visible[id] ?? "")
+    }
+
+    var placed: [String: [(x: Double, y: Double, app: String)]] = [:]
+    if let list = omniQuery("windows", ["--fields", "workspace,app,mode,frame,is-focused"])?["windows"]
+        as? [[String: Any]] {
+        for w in list {
+            guard let ws = (w["workspace"] as? [String: Any])?["rawName"] as? String,
+                  let app = (w["app"] as? [String: Any])?["name"] as? String else { continue }
+            guard (w["mode"] as? String) != "floating" else { continue }
+            s.occupied.insert(ws)
+            if (w["isFocused"] as? Bool) == true { s.focusedApp = app }
+            let frame = w["frame"] as? [String: Any]
+            placed[ws, default: []].append((frame?["x"] as? Double ?? .infinity,
+                                           frame?["y"] as? Double ?? .infinity, app))
+        }
+    }
+    for (ws, wins) in placed {
+        s.wsApps[ws] = handOf(layoutOrder(wins))
     }
     return s
+}
+
+// Leftmost window first, matching the workspace-bar stream's layout order
+// for a niri workspace. OmniWM stacks a hidden workspace's windows on one
+// frame, so a position tie falls back to query order, which is the
+// layout order. Sorting by app name instead flipped the icons.
+func layoutOrder(_ wins: [(x: Double, y: Double, app: String)]) -> [String] {
+    wins.enumerated()
+        .sorted { ($0.element.x, $0.element.y, $0.offset) < ($1.element.x, $1.element.y, $1.offset) }
+        .map(\.element.app)
 }
 
 // Reports whether anything changed. A workspace switch also triggers
@@ -491,7 +492,6 @@ func apply(_ s: Snapshot) -> Bool {
             changed = true
         }
     }
-    if model.labels != s.labels { model.labels = s.labels; changed = true }
     if model.occupied != s.occupied { model.occupied = s.occupied; changed = true }
     if model.wsApps != s.wsApps { model.wsApps = s.wsApps; changed = true }
     if model.focusedApp != s.focusedApp { model.focusedApp = s.focusedApp; changed = true }

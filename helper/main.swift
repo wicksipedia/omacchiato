@@ -357,6 +357,37 @@ case "brightness":
     }
     print(Int((level * 100).rounded()))
 
+case "omniwm-overview-close":
+    // Swipe-down's half of the overview gesture. OmniWM rejects every
+    // IPC command while its overview is open (ignored_overview), so no
+    // gesture can close it through the socket — but the overview
+    // listens for Escape. Post one, guarded on the overview actually
+    // being on screen (an OmniWM-owned window tall enough to be the
+    // panel, not the workspace bar), so a stray swipe-down can never
+    // fire Escape into whatever app is focused.
+    //
+    // CGEventPost needs Accessibility, judged by the RESPONSIBLE
+    // process: run from omacchiato-gesture's handler (which holds
+    // the grant) this works; run from a bare shell it may not.
+    guard let wins = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else { exit(1) }
+    let overviewUp = wins.contains { w in
+        (w[kCGWindowOwnerName as String] as? String) == "OmniWM"
+            && ((w[kCGWindowBounds as String] as? [String: CGFloat])?["Height"] ?? 0) > 400
+    }
+    guard overviewUp else { exit(0) }
+    // don't post Escape — synthetic key events depend on the caller's
+    // Accessibility responsibility and OmniWM ignored them in testing.
+    // The overview dismisses ITSELF when another app takes focus (its
+    // own documented behavior), and activating an app needs no
+    // permission: hand focus to the topmost normal window's app.
+    for w in wins {
+        guard (w[kCGWindowLayer as String] as? Int) == 0,
+            let pid = w[kCGWindowOwnerPID as String] as? pid_t,
+            let app = NSRunningApplication(processIdentifier: pid) else { continue }
+        app.activate()
+        break
+    }
+
 case "audio":
     let sub = args.count > 2 ? args[2] : "list"
     if sub == "list" {

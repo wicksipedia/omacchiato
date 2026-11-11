@@ -10,8 +10,10 @@ Direction, not promises. Ordered roughly by pull.
   scope so far.
 - **Super + mouse-drag resize (and move).** Hyprland binds Super +
   right-drag to resize the window toward the grabbed corner, and Super +
-  left-drag to move it; omarchy users expect both. Whether Defi can
-  move or resize a window with a modifier and a drag is untested.
+  left-drag to move it; omarchy users expect both. OmniWM moves and
+  resizes windows with a modifier and a drag, and settings.toml sets
+  Option for both (`mouseMoveModifierKey`, `mouseResizeModifierKey`).
+  Whether Super works there is untested.
 - **macOS support matrix.** Built and tested on macOS 26 (Tahoe),
   Apple Silicon, one external display. Sequoia and Intel are
   unknown territory — reports welcome.
@@ -160,6 +162,19 @@ existing (~20MB) and every plugin's fork storm no longer happening. Call
 memory a wash; the win was always latency, and it should be described
 that way.
 
+Still a separate process: the overview. An earlier draft of this file
+called folding it in "the obvious next step", which the measurements do
+not support as stated.
+
+A minimal AppKit daemon with one empty window is 32.5MB resident before
+it does anything, and the overview is 37MB either way, being the one
+that holds capture buffers. Folding it into the bar would reclaim one
+AppKit runtime. Against it: blast radius (an overview crash leaves the
+bar up) and the permission surface. TCC grants are tied to the
+signature, so one binary holding Screen Recording, Bluetooth and
+Accessibility loses all three whenever a rebuild invalidates it, where
+today they fail independently.
+
 Never a lock screen (`loginwindow` is protected) or a Notification
 Center replacement.
 
@@ -170,4 +185,5 @@ Center replacement.
 - **Upstreaming.** The gesture engine's macOS 26 fixes are offered
   upstream (pull requests #29 and #30, linked in the README). The
   engine lives in-tree as `omacchiato-gesture`, so a merge is a courtesy,
-  not a dependency.
+  not a dependency. A window-created event in OmniWM's IPC would
+  delete the bar's SkyLight dependency for window events.

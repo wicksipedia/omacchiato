@@ -68,8 +68,9 @@ final class BarSurface {
         window.backgroundColor = .clear
         window.hasShadow = false
         // AppKit honours a negative window level: the bar still renders
-        // and receives clicks below normal windows. Defi's reserved_top
-        // keeps tiled windows off the strip.
+        // and receives clicks below normal windows. OmniWM's top outer
+        // gap keeps tiled windows off the strip (measured: a tiled
+        // window sits at y=42, the bar at 0..34).
         //
         // This does not replace the fullscreen check. On a notched
         // display a fullscreen window starts below the notch, at y=32,
@@ -100,23 +101,33 @@ func screenID(_ screen: NSScreen) -> CGDirectDisplayID {
     (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value ?? 0
 }
 
-// Defi numbers displays by their place in NSScreen.screens, from 1.
-// Resolve it every time the screens change, never cache it.
-func monitorIDs(active: Bool = defiActive()) -> [String: String] { // display name -> Defi display index
+// Monitor ids are resolved by display name every time the screens change,
+// never cached. A stale id returns an empty snapshot, which renders as
+// the last known set, stale and silent. OmniWM names monitors with
+// NSScreen.localizedName (Monitor.current() in its source), so the name
+// join works; its ids stay opaque and meet only the query payloads they
+// came from.
+func monitorIDs(active: Bool = omniwmActive()) -> [String: String] { // display name -> OmniWM display id
     guard active else { return [:] }
     var map: [String: String] = [:]
-    for (i, screen) in NSScreen.screens.enumerated() { map[screen.localizedName] = String(i + 1) }
+    if let list = omniQuery("displays", ["--fields", "id,name"])?["displays"]
+        as? [[String: Any]] {
+        for d in list {
+            if let id = d["id"] as? String, let name = d["name"] as? String { map[name] = id }
+        }
+    }
     return map
 }
 
-// One rebuild runs at a time: a call during one asks for one more after
-// it. New surfaces need a snapshot of their own.
+// The OmniWM query runs on rebuildQueue, because a hung OmniWM blocks it
+// for up to two timeouts. One query runs at a time: a call during a query
+// asks for one more after it. New surfaces need a snapshot of their own.
 var surfacesFetching = false
 var surfacesAgain = false
 func rebuildSurfaces() {
     guard !surfacesFetching else { surfacesAgain = true; return }
     surfacesFetching = true
-    let active = defiActive()
+    let active = omniwmActive()
     rebuildQueue.async {
         let ids = monitorIDs(active: active)
         DispatchQueue.main.async {
@@ -155,24 +166,6 @@ func applySurfaces(_ ids: [String: String]) {
         gone.window.orderOut(nil)
     }
     surfaces = kept
-    reserveBarSpace()
-}
-
-// macOS keeps windows out of the menu bar and notch strip, but the bar
-// is taller than the strip on a display without a notch. Defi adds the
-// difference to each display. Defi forgets it on a restart, and its
-// launch rebuilds the surfaces.
-func reservedTop(barHeight: CGFloat, screen: NSRect, visible: NSRect) -> Int {
-    Int(max(0, barHeight - (screen.maxY - visible.maxY)).rounded(.up))
-}
-
-func reserveBarSpace() {
-    let tops = surfaces.filter { !$0.monitorID.isEmpty }.map {
-        ($0.monitorID, reservedTop(barHeight: barHeight, screen: $0.screen.frame, visible: $0.screen.visibleFrame))
-    }
-    DispatchQueue.global(qos: .utility).async {
-        for (display, top) in tops { defi(["--monitor", display, "set-reserved-area", "top", String(top)]) }
-    }
 }
 
 func repaint() {
@@ -204,6 +197,14 @@ func safeTop(for display: CGRect) -> CGFloat {
 
 func fullscreenDisplays() -> Set<CGDirectDisplayID> {
     var covered: Set<CGDirectDisplayID> = []
+    // Under OmniWM the width test below cannot tell a tiled window from
+    // a fullscreen one. Its 0.6.3 dwindle applies no outer gaps (an
+    // upstream bug: resolved settings say 42, layout applies 0; see
+    // docs/omniwm-port.md), so an ordinary tile takes the side gaps too
+    // and reads as fullscreen. Skip the check under OmniWM until that
+    // bug is fixed, and accept that the bar can overlap a real
+    // fullscreen window instead of ducking away.
+    if omniwmActive() { return covered }
     guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]]
     else { return covered }
     var ids = [CGDirectDisplayID](repeating: 0, count: 8)
@@ -370,6 +371,10 @@ func watch(_ path: String, create: Bool, handler: @escaping () -> Void) {
     src.resume()
 }
 
+// A window sent from one hidden workspace to another moves nothing on
+// screen, so SkyLight reports no event at all, measured with a probe. No
+// publisher exists for this, so the commands that move windows announce
+// it themselves (omacchiato-ws, and the overview's drag-reorder).
 // Super+K writes this file. The bar has no key tap, and should not grow one.
 let cheatPath = "/tmp/omacchiato-bar-cheatsheet"
 watch(cheatPath, create: true) { toggleCheatsheet() }
@@ -397,38 +402,143 @@ watch(popupPath, create: true) {
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: poke)
 }
 
-// --- defi fast path ---------------------------------------------------------
-// Defi posts its whole workspace state with each change, so a switch
-// costs no subprocess.
-DistributedNotificationCenter.default().addObserver(
-    forName: Notification.Name("com.qeude.defi.workspaceChanged"), object: nil, queue: .main
-) { note in
-    guard let state = note.userInfo as? [String: Any] else { return }
+let movedPath = "/tmp/omacchiato-bar-moved"
+watch(movedPath, create: true) {
+    tlog("moved poke")
+    kickRebuild()
+}
+
+// --- omniwm fast path -------------------------------------------------------
+// A switch between two empty workspaces moves no windows, so SkyLight
+// says nothing. OmniWM publishes instead: its active-workspace channel
+// emits one event per change. Use `watch … --exec /bin/cat`, not
+// `subscribe`: subscribe pretty-prints multi-line JSON, while watch hands
+// its child one NDJSON line per event over an inherited pipe (OmniWM
+// docs/IPC-CLI.md, watch). The stream arrives line-delimited, and the bar
+// forks nothing.
+
+var omniWatch: Process?
+var omniWatchBuffer = Data()
+
+func omniWorkspaceBarEvent(_ line: Data) {
+    // Use the workspace-bar channel, not active-workspace. Measured
+    // 2026-08-29: active-workspace and focus fire only when the focused
+    // window changes, so a switch to or from an empty workspace stays
+    // silent. workspace-bar fires on every switch and carries each
+    // workspace's windows, so occupancy and app icons come free, with no
+    // windows query.
+    guard let root = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
+          root["channel"] as? String == "workspace-bar",
+          let payload = (root["result"] as? [String: Any])?["payload"] as? [String: Any],
+          let monitors = payload["monitors"] as? [[String: Any]]
+    else { return }
+    let current = payload["interactionMonitorId"] as? String ?? ""
     let t0 = DispatchTime.now().uptimeNanoseconds
-    let s = defiSnapshot(state, onScreen: appsOnScreen)
-    // Defi animates a switch, so read the window order again once it lands.
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-        if apply(defiSnapshot(state, onScreen: appsOnScreen)) { repaint() }
+    var changed = false
+    var occupied = Set<String>()
+    var hands: [String: [String]] = [:]
+    var focusedNow = ""
+    var focusedAppNow = ""
+    for m in monitors {
+        guard let id = m["id"] as? String,
+              let list = m["workspaces"] as? [[String: Any]] else { continue }
+        var active = ""
+        for w in list {
+            guard let name = w["rawName"] as? String else { continue }
+            if (w["isFocused"] as? Bool) == true { active = name }
+            // no floating filter here: OmniWM leaves floating windows out of
+            // this payload unless its showFloatingWindows is on
+            let wins = ((w["windows"] as? [[String: Any]]) ?? [])
+                .filter { ($0["appName"] as? String)?.hasPrefix("omacchiato") != true }
+            if !wins.isEmpty {
+                occupied.insert(name)
+                hands[name] = handOf(wins.compactMap { $0["appName"] as? String })
+                if let app = wins.first(where: { ($0["isFocused"] as? Bool) == true })?["appName"] {
+                    focusedAppNow = app as? String ?? ""
+                }
+            }
+        }
+        guard !active.isEmpty else { continue }
+        if id == current { focusedNow = active }
+        for surface in surfaces where surface.monitorID == id && surface.visible != active {
+            surface.visible = active
+            changed = true
+        }
     }
-    if surfaces.contains(where: { $0.monitorID.isEmpty || s.perMonitor[$0.monitorID] == nil }) {
-        rebuildSurfaces()
-    }
-    guard apply(s) else { return }
+    if !focusedNow.isEmpty, model.focused != focusedNow { model.focused = focusedNow; changed = true }
+    if model.occupied != occupied { model.occupied = occupied; changed = true }
+    if model.wsApps != hands { model.wsApps = hands; changed = true }
+    if model.focusedApp != focusedAppNow { model.focusedApp = focusedAppNow; changed = true }
+    guard changed else { return }
     repaint()
     kickVisibility()
-    tlog(String(format: "switch %@ %.2f ms (defi)", s.focused,
+    tlog(String(format: "switch %@ %.2f ms (omniwm)", focusedNow,
                 Double(DispatchTime.now().uptimeNanoseconds - t0) / 1_000_000))
 }
 
-// Defi can start or quit under the bar. The retries cover Defi still
-// starting when the first attempt asks.
+func startOmniWatch() {
+    guard omniWatch == nil, omniwmActive() else { return }
+    // A bar killed by launchd (kickstart -k sends SIGKILL) leaves its
+    // stream child alive under pid 1, one per restart. Reap orphans
+    // before spawning a new one; -P 1 cannot touch a living bar's own
+    // child.
+    let reap = Process()
+    reap.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
+    reap.arguments = ["-P", "1", "-f", "omniwmctl watch workspace-bar"]
+    try? reap.run()
+    reap.waitUntilExit()
+    let p = Process()
+    p.executableURL = URL(fileURLWithPath: omniwmctlBin)
+    p.arguments = ["watch", "workspace-bar", "--exec", "/bin/cat"]
+    let pipe = Pipe()
+    p.standardOutput = pipe
+    p.standardError = FileHandle.nullDevice
+    pipe.fileHandleForReading.readabilityHandler = { handle in
+        let chunk = handle.availableData
+        guard !chunk.isEmpty else { return }
+        DispatchQueue.main.async {
+            omniWatchBuffer.append(chunk)
+            while let nl = omniWatchBuffer.firstIndex(of: 0x0A) {
+                let line = Data(omniWatchBuffer[omniWatchBuffer.startIndex..<nl])
+                omniWatchBuffer = Data(omniWatchBuffer[omniWatchBuffer.index(after: nl)...])
+                omniWorkspaceBarEvent(line)
+            }
+        }
+    }
+    p.terminationHandler = { proc in
+        DispatchQueue.main.async {
+            pipe.fileHandleForReading.readabilityHandler = nil
+            guard omniWatch === proc else { return } // a newer watch took over
+            omniWatch = nil
+            // OmniWM restarting, or its IPC server not up yet, drops the
+            // stream: keep knocking while OmniWM is the one running
+            guard omniwmActive() else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { startOmniWatch() }
+        }
+    }
+    guard (try? p.run()) != nil else { return }
+    omniWatch = p
+    tlog("omniwm: watching workspace-bar")
+}
+
+func stopOmniWatch() {
+    guard let p = omniWatch else { return }
+    omniWatch = nil // before terminate, so the handler cannot restart it
+    p.terminate()
+}
+
+// OmniWM can start or quit under the bar, and OmniWM.app appearing or
+// vanishing is the signal. Monitor ids have to be re-resolved, and the
+// retries cover OmniWM still booting when the first attempt asks.
 for event in [NSWorkspace.didLaunchApplicationNotification,
               NSWorkspace.didTerminateApplicationNotification] {
     NSWorkspace.shared.notificationCenter.addObserver(forName: event, object: nil, queue: .main) { note in
         guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-              app.bundleIdentifier == defiBundleID else { return }
-        tlog("wm: Defi \(event == NSWorkspace.didLaunchApplicationNotification ? "launched" : "quit")")
-        for delay in [1.0, 3.0, 8.0] {
+              isOmniWM(app.bundleIdentifier) else { return }
+        let launched = event == NSWorkspace.didLaunchApplicationNotification
+        tlog("wm: OmniWM \(launched ? "launched" : "quit")")
+        if launched { startOmniWatch() } else { stopOmniWatch() }
+        for delay in [1.0, 3.0, 8.0, 15.0] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                 rebuildSurfaces()
                 kickRebuild()
@@ -437,8 +547,34 @@ for event in [NSWorkspace.didLaunchApplicationNotification,
     }
 }
 
-// While a surface has no display, look for Defi again every 5 s.
+// A new app window opens on OmniWM's focused display, which can be the
+// other screen while focus follows clicks only. So when an app with a
+// Dock icon launches, focus the workspace under the pointer first.
+// "Will launch" beats the first window, but macOS sends it for some
+// launches only, so "did launch" covers the rest.
+for event in [NSWorkspace.willLaunchApplicationNotification,
+              NSWorkspace.didLaunchApplicationNotification] {
+    NSWorkspace.shared.notificationCenter.addObserver(forName: event, object: nil, queue: .main) { note in
+        guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+              !isOmniWM(app.bundleIdentifier), hasDockIcon(app) else { return }
+        let pointer = NSEvent.mouseLocation
+        guard let ws = surfaces.first(where: { $0.screen.frame.contains(pointer) })?.visible,
+              !ws.isEmpty, ws != model.focused else { return }
+        tlog("launch: \(app.localizedName ?? "?") -> workspace \(ws)")
+        model.focused = ws
+        DispatchQueue.global().async {
+            _ = shell(NSHomeDirectory() + "/.local/bin/omacchiato-omni", ["focus", ws], timeout: omniTimeout)
+        }
+    }
+}
+
+// The retries above stop at 15 s, and OmniWM's socket can take longer to
+// answer after a settings migration. So while a surface has no monitor,
+// look for OmniWM again every 5 s.
+// NSWorkspace posts no launch notification for an LSUIElement app such as
+// OmniWM. So the timer also restarts the stream after OmniWM relaunches.
 Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
+    startOmniWatch()
     guard surfaces.contains(where: { $0.monitorID.isEmpty }) else { return }
     rebuildSurfaces()
     kickRebuild()
@@ -458,9 +594,21 @@ NSWorkspace.shared.notificationCenter.addObserver(
     tlog(String(format: "frontapp %@ %.2f ms", name, ms))
 }
 
-// Displays come and go. Re-resolve which Defi display this screen is
+// Displays come and go. Re-resolve which OmniWM display this screen is
 // now, move the window onto it, and rebuild. Give screen parameters a
 // beat to settle before reading them.
+//
+// This is also where a second display's set folds and unfolds. Undocked,
+// OmniWM moves that set's workspaces to the one display, but their
+// windows stay on two-digit workspaces that Super+N cannot reach from
+// there. omacchiato-ws-collapse moves those windows into the empty 1-9
+// slots and remembers where they came from. The bar is the only
+// long-lived process already watching for this, so it owns folding.
+//
+// Guard on the count changing: this notification also fires for
+// resolution and arrangement changes, and re-folding on those would
+// shuffle windows for no reason.
+var monitorCount = NSScreen.screens.count
 NotificationCenter.default.addObserver(
     forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
 ) { _ in
@@ -470,13 +618,28 @@ NotificationCenter.default.addObserver(
         applyShade() // a new display arrives at full output
         kickRebuild()
         // The 1 s grace can still lose the race with the WM adopting the
-        // new display (measured on a Dell, on replug).
+        // new display: its monitor id resolves to nothing and the
+        // screen stays barless (measured on a Dell, on replug). Use the
+        // same retry ladder as the OmniWM launch observer.
         for delay in [3.0, 8.0] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                 rebuildSurfaces()
                 applyShade()
                 kickRebuild()
             }
+        }
+        let now = NSScreen.screens.count
+        guard now != monitorCount else { return }
+        let wasSingle = monitorCount == 1
+        monitorCount = now
+        let op = now == 1 ? "collapse" : (wasSingle ? "restore" : "")
+        guard !op.isEmpty else { return }
+        tlog("displays: \(now) — running ws-collapse \(op)")
+        // off-main: it makes IPC calls per window, and sleeps between
+        // moves while OmniWM settles
+        DispatchQueue.global(qos: .userInitiated).async {
+            _ = shell("\(NSHomeDirectory())/.local/bin/omacchiato-ws-collapse", [op])
+            DispatchQueue.main.async { kickRebuild() }
         }
     }
 }
@@ -819,6 +982,11 @@ func startProviders() {
 // --- go -------------------------------------------------------------------
 
 model.frontApp = NSWorkspace.shared.frontmostApplication?.localizedName ?? ""
+// startup only: from here the workspace-bar stream keeps it
+model.focused = omniwmActive()
+    ? ((omniQuery("workspaces", ["--focused", "--fields", "raw-name"])?["workspaces"]
+        as? [[String: Any]])?.first?["rawName"] as? String ?? "")
+    : ""
 applySurfaces(monitorIDs())
 guard !surfaces.isEmpty else {
     FileHandle.standardError.write("omacchiato-bar: no screen to draw on\n".data(using: .utf8)!)
@@ -846,5 +1014,6 @@ startPlugins()
 watchConfig()
 repaint()
 primeMedia()
+startOmniWatch() // a no-op until OmniWM runs; the WM observer starts it then
 tlog("omacchiato-bar up on " + surfaces.map { "\($0.screen.localizedName)=m\($0.monitorID)\($0.notched ? " (notched)" : "")" }.joined(separator: ", "))
 app.run()

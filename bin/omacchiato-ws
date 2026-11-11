@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# omacchiato-ws <N|next|prev> [switch|move] — switch to workspace N or move
+# the focused window there, or step to the next or previous workspace of
+# the display under the cursor (Super+Tab).
+#
+# Everything goes through omacchiato-omni, a held-socket C client that
+# launches in ~3 ms where omniwmctl needs ~10 ms. The slot-scoped cycle
+# (1-9 stays in 1-9, guests in guests, wrapping) lives in helper/gesture/
+# omniwm.c, shared with the gesture daemon, so a swipe and Super+Tab
+# cannot disagree. No bar poke: the bar follows OmniWM's workspace-bar
+# channel, which fires for empties too. `|| true` because IPC may be
+# off; a dead key beats error spam on every press.
+set -euo pipefail
+slot="${1:-}"
+op="${2:-switch}"
+OMNI="$HOME/.local/bin/omacchiato-omni"
+
+case "$slot" in next | prev) op="$slot" ;; esac
+case "$op" in
+  switch) "$OMNI" command switch-workspace "{\"workspaceNumber\":$slot}" >/dev/null 2>&1 || true ;;
+  move) "$OMNI" command move-to-workspace "{\"workspaceNumber\":$slot}" >/dev/null 2>&1 || true ;;
+  next | prev)
+    r="$("$OMNI" "$op" 2>&1)" || true
+    echo "$(date +%T) op=$op resp='$(echo "$r" | head -c 120)'" >> /tmp/omacchiato-ws.log ;;
+esac

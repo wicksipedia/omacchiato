@@ -1,0 +1,205 @@
+// omacchiato-omni — the scripts' door to OmniWM's socket. A plain C binary
+// launches in ~3 ms where omniwmctl (Swift) needs ~36 ms; omacchiato-ws and
+// omacchiato-spawn call this so a Super+Tab or Super+Enter costs one
+// round-trip, not three process launches and three python parses.
+#include "omniwm.h"
+#include "yyjson.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+static int usage(void)
+{
+	fprintf(stderr,
+		"usage: omacchiato-omni active | numbers | focus <raw-name> | next | prev\n"
+		"       omacchiato-omni command <name> [args-json]\n"
+		"       omacchiato-omni query <name> [fields-csv]      (raw response line)\n"
+		"       omacchiato-omni preselect-for-focused [mult]   (down/right by aspect)\n"
+		"       omacchiato-omni slot <1-9> [move]               (cursor display's set)\n"
+		"       omacchiato-omni focus-window <window-id>\n"
+		"       omacchiato-omni window-count | wait-window <baseline> [timeout-ms]\n");
+	return 3;
+}
+
+// The workspace on show on the next display to the right of the one
+// showing `cur`, wrapping round. `cur` itself when no other display has one.
+static int next_display_workspace(omniwm* c, int cur)
+{
+	char* r = omniwm_request(c, "query", "{\"name\":\"displays\",\"selectors\":{},\"fields\":[]}");
+	if (!r) return cur;
+	double xs[16];
+	int ws[16], k = 0;
+	yyjson_doc* d = yyjson_read(r, strlen(r), 0);
+	if (d) {
+		yyjson_val* list = yyjson_obj_get(omniwm_payload_of(d), "displays");
+		size_t i, m;
+		yyjson_val* disp;
+		yyjson_arr_foreach(list, i, m, disp) {
+			const char* a = yyjson_get_str(yyjson_obj_get(yyjson_obj_get(disp, "activeWorkspace"), "rawName"));
+			if (!a || k >= 16) continue;
+			double x = yyjson_get_num(yyjson_obj_get(yyjson_obj_get(disp, "frame"), "x"));
+			int j = k++;
+			while (j > 0 && xs[j - 1] > x) { xs[j] = xs[j - 1]; ws[j] = ws[j - 1]; j--; }
+			xs[j] = x;
+			ws[j] = atoi(a);
+		}
+		yyjson_doc_free(d);
+	}
+	free(r);
+	for (int i = 0; i < k; i++) if (ws[i] == cur) return ws[(i + 1) % k];
+	return cur;
+}
+
+int main(int argc, char** argv)
+{
+	if (argc < 2) return usage();
+	const char* op = argv[1];
+	if (!strcmp(op, "wait-window")) {
+		if (argc < 3) return usage();
+		int n = omniwm_wait_window_count_above(atoi(argv[2]), argc > 3 ? atoi(argv[3]) : 2000);
+		if (n < 0) return 1;
+		printf("%d\n", n);
+		return 0;
+	}
+	omniwm* c = omniwm_new();
+	if (!c) { fprintf(stderr, "omacchiato-omni: OmniWM socket unavailable\n"); return 2; }
+	int rc = 0;
+	if (!strcmp(op, "active")) {
+		char* a = omniwm_active_workspace(c);
+		if (a) printf("%s\n", a); else rc = 1;
+		free(a);
+	} else if (!strcmp(op, "numbers")) {
+		int* nums = NULL;
+		int n = omniwm_workspace_numbers(c, &nums);
+		for (int i = 0; i < n; i++) printf("%d%s", nums[i], i + 1 < n ? " " : "\n");
+		free(nums);
+		if (!n) rc = 1;
+	} else if (!strcmp(op, "focus") && argc > 2) {
+		rc = omniwm_focus_name(c, argv[2]) ? 0 : 1;
+	} else if (!strcmp(op, "next") || !strcmp(op, "prev")) {
+		int t = omniwm_cycle(c, op[0] == 'n' ? 1 : -1);
+		if (t) printf("%d\n", t); else rc = 1;
+	} else if (!strcmp(op, "command") && argc > 2) {
+		rc = omniwm_command(c, argv[2], argc > 3 ? argv[3] : NULL) ? 0 : 1;
+	} else if (!strcmp(op, "query") && argc > 2) {
+		char payload[1024], fields[512] = "";
+		if (argc > 3) { // csv -> json array
+			char* csv = strdup(argv[3]);
+			size_t o = 0;
+			for (char* tok = strtok(csv, ","); tok; tok = strtok(NULL, ",")) {
+				// snprintf returns the WOULD-BE length: unchecked, a long
+				// csv walks o past the buffer and the next write is out
+				// of bounds (reproduced as SIGBUS in review)
+				int n = snprintf(fields + o, sizeof fields - o, "%s\"%s\"", o ? "," : "", tok);
+				if (n < 0 || (o += (size_t)n) >= sizeof fields - 1) break;
+			}
+			free(csv);
+		}
+		snprintf(payload, sizeof payload, "{\"name\":\"%s\",\"selectors\":{},\"fields\":[%s]}", argv[2], fields);
+		char* r = omniwm_request(c, "query", payload);
+		if (r) { puts(r); free(r); } else rc = 1;
+	} else if (!strcmp(op, "slot") && argc > 2) {
+		// Super+N semantics: slot N of the display under the CURSOR,
+		// which OmniWM's name-global hotkeys cannot express (its "4"
+		// always means the main set's 4). Each further set is named 1N,
+		// 2N, ... by convention, so base falls out of the cursor
+		// display's active workspace.
+		char* cur_s = omniwm_active_workspace_under_cursor(c);
+		rc = 1;
+		if (cur_s) {
+			int base = atoi(cur_s) / 10 * 10;
+			free(cur_s);
+			int target = base + atoi(argv[2]);
+			if (argc > 3 && !strcmp(argv[3], "move")) {
+				char args[64];
+				snprintf(args, sizeof args, "{\"workspaceNumber\":%d}", target);
+				rc = omniwm_command(c, "move-to-workspace", args) ? 0 : 1;
+			} else {
+				char name[16];
+				snprintf(name, sizeof name, "%d", target);
+				rc = omniwm_focus_name(c, name) ? 0 : 1;
+			}
+		}
+	} else if (!strcmp(op, "throw-window") || !strcmp(op, "throw-workspace")) {
+		// the workspace on show on the next display to the right,
+		// wrapping round — never a
+		// whole-workspace move, which conflicts with per-monitor
+		// assignment. throw-window moves the focused window;
+		// throw-workspace walks every window on the current workspace
+		// (focus by id, then move — OmniWM has no move-by-id).
+		char* cur_s = omniwm_active_workspace(c);
+		rc = 1;
+		if (cur_s) {
+			int cur = atoi(cur_s);
+			int twin = next_display_workspace(c, cur);
+			char args[64];
+			snprintf(args, sizeof args, "{\"workspaceNumber\":%d}", twin);
+			if (!strcmp(op, "throw-window")) {
+				rc = omniwm_command(c, "move-to-workspace", args) ? 0 : 1;
+			} else {
+				char* r = omniwm_request(c, "query",
+					"{\"name\":\"windows\",\"selectors\":{},\"fields\":[\"id\",\"workspace\"]}");
+				if (r) {
+					yyjson_doc* d = yyjson_read(r, strlen(r), 0);
+					if (d) {
+						yyjson_val* list = yyjson_obj_get(omniwm_payload_of(d), "windows");
+						size_t i, m; yyjson_val* w; rc = 0;
+						yyjson_arr_foreach(list, i, m, w) {
+							const char* ws = yyjson_get_str(yyjson_obj_get(yyjson_obj_get(w, "workspace"), "rawName"));
+							const char* wid = yyjson_get_str(yyjson_obj_get(w, "id"));
+							if (!ws || !wid || atoi(ws) != cur) continue;
+							char fp[256];
+							snprintf(fp, sizeof fp, "{\"name\":\"focus\",\"windowId\":\"%s\"}", wid);
+							char* fr = omniwm_request(c, "window", fp);
+							free(fr);
+							usleep(60000); // focus settle before the move
+							if (!omniwm_command(c, "move-to-workspace", args)) rc = 1;
+						}
+						yyjson_doc_free(d);
+					}
+					free(r);
+				}
+			}
+			free(cur_s);
+		}
+	} else if (!strcmp(op, "focus-window") && argc > 2) {
+		char payload[512];
+		snprintf(payload, sizeof payload, "{\"name\":\"focus\",\"windowId\":\"%s\"}", argv[2]);
+		char* r = omniwm_request(c, "window", payload);
+		rc = r && strstr(r, "\"ok\":true") ? 0 : 1;
+		free(r);
+	} else if (!strcmp(op, "window-count")) {
+		int n = omniwm_window_count(c);
+		if (n >= 0) printf("%d\n", n); else rc = 1;
+	} else if (!strcmp(op, "preselect-for-focused")) {
+		// OmniWM's own orientation rule on the focused tile:
+		// height * multiplier > width -> vertical split -> new goes below
+		double mult = argc > 2 ? atof(argv[2]) : 1.4;
+		char* r = omniwm_request(c, "query", "{\"name\":\"focused-window\",\"selectors\":{},\"fields\":[]}");
+		const char* dir = NULL;
+		if (r) {
+			yyjson_doc* d = yyjson_read(r, strlen(r), 0);
+			if (d) {
+				yyjson_val* w = yyjson_obj_get(omniwm_payload_of(d), "window");
+				yyjson_val* f = yyjson_obj_get(w, "frame");
+				const char* mode = yyjson_get_str(yyjson_obj_get(w, "mode"));
+				if (f && !(mode && !strcmp(mode, "floating"))) {
+					double wd = yyjson_get_num(yyjson_obj_get(f, "width"));
+					double ht = yyjson_get_num(yyjson_obj_get(f, "height"));
+					if (wd > 0 && ht > 0) dir = ht * mult > wd ? "down" : "right";
+				}
+				yyjson_doc_free(d);
+			}
+			free(r);
+		}
+		if (dir) {
+			char args[64];
+			snprintf(args, sizeof args, "{\"direction\":\"%s\"}", dir);
+			rc = omniwm_command(c, "preselect", args) ? 0 : 1;
+			printf("%s\n", dir);
+		}
+	} else rc = usage();
+	omniwm_close(c);
+	return rc;
+}

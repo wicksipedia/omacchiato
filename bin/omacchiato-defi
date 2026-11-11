@@ -1,9 +1,0 @@
-#!/bin/bash
-# omacchiato-defi <args>: run the Defi CLI.
-# Defi's installer can put Defi.app in /Applications or ~/Applications.
-for app in /Applications/Defi.app "$HOME/Applications/Defi.app"; do
-  [ -x "$app/Contents/MacOS/defi" ] && exec "$app/Contents/MacOS/defi" "$@"
-done
-command -v defi >/dev/null && exec defi "$@"
-echo "omacchiato-defi: Defi is not installed" >&2
-exit 127

@@ -30,11 +30,11 @@ import WeatherPanel
 // Icons come from the running app and are cached by name: a redraw must
 // not walk the process list.
 var iconCache: [String: NSImage] = [:]
-func appIcon(_ bundleID: String) -> NSImage? {
-    if let cached = iconCache[bundleID] { return cached }
-    guard let icon = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first?.icon
-    else { return nil }
-    iconCache[bundleID] = icon
+func appIcon(_ name: String) -> NSImage? {
+    if let cached = iconCache[name] { return cached }
+    guard let icon = NSWorkspace.shared.runningApplications
+        .first(where: { $0.localizedName == name })?.icon else { return nil }
+    iconCache[name] = icon
     return icon
 }
 
@@ -129,7 +129,16 @@ final class BarView: NSView {
         guard let surface else { return }
 
         // Chips are grouped per display, in one bracket.
-        let shown = surface.workspaces
+        // Undocked, the guest set (11-19) parks on this one display.
+        // Filtering hides its empty slots, which would otherwise render
+        // as duplicate digits, and keeps an empty primary slot so the row
+        // still holds 1..9.
+        // Docked, each surface's own list is already the right set.
+        // Filtering it here once left the laptop showing only two icons.
+        let shown = surfaces.count > 1 ? surface.workspaces
+            : surface.workspaces.filter {
+                $0.count == 1 || model.occupied.contains($0) || $0 == model.focused
+            }
         // apple pill: the system menu the hidden native menu bar carried
         let appleGlyph = "\u{f179}"
         let appleFont = nerdFont("Bold", 15)
@@ -140,7 +149,7 @@ final class BarView: NSView {
         appleRect = NSRect(x: apple.minX, y: 0, width: appleW, height: barHeight)
 
         let hands = shown.map { ws -> [(String, NSImage)] in
-            switch workspaceIconConfig.icon(for: model.labels[ws] ?? ws) {
+            switch workspaceIconConfig.icon(for: ws) {
             case .some(.glyph), .some(.image): return []
             default: break
             }
@@ -152,13 +161,12 @@ final class BarView: NSView {
         // here" marker.
         let chips = shown.enumerated().map { i, ws -> WorkspaceChip in
             let face: WorkspaceChip.Face
-            let label = model.labels[ws] ?? ws
-            switch workspaceIconConfig.icon(for: label) {
+            switch workspaceIconConfig.icon(for: ws) {
             case .some(.glyph(let glyph)): face = .glyph(glyph)
             case .some(.image(let icon)): face = .image(icon)
             case .some(.unavailable), .none:
                 let cards = hands[i]
-                face = cards.isEmpty ? .digit(label)
+                face = cards.isEmpty ? .digit(String(ws.suffix(1)))
                     : .hand(cards.map(\.1), ring: ws == model.focused ? cards.firstIndex { $0.0 == model.focusedApp } : nil)
             }
             return WorkspaceChip(face: face, focused: ws == model.focused, shown: ws == surface.visible)
@@ -315,10 +323,10 @@ final class BarView: NSView {
             showItemPopup("apple")
             return
         }
-        if let (ws, slot, apps) = chipRects.first(where: { $0.1.contains(p) }), let display = surface?.monitorID {
+        if let (ws, slot, apps) = chipRects.first(where: { $0.1.contains(p) }) {
             DispatchQueue.global(qos: .userInitiated).async {
-                if apps.isEmpty { focusWorkspace(ws, on: display) }
-                else { focusApp(apps[handIndex(at: p.x, in: slot, count: apps.count)], on: ws, display: display) }
+                if apps.isEmpty { focusWorkspace(ws) }
+                else { focusApp(apps[handIndex(at: p.x, in: slot, count: apps.count)], on: ws) }
             }
             return
         }
@@ -392,9 +400,9 @@ final class BarView: NSView {
         scrollAccum = 0
         switch name {
         case "workspaces":
-            guard let display = surface?.monitorID else { return }
+            let op = step > 0 ? "next" : "prev"
             DispatchQueue.global(qos: .userInitiated).async {
-                defi(["--monitor", display, "focus-workspace", step > 0 ? "down" : "up"])
+                _ = shell("\(NSHomeDirectory())/.local/bin/omacchiato-ws", [op], timeout: omniTimeout)
             }
         case "media":
             musicCommand(step > 0 ? "next track" : "previous track")
