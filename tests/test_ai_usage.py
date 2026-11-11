@@ -81,9 +81,16 @@ class Panel(unittest.TestCase):
         self.assertNotIn("days", out)
 
     def test_usage_read_at_is_the_oldest_shown_provider(self):
-        entry = {"usage": {"claude": {"at": 100, "outputs": []}, "codex": {"at": 200, "outputs": []}}}
-        self.assertEqual(ai.usage_read_at(entry, ["claude", "codex"]), 100)
-        self.assertEqual(ai.usage_read_at(entry, ["codex"]), 200)
+        entry = {"usage": {"claude": {"at": ai.NOW - 200, "outputs": []},
+                           "codex": {"at": ai.NOW - 100, "outputs": []}}}
+        self.assertEqual(ai.usage_read_at(entry, ["claude", "codex"]), ai.NOW - 200)
+        self.assertEqual(ai.usage_read_at(entry, ["codex"]), ai.NOW - 100)
+
+    def test_usage_read_at_skips_a_read_too_old_to_show(self):
+        old = ai.NOW - ai.FRESH_S - ai.SERVE_STALE_S - 1
+        entry = {"usage": {"claude": {"at": ai.NOW - 60, "outputs": []},
+                           "codex": {"at": old, "outputs": []}}}
+        self.assertEqual(ai.usage_read_at(entry, ["claude", "codex"]), ai.NOW - 60)
 
     def test_usage_read_at_falls_back_to_now_with_nothing_cached(self):
         self.assertEqual(ai.usage_read_at({}, ["claude"]), ai.NOW)

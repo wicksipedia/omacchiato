@@ -163,9 +163,11 @@ def usage(entry, tokscale):
 def usage_read_at(entry, pids):
     """When tokscale actually returned the usage shown for these providers,
     not when this run of the script happened. The oldest of the group, so a
-    stale provider among them still marks the whole panel stale."""
+    stale provider among them still marks the whole panel stale. A read too
+    old for usage() to serve shows as "No data", so it does not count."""
     seen = entry.get("usage") or {}
-    ats = [seen[pid]["at"] for pid in pids if pid in seen]
+    ats = [seen[pid]["at"] for pid in pids
+           if pid in seen and NOW - seen[pid]["at"] < FRESH_S + SERVE_STALE_S]
     return min(ats) if ats else NOW
 
 
