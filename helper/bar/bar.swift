@@ -708,3 +708,20 @@ func applyPanelColors() {
 }
 
 var themeIsDark = false
+
+var lastCovered: Set<CGDirectDisplayID> = []
+
+/// Whether a window covers a display as a fullscreen window does.
+// Height and top edge alone are not enough. On a notched display, the
+// notch inset (32) and the gap a tiled window leaves for the bar (33) sit
+// at the same edge. Width separates them: a fullscreen window takes the
+// side gaps too, a tiled one never does. Measure the part on the display,
+// because Defi parks the windows of hidden workspaces off screen with one
+// point still on it.
+func coversDisplay(_ window: CGRect, _ display: CGRect, inset: CGFloat) -> Bool {
+    let part = window.intersection(display)
+    guard !part.isNull else { return false }
+    return part.origin.y - display.origin.y < inset + 3
+        && part.height >= display.height - inset - 6
+        && part.width >= display.width - 2
+}

@@ -197,6 +197,7 @@ func safeTop(for display: CGRect) -> CGFloat {
 
 func fullscreenDisplays() -> Set<CGDirectDisplayID> {
     var covered: Set<CGDirectDisplayID> = []
+    var owners: [CGDirectDisplayID: String] = [:]
     // Under OmniWM the width test below cannot tell a tiled window from
     // a fullscreen one. Its 0.6.3 dwindle applies no outer gaps (an
     // upstream bug: resolved settings say 42, layout applies 0; see
@@ -217,20 +218,16 @@ func fullscreenDisplays() -> Set<CGDirectDisplayID> {
         let rect = CGRect(x: b["X"] ?? 0, y: b["Y"] ?? 0, width: b["Width"] ?? 0, height: b["Height"] ?? 0)
         for i in 0..<Int(count) {
             let display = CGDisplayBounds(ids[i])
-            guard display.intersects(rect) else { continue }
-            let inset = safeTop(for: display)
-            // Height and top edge alone are not enough. On a notched
-            // display, the notch inset (32) and the gap a tiled window
-            // leaves for the bar (33) sit at the same edge, so an
-            // ordinary tiled window can read as fullscreen. Width
-            // separates them: a fullscreen window takes the side gaps
-            // too, a tiled one never does.
-            if rect.origin.y - display.origin.y < inset + 3,
-               rect.height >= display.height - inset - 6,
-               rect.width >= display.width - 2 {
+            if coversDisplay(rect, display, inset: safeTop(for: display)) {
                 covered.insert(ids[i])
+                owners[ids[i]] = window[kCGWindowOwnerName as String] as? String
             }
         }
+    }
+    if covered != lastCovered {
+        lastCovered = covered
+        tlog("fullscreen: " + (covered.isEmpty ? "none"
+            : covered.map { "display \($0) by \(owners[$0] ?? "?")" }.joined(separator: ", ")))
     }
     return covered
 }
