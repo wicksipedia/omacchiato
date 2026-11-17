@@ -71,10 +71,11 @@ public struct AIUsageReport {
         public var incidents: [Incident]
         public var statusPage: URL?
         public var open: Bool                // shows its windows until a click folds it
+        public var notice: String?           // why the provider has no metrics
 
         public init(id: String, name: String, plan: String? = nil, glyph: String? = nil, color: Color = .primary,
                     metrics: [Metric] = [], severity: Int = 0, status: String? = nil,
-                    incidents: [Incident] = [], statusPage: URL? = nil, open: Bool = true) {
+                    incidents: [Incident] = [], statusPage: URL? = nil, open: Bool = true, notice: String? = nil) {
             self.id = id
             self.name = name
             self.plan = plan
@@ -86,6 +87,7 @@ public struct AIUsageReport {
             self.incidents = incidents
             self.statusPage = statusPage
             self.open = open
+            self.notice = notice
         }
 
         public var healthy: Bool { severity == 0 && incidents.isEmpty }
@@ -284,7 +286,7 @@ extension AIUsageReport {
                                     url: ($0["url"] as? String).flatMap(URL.init(string:)))
                 },
                 statusPage: (p["status_page"] as? String).flatMap(URL.init(string:)),
-                open: p["open"] as? Bool ?? true)
+                open: p["open"] as? Bool ?? true, notice: p["notice"] as? String)
         }
         let days = list(json["days"]).compactMap { d -> Day? in
             guard let date = (d["date"] as? String).flatMap(day.date(from:)) else { return nil }

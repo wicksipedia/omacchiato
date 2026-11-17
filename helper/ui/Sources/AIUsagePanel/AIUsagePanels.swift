@@ -23,7 +23,7 @@ public struct RingsAIUsagePanel: View {
                 PanelCard {
                     ProviderSection(provider: provider, actions: actions) {
                         if provider.metrics.isEmpty {
-                            Text("No data").font(.system(size: 12)).foregroundStyle(.secondary)
+                            NoDataNote(notice: provider.notice)
                         } else {
                             HStack(spacing: 14) {
                                 UsageRings(metrics: provider.metrics).frame(width: 76, height: 76)
@@ -243,7 +243,7 @@ public struct ForecastAIUsagePanel: View {
                 PanelCard {
                     ProviderSection(provider: provider, actions: actions) {
                         if provider.metrics.isEmpty {
-                            Text("No data").font(.system(size: 12)).foregroundStyle(.secondary)
+                            NoDataNote(notice: provider.notice)
                         }
                         ForEach(provider.metrics) { forecast($0) }
                     }
@@ -321,5 +321,21 @@ public struct ForecastAIUsagePanel: View {
             }
         }
         .frame(height: 100)
+    }
+}
+
+// Says why a provider has no numbers, so its card does not read as broken.
+struct NoDataNote: View {
+    var notice: String?
+
+    var body: some View {
+        if let notice {
+            Label(notice, systemImage: "exclamationmark.triangle.fill")
+                .font(.system(size: 12))
+                .foregroundStyle(.yellow)
+                .fixedSize(horizontal: false, vertical: true)
+        } else {
+            Text("No data").font(.system(size: 12)).foregroundStyle(.secondary)
+        }
     }
 }

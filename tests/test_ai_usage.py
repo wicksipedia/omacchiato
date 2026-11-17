@@ -92,6 +92,23 @@ class Panel(unittest.TestCase):
                            "codex": {"at": old, "outputs": []}}}
         self.assertEqual(ai.usage_read_at(entry, ["claude", "codex"]), ai.NOW - 60)
 
+    def test_a_pill_provider_with_no_usage_says_so(self):
+        ai.PILL = [("claude", "5h"), ("codex", "weekly")]
+        self.assertEqual(ai.label({}), ("", "yellow", [
+            {"label": "no data", "label_color": "yellow", **ai.logo("claude")},
+            {"label": "no data", "label_color": "yellow", **ai.logo("codex")}]))
+        _, _, parts = ai.label({"codex": quota(30)})
+        self.assertEqual(parts[-1]["label"], "no data")
+        ai.PILL = [("claude", "5h")]
+        self.assertEqual(ai.label({}), ("no data", "yellow", []))
+
+    def test_missing_notice_names_the_last_read_and_the_sign_in(self):
+        entry = {"usage": {"claude": {"at": ai.NOW - 3 * 86400, "outputs": []}}}
+        notice = ai.missing_notice(entry, "claude")
+        self.assertIn("since 3d ago", notice)
+        self.assertIn("sign in", notice)
+        self.assertEqual(ai.missing_notice({}, "copilot"), "tokscale reports no usage for Copilot.")
+
     def test_usage_read_at_falls_back_to_now_with_nothing_cached(self):
         self.assertEqual(ai.usage_read_at({}, ["claude"]), ai.NOW)
 

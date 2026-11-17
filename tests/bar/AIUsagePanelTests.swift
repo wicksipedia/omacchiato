@@ -39,7 +39,8 @@ import Testing
                         "severity": 2, "status": "Claude Code: Partial outage",
                         "incidents": [{"name": "Errors", "status": "identified",
                                        "at": "2026-09-28T01:02:03.456Z", "url": "https://x.test"}]},
-                       {"id": "codex-0", "name": "Codex", "color": "label", "metrics": []}],
+                       {"id": "codex-0", "name": "Codex", "color": "label", "metrics": [],
+                        "notice": "Signed out"}],
          "days": [{"date": "2026-09-28", "models": {"Opus 5.5": 30000000}, "cost": 11.2}],
          "models": [{"name": "Opus 5.5", "tokens": 30000000, "cost": 11.2}],
          "sessions": 3, "active_hours": 2, "updated": 1769000000}
@@ -50,6 +51,7 @@ import Testing
         #expect(report.providers[0].metrics[0].elapsed == 0.4)
         #expect(report.providers[0].incidents[0].at != nil)
         #expect(!report.providers[0].healthy && report.providers[1].healthy)
+        #expect(report.providers[0].notice == nil && report.providers[1].notice == "Signed out")
         #expect(report.weekTokens == 30_000_000)
         #expect(report.sessions == 3 && report.activeHours == 2)
         #expect(report.updated == Date(timeIntervalSince1970: 1769000000))

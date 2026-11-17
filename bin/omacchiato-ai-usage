@@ -39,9 +39,11 @@ MONTH = 30 * 24 * 3600
 # shades: the chart colours of the provider's models, busiest first.
 PROVIDERS = {
     "claude": {"page": "https://status.claude.com", "component": "Claude Code",
+               "sign_in": "If Claude Code signed you out, sign in to it again.",
                "span": WEEK, "glyph": "\uec82", "colour": "#D97757",
                "shades": ["#D97757", "#F2B08F", "#A8502F"]},
     "codex": {"page": "https://status.openai.com", "component": "Codex",
+              "sign_in": "If Codex signed you out, run codex login.",
               "span": WEEK, "glyph": "\uec81", "colour": "label",
               "shades": ["#10A37F", "#6FD1B0", "#0B6B54"]},
     "copilot": {"page": "https://www.githubstatus.com", "component": "Copilot",
@@ -169,6 +171,17 @@ def usage_read_at(entry, pids):
     ats = [seen[pid]["at"] for pid in pids
            if pid in seen and NOW - seen[pid]["at"] < FRESH_S + SERVE_STALE_S]
     return min(ats) if ats else NOW
+
+
+def missing_notice(entry, pid):
+    """Why a provider shows no usage. tokscale reads each tool's own sign-in,
+    so a tool that signed the user out goes quiet with no error."""
+    name = pid.capitalize()
+    at = ((entry.get("usage") or {}).get(pid) or {}).get("at")
+    text = ("tokscale has read no usage for %s since %s ago." % (name, whole(NOW - at)) if at
+            else "tokscale reports no usage for %s." % name)
+    hint = (PROVIDERS.get(pid) or {}).get("sign_in")
+    return text + (" " + hint if hint else "")
 
 
 def pick(metrics, want, fallback=True):
@@ -433,7 +446,7 @@ def panel_health(pid, state):
             "status_page": (PROVIDERS.get(pid) or {}).get("page")}
 
 
-def panel(quotas, states, stats, updated):
+def panel(quotas, states, stats, updated, notices=None):
     """The data of the bar's SwiftUI panel. Keep in sync with
     AIUsageReport(json:) in helper/ui/Sources/AIUsagePanel."""
     providers = []
@@ -448,6 +461,7 @@ def panel(quotas, states, stats, updated):
                 # a plan the account does not carry reports a limit of zero
                 "metrics": [panel_metric(pid, m) for m in output.get("metrics") or []
                             if not str(m.get("remaining_label") or "").startswith("0/0")],
+                **({"notice": (notices or {}).get(pid)} if not quotas.get(pid) else {}),
                 **(panel_health(pid, states.get(pid)) if not n else {})})
     out = {"kind": "ai-usage", "providers": providers, "updated": updated}
     if stats:
@@ -520,11 +534,11 @@ def logo(pid):
     return {"icon": brand["glyph"], "icon_color": brand["colour"]} if brand else {}
 
 
-def provider_rows(pid, outputs, state, first=False):
+def provider_rows(pid, outputs, state, first=False, notice=None):
     if not outputs:
         return ([{"text": pid.capitalize(), "hero": True, "section": "closed", **logo(pid)}]
                 + health_rows(pid, state)
-                + [{"text": "No data for %s" % pid, "dim": True}])
+                + [{"text": notice or "No data for %s" % pid, "dim": True}])
     rows = []
     for n, output in enumerate(outputs):
         plan = " · ".join(filter(None, [output.get("plan"), (output.get("account") or {}).get("label")]))
@@ -559,18 +573,23 @@ def label(quotas):
         strict = want in ("5h", "weekly")
         picked.append(pick(active(outputs).get("metrics") or [], want, not strict) if outputs else None)
     found = [m for m in picked if m]
+    # A provider with no usage at all says so, or the pill vanishes with no reason.
+    silent = [{"label": "no data", "label_color": "yellow", **logo(pid)}
+              for pid, _ in PILL if not quotas.get(pid)]
+    if len(PILL) == 1 and silent:
+        return "no data", "yellow", []
     if not found:
-        return "--", "muted", []
+        return ("", "yellow", silent) if silent else ("--", "muted", [])
     # a provider the user has not touched in this window says nothing
     shown = [(pid, m, round(m.get("used_percent") or 0))
              for (pid, _), m in zip(PILL, picked) if m and round(m.get("used_percent") or 0)]
     if not shown:
-        return "", "muted", []
+        return ("", "yellow", silent) if silent else ("", "muted", [])
     worst = colour_for(max(m.get("used_percent") or 0 for _, m, _ in shown))
     if len(PILL) > 1:
         # one icon cannot name several providers, so each percent gets its logo
         return "", worst, [p for pid, m, pct in shown
-                           for p in [{"label": "%d%%" % pct, **logo(pid)}] + reset_part(m)]
+                           for p in [{"label": "%d%%" % pct, **logo(pid)}] + reset_part(m)] + silent
     return "%d%%" % shown[0][2], worst, reset_part(shown[0][1])
 
 
@@ -609,15 +628,18 @@ def main():
     quotas = usage(entry, tokscale)
     states = {pid: health(entry, pid) for pid in dict.fromkeys(PANEL + [pid for pid, _ in PILL])}
 
+    notices = {pid: missing_notice(entry, pid) for pid in states if tokscale and not quotas.get(pid)}
+
     # nothing to report: the pill takes no space
-    if not any(quotas.get(pid) or health_rows(pid, state) for pid, state in states.items()):
+    if not any(quotas.get(pid) or health_rows(pid, state) or notices.get(pid)
+               for pid, state in states.items()):
         print(json.dumps({"label": ""}))
         return
 
     rows = []
     for pid in PANEL:
         rows += ([{"separator": True}] if rows else []) + provider_rows(
-            pid, quotas.get(pid), states[pid], first=pid == PANEL[0])
+            pid, quotas.get(pid), states[pid], first=pid == PANEL[0], notice=notices.get(pid))
 
     text, colour, parts = label(quotas)
     payload = {"label": text, "color": colour, "rows": rows}
@@ -632,7 +654,7 @@ def main():
         if stats:
             payload["rows"] += stats_rows(stats)
         payload["rows"] += [{"separator": True, "section": "end"}, tokens_row(tokscale)]
-    payload["panel"] = panel(quotas, states, stats, usage_read_at(entry, PANEL))
+    payload["panel"] = panel(quotas, states, stats, usage_read_at(entry, PANEL), notices)
     if tokscale:
         payload["panel"]["report"] = tokscale
     print(json.dumps(payload))
